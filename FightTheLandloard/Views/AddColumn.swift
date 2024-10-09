@@ -51,7 +51,7 @@ struct AddColumn: View {
                             }
                             .frame(height: height)
                             VStack{
-                                Toggle(isOn: $viewModel.adouble) {
+                                Toggle(isOn: $viewModel.setting.adouble) {
                                     Label("", systemImage: "flag.fill")
                                 }
                                 .toggleStyle(.button)
@@ -74,7 +74,7 @@ struct AddColumn: View {
                             }
                             .frame(height: height)
                             VStack{
-                                Toggle(isOn: $viewModel.bdouble) {
+                                Toggle(isOn: $viewModel.setting.bdouble) {
                                     Label("", systemImage: "flag.fill")
                                 }
                                 .toggleStyle(.button)
@@ -97,7 +97,7 @@ struct AddColumn: View {
                             }
                             .frame(height: height)
                             VStack{
-                                Toggle(isOn: $viewModel.cdouble) {
+                                Toggle(isOn: $viewModel.setting.cdouble) {
                                     Label("", systemImage: "flag.fill")
                                 }
                                 .toggleStyle(.button)
@@ -159,30 +159,14 @@ struct AddColumn: View {
                 .padding(.leading, 20)
                 .padding(.trailing, 20)
                 Spacer()
-                Button {
+                PrimaryButton(title: "添加", onPressed: {
                     if (viewModel.add()){
                         let prev: Instance = list.last ?? Instance(A: 0, B: 0, C: 0)
-                        list.append(Instance(A: viewModel.a+prev.A, B: viewModel.b+prev.B, C: viewModel.c+prev.C))
+                        list.append(Instance(A: viewModel.setting.A+prev.A, B: viewModel.setting.B+prev.B, C: viewModel.setting.C+prev.C))
                         
                         showingNewItemView = false
                     }
-                } label: {
-                    
-                    ZStack{
-                        Image("primary_btn")
-                            .resizable()
-                            .scaledToFill()
-                            .padding(.horizontal, 40)
-                            .frame(width: .screenWidth, height: 48)
-                        
-                        Text("Save")
-                            .font(.customfont(.semibold, fontSize: 14))
-                            .padding(.horizontal, 20)
-                    }
-                    .padding(.bottom, .bottomInsets + 20)
-                }
-                .foregroundColor(.white)
-                .shadow(color: .secondaryC.opacity(0.3), radius: 5, y: 3)
+                })
             }
             .navigationTitle("新一局")
             .alert(isPresented: $viewModel.showAlert) {

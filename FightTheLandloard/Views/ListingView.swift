@@ -7,7 +7,7 @@
 
 import SwiftUI
 
-struct ContentView: View {
+struct ListingView: View {
     @StateObject var viewModel: ListingViewModel = ListingViewModel()
     var height: CGFloat = 10
     var width: CGFloat = 120
@@ -72,5 +72,5 @@ struct ContentView: View {
 }
 
 #Preview {
-    ContentView()
+    ListingView()
 }
