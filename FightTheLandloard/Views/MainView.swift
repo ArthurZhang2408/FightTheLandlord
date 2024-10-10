@@ -8,8 +8,12 @@
 import SwiftUI
 
 struct MainView: View {
+    @EnvironmentObject var instance: DataSingleton
     var body: some View {
-        accountView
+        switch instance.page{
+        case "welcome": WelcomeView().environmentObject(DataSingleton.instance)
+        default: accountView
+        }
     }
     
     @ViewBuilder

@@ -16,7 +16,7 @@ struct FightTheLandloardApp: App {
     
     var body: some Scene {
         WindowGroup {
-            MainView()
+            MainView().environmentObject(DataSingleton.instance)
         }
     }
 }
