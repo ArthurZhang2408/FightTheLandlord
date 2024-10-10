@@ -9,6 +9,8 @@ import SwiftUI
 
 struct ListingView: View {
     @StateObject var viewModel: ListingViewModel = ListingViewModel()
+    @State var showConfirm: Bool = false
+    @EnvironmentObject var instance: DataSingleton
     var height: CGFloat = 10
     var width: CGFloat = 120
     var body: some View {
@@ -50,7 +52,7 @@ struct ListingView: View {
                 }
             }
             .padding()
-            .navigationTitle("斗地主计分牌")
+            .navigationTitle("今日第\(instance.gameNum)局")
             .toolbar{
                 Button {
                     viewModel.showingNewItemView = true
@@ -58,7 +60,8 @@ struct ListingView: View {
                     Image(systemName: "plus")
                 }
                 Button {
-                    viewModel.list = []
+//                    viewModel.list = []
+                    showConfirm.toggle()
                 } label: {
                     Image(systemName: "circle")
                 }
@@ -66,6 +69,20 @@ struct ListingView: View {
             .sheet(isPresented: $viewModel.showingNewItemView)
             {
                 AddColumn( showingNewItemView: $viewModel.showingNewItemView, list: $viewModel.list, A: viewModel.A, B: viewModel.B, C: viewModel.C )
+            }.confirmationDialog("确定", isPresented: $showConfirm) {
+                Button {
+                    viewModel.list = []
+                    viewModel.instance.page = "welcome"
+                } label: {
+                    Label("确定结束牌局吗？",
+                    systemImage: "questionmark.circle")
+                }
+            }
+            .alert(isPresented: $viewModel.showAlert) {
+                Alert(
+                    title: Text("错误"),
+                    message: Text("没有可以继续的游戏，已开始新的牌局")
+                )
             }
         }
     }

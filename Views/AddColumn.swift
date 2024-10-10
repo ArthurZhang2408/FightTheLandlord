@@ -171,7 +171,7 @@ struct AddColumn: View {
             .navigationTitle("新一局")
             .alert(isPresented: $viewModel.showAlert) {
                 Alert(
-                    title: Text("Error"),
+                    title: Text("错误"),
                     message: Text(viewModel.errorMessage)
                 )
             }

@@ -9,6 +9,7 @@ import SwiftUI
 
 struct WelcomeView: View {
     @State var start: Bool = false
+    @EnvironmentObject var instance: DataSingleton
     
     var body: some View {
         ZStack{
@@ -16,19 +17,27 @@ struct WelcomeView: View {
             
             VStack{
                 Text("斗地主计分牌")
-                    .font(.customfont(.regular, fontSize: 30))
-                    .foregroundColor(.black)
+                    .font(.customfont(.bold, fontSize: 50))
+                    .foregroundColor(.white)
                     .padding(.top, .topInsets + 30)
                 
                 Spacer()
-                PrimaryButton(title: "开始", onPressed: {
-                    start.toggle()
+                SecondaryButton(title: "继续", onPressed: {
+                    instance.page = "main"
                 })
-                .background( NavigationLink(destination: MainView(), isActive: $start, label: {EmptyView()}))
+                .padding(.bottom, 15)
+                
+                PrimaryButton(title: "开始", onPressed: {
+                    instance.page = "main"
+                    instance.gameNum += 1
+                })
                 .padding(.bottom, .bottomInsets)
             }
-            .navigationTitle("斗地主计分牌")
         }
+        .navigationTitle("斗地主计分牌")
+        .navigationBarHidden(true)
+        .navigationBarBackButtonHidden(true)
+        .background(Color.grayC)
     }
 }
 
