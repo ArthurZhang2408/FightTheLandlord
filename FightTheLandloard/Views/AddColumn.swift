@@ -161,8 +161,8 @@ struct AddColumn: View {
                 Spacer()
                 PrimaryButton(title: "添加", onPressed: {
                     if (viewModel.add()){
-                        let prev: Instance = list.last ?? Instance(A: 0, B: 0, C: 0)
-                        list.append(Instance(A: viewModel.setting.A+prev.A, B: viewModel.setting.B+prev.B, C: viewModel.setting.C+prev.C))
+                        let prev: Instance = list.last ?? Instance(A: 0, B: 0, C: 0, aC: .white, bC: .white, cC: .white)
+                        list.append(Instance(A: viewModel.setting.A+prev.A, B: viewModel.setting.B+prev.B, C: viewModel.setting.C+prev.C, aC: viewModel.aC, bC: viewModel.bC, cC: viewModel.cC))
                         
                         showingNewItemView = false
                     }

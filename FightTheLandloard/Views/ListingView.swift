@@ -43,10 +43,13 @@ struct ListingView: View {
                     HStack {
                         Text(inst.A.description)
                             .frame(width: width)
+                            .foregroundColor(inst.aC)
                         Text(inst.B.description)
                             .frame(width: width)
+                            .foregroundColor(inst.bC)
                         Text(inst.C.description)
                             .frame(width: width)
+                            .foregroundColor(inst.cC)
                     }
                     .frame(width: width * 3)
                 }

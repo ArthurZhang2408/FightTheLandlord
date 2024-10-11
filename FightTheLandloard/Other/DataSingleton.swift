@@ -14,6 +14,7 @@ class DataSingleton: ObservableObject {
     static let instance: DataSingleton = DataSingleton()
     @Published var page: String = "welcome"
     @Published var gameNum: Int = 0
+    @Published var games: [GameSetting] = []
     
     private init() {
         

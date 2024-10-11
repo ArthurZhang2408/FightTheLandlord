@@ -6,6 +6,7 @@
 //
 
 import Foundation
+import SwiftUI
 
 extension Int {
     var point: String {
@@ -40,6 +41,9 @@ class AddColumnViewModel: ObservableObject {
     let results: [String] = ["赢了", "输了"]
     @Published var basepoint: Int = 100
     @Published var setting: GameSetting
+    @Published var aC: Color = .white
+    @Published var bC: Color = .white
+    @Published var cC: Color = .white
     
     init(setting: GameSetting = GameSetting()) {
         self.setting = setting
@@ -149,8 +153,12 @@ class AddColumnViewModel: ObservableObject {
             if landlordResult == "赢了" {
                 b *= -1
                 c *= -1
+                aC = .green
             }
-            else {a *= -1}
+            else {
+                a *= -1
+                aC = .red
+            }
         case 2:
             if setting.bdouble {
                 basepoint *= 2
@@ -161,8 +169,12 @@ class AddColumnViewModel: ObservableObject {
             if landlordResult == "赢了" {
                 a *= -1
                 c *= -1
+                bC = .green
             }
-            else {b *= -1}
+            else {
+                b *= -1
+                bC = .red
+            }
         default:
             if setting.cdouble {
                 basepoint *= 2
@@ -173,8 +185,12 @@ class AddColumnViewModel: ObservableObject {
             if landlordResult == "赢了" {
                 b *= -1
                 a *= -1
+                cC = .green
             }
-            else {c *= -1}
+            else {
+                c *= -1
+                cC = .red
+            }
         }
         setting.bombs = Int(bombs) ?? 0
         setting.apoint = apoint.point
