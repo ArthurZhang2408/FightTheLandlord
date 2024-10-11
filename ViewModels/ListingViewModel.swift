@@ -30,7 +30,7 @@ class ListingViewModel: ObservableObject {
         }
     }
     
-    public func add (A: Int, B: Int, C: Int) {
-        list.append(Instance(A: A, B: B, C: C))
-    }
+//    public func add (A: Int, B: Int, C: Int) {
+//        list.append(Instance(A: A, B: B, C: C))
+//    }
 }

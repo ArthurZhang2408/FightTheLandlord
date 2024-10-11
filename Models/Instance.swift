@@ -6,10 +6,14 @@
 //
 
 import Foundation
+import SwiftUI
 
-struct Instance: Codable, Identifiable {
+struct Instance: Identifiable {
     var id: String = UUID().uuidString
     let A: Int
     let B: Int
     let C: Int
+    let aC: Color
+    let bC: Color
+    let cC: Color
 }
