@@ -23,13 +23,12 @@ struct WelcomeView: View {
                 
                 Spacer()
                 SecondaryButton(title: "继续", onPressed: {
-                    instance.page = "main"
+                    instance.continueGame()
                 })
                 .padding(.bottom, 15)
                 
                 PrimaryButton(title: "开始", onPressed: {
-                    instance.page = "main"
-                    instance.gameNum += 1
+                    instance.newGame()
                 })
                 .padding(.bottom, .bottomInsets)
             }
