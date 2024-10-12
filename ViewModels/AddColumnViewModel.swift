@@ -17,6 +17,13 @@ extension Int {
         default: return "不叫"
         }
     }
+    
+    var bombs: String {
+        switch self {
+        case 0: return ""
+        default: return self.description
+        }
+    }
 }
 
 extension String {
@@ -39,23 +46,22 @@ class AddColumnViewModel: ObservableObject {
     @Published var errorMessage: String = ""
     @Published var landlordResult: String = "赢了"
     let results: [String] = ["赢了", "输了"]
-    @Published var basepoint: Int = 100
+    var basepoint: Int = 100
     @Published var setting: GameSetting
     @Published var aC: Color = .white
     @Published var bC: Color = .white
     @Published var cC: Color = .white
+    var gameIdx: Int
     var instance: DataSingleton = DataSingleton.instance
     
-    init() {
-        self.setting = GameSetting()
-    }
-    
     init(idx: Int) {
-        setting = instance.games[idx]
-        bombs = setting.bombs.description
+        gameIdx = idx
+        setting = gameIdx == -1 ? GameSetting() : instance.games[gameIdx]
+        bombs = setting.bombs.bombs
         apoint = setting.apoint.point
         bpoint = setting.bpoint.point
         cpoint = setting.cpoint.point
+        landlordResult = setting.landlordResult ? "赢了" : "输了"
     }
     
     @Published var points: [String] = ["不叫", "1分", "2分", "3分"]
@@ -147,6 +153,9 @@ class AddColumnViewModel: ObservableObject {
         let xrate: Int = Int(bombs) ?? 0
         basepoint <<= xrate
         var a: Int, b: Int, c: Int
+        setting.aC = "white"
+        setting.bC = "white"
+        setting.cC = "white"
         switch setting.landlord {
         case 1:
             if setting.adouble {
@@ -208,9 +217,9 @@ class AddColumnViewModel: ObservableObject {
         setting.bpoint = bpoint.point
         setting.cpoint = cpoint.point
         setting.landlordResult = landlordResult=="赢了"
-        var prevA = setting.A
-        var prevB = setting.B
-        var prevC = setting.C
+        let prevA = setting.A
+        let prevB = setting.B
+        let prevC = setting.C
         setting.A = a
         setting.B = b
         setting.C = c
@@ -219,6 +228,8 @@ class AddColumnViewModel: ObservableObject {
         instance.cRe += c - prevC
         if (prevA == 0) {
             instance.games.append(setting)
+        } else {
+            instance.games[gameIdx] = setting
         }
         return true
     }

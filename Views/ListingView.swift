@@ -9,8 +9,8 @@ import SwiftUI
 
 struct ListingView: View {
     @StateObject var viewModel: ListingViewModel = ListingViewModel()
-    @State var showConfirm: Bool = false
     @EnvironmentObject var instance: DataSingleton
+    @State var gameIdx: Int = -1
     var height: CGFloat = 10
     var width: CGFloat = 90
     var body: some View {
@@ -55,6 +55,15 @@ struct ListingView: View {
                                 .foregroundColor(viewModel.instance.games[idx].cC.color)
                         }
                         .frame(width: width * 4)
+                        .swipeActions(allowsFullSwipe: false) {
+                            Button {
+                                gameIdx = idx
+                                viewModel.showingNewItemView = true
+                            } label: {
+                                Label("Mute", systemImage: "bell.slash.fill")
+                            }
+                            .tint(.indigo)
+                        }
                     }
                     HStack {
                         Text("总分: ")
@@ -75,19 +84,20 @@ struct ListingView: View {
             .toolbar{
                 Button {
                     viewModel.showingNewItemView = true
+                    gameIdx = -1
                 } label: {
                     Image(systemName: "plus")
                 }
                 Button {
-                    showConfirm.toggle()
+                    viewModel.showConfirm.toggle()
                 } label: {
                     Image(systemName: "circle")
                 }
             }
             .sheet(isPresented: $viewModel.showingNewItemView)
             {
-                AddColumn( showingNewItemView: $viewModel.showingNewItemView )
-            }.confirmationDialog("确定", isPresented: $showConfirm) {
+                AddColumn( showingNewItemView: $viewModel.showingNewItemView, viewModel: AddColumnViewModel(idx: gameIdx) )
+            }.confirmationDialog("确定", isPresented: $viewModel.showConfirm) {
                 Button {
                     viewModel.instance.page = "welcome"
                 } label: {

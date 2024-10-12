@@ -9,7 +9,7 @@ import SwiftUI
 
 struct AddColumn: View {
     @Binding var showingNewItemView: Bool
-    @StateObject var viewModel: AddColumnViewModel = AddColumnViewModel()
+    @StateObject var viewModel: AddColumnViewModel = AddColumnViewModel(idx: -1)
     var height: CGFloat = 40
     var width: CGFloat = 80
     var body: some View {
@@ -161,7 +161,7 @@ struct AddColumn: View {
                     }
                 })
             }
-            .navigationTitle("新一局")
+            .navigationTitle(viewModel.gameIdx == -1 ? "新一局" : "修改第\(viewModel.gameIdx+1)局")
             .alert(isPresented: $viewModel.showAlert) {
                 Alert(
                     title: Text("错误"),
