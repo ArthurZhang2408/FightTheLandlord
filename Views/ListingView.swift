@@ -12,7 +12,7 @@ struct ListingView: View {
     @State var showConfirm: Bool = false
     @EnvironmentObject var instance: DataSingleton
     var height: CGFloat = 10
-    var width: CGFloat = 120
+    var width: CGFloat = 90
     var body: some View {
         NavigationView {
             VStack {
@@ -39,20 +39,36 @@ struct ListingView: View {
                                 .stroke(Color.gray70, lineWidth: 1)
                         }
                 }
-                List(viewModel.list) { inst in
-                    HStack {
-                        Text(inst.A.description)
-                            .frame(width: width)
-                            .foregroundColor(inst.aC)
-                        Text(inst.B.description)
-                            .frame(width: width)
-                            .foregroundColor(inst.bC)
-                        Text(inst.C.description)
-                            .frame(width: width)
-                            .foregroundColor(inst.cC)
+                List {
+                    ForEach(viewModel.instance.games.indices, id: \.self) {idx in
+                        HStack {
+                            Text("\(idx+1): ")
+                                .frame(width: width)
+                            Text(viewModel.instance.games[idx].A.description)
+                                .frame(width: width)
+                                .foregroundColor(viewModel.instance.games[idx].aC.color)
+                            Text(viewModel.instance.games[idx].B.description)
+                                .frame(width: width)
+                                .foregroundColor(viewModel.instance.games[idx].bC.color)
+                            Text(viewModel.instance.games[idx].C.description)
+                                .frame(width: width)
+                                .foregroundColor(viewModel.instance.games[idx].cC.color)
+                        }
+                        .frame(width: width * 4)
                     }
-                    .frame(width: width * 3)
+                    HStack {
+                        Text("总分: ")
+                            .frame(width: width)
+                        Text(viewModel.instance.aRe.description)
+                            .frame(width: width)
+                        Text(viewModel.instance.bRe.description)
+                            .frame(width: width)
+                        Text(viewModel.instance.cRe.description)
+                            .frame(width: width)
+                    }
+                    .frame(width: width * 4)
                 }
+                .frame(width: .screenWidth)
             }
             .padding()
             .navigationTitle("今日第\(instance.gameNum)局")
@@ -63,7 +79,8 @@ struct ListingView: View {
                     Image(systemName: "plus")
                 }
                 Button {
-//                    viewModel.list = []
+                    viewModel.instance.games = []
+                    viewModel.instance.updateResult()
                     showConfirm.toggle()
                 } label: {
                     Image(systemName: "circle")
@@ -71,10 +88,9 @@ struct ListingView: View {
             }
             .sheet(isPresented: $viewModel.showingNewItemView)
             {
-                AddColumn( showingNewItemView: $viewModel.showingNewItemView, list: $viewModel.list, A: viewModel.A, B: viewModel.B, C: viewModel.C )
+                AddColumn( showingNewItemView: $viewModel.showingNewItemView, A: viewModel.A, B: viewModel.B, C: viewModel.C )
             }.confirmationDialog("确定", isPresented: $showConfirm) {
                 Button {
-                    viewModel.list = []
                     viewModel.instance.page = "welcome"
                 } label: {
                     Label("确定结束牌局吗？",
@@ -92,5 +108,5 @@ struct ListingView: View {
 }
 
 #Preview {
-    ListingView()
+    ListingView().environmentObject(DataSingleton.instance)
 }

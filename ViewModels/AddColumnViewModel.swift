@@ -44,10 +44,15 @@ class AddColumnViewModel: ObservableObject {
     @Published var aC: Color = .white
     @Published var bC: Color = .white
     @Published var cC: Color = .white
+    var instance: DataSingleton = DataSingleton.instance
     
-    init(setting: GameSetting = GameSetting()) {
-        self.setting = setting
-        bombs = setting.bombs == 0 ? "":setting.bombs.description
+    init() {
+        self.setting = GameSetting()
+    }
+    
+    init(idx: Int) {
+        setting = instance.games[idx]
+        bombs = setting.bombs.description
         apoint = setting.apoint.point
         bpoint = setting.bpoint.point
         cpoint = setting.cpoint.point
@@ -154,10 +159,12 @@ class AddColumnViewModel: ObservableObject {
                 b *= -1
                 c *= -1
                 aC = .green
+                setting.aC = "green"
             }
             else {
                 a *= -1
                 aC = .red
+                setting.aC = "red"
             }
         case 2:
             if setting.bdouble {
@@ -170,10 +177,12 @@ class AddColumnViewModel: ObservableObject {
                 a *= -1
                 c *= -1
                 bC = .green
+                setting.bC = "green"
             }
             else {
                 b *= -1
                 bC = .red
+                setting.bC = "red"
             }
         default:
             if setting.cdouble {
@@ -186,10 +195,12 @@ class AddColumnViewModel: ObservableObject {
                 b *= -1
                 a *= -1
                 cC = .green
+                setting.cC = "green"
             }
             else {
                 c *= -1
                 cC = .red
+                setting.cC = "red"
             }
         }
         setting.bombs = Int(bombs) ?? 0
@@ -197,9 +208,18 @@ class AddColumnViewModel: ObservableObject {
         setting.bpoint = bpoint.point
         setting.cpoint = cpoint.point
         setting.landlordResult = landlordResult=="赢了"
+        var prevA = setting.A
+        var prevB = setting.B
+        var prevC = setting.C
         setting.A = a
         setting.B = b
         setting.C = c
+        instance.aRe += a - prevA
+        instance.bRe += b - prevB
+        instance.cRe += c - prevC
+        if (prevA == 0) {
+            instance.games.append(setting)
+        }
         return true
     }
     
