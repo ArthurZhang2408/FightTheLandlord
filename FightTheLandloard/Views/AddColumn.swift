@@ -9,7 +9,6 @@ import SwiftUI
 
 struct AddColumn: View {
     @Binding var showingNewItemView: Bool
-    @Binding var list: [Instance]
     @StateObject var viewModel: AddColumnViewModel = AddColumnViewModel()
     var height: CGFloat = 40
     var width: CGFloat = 80
@@ -161,9 +160,6 @@ struct AddColumn: View {
                 Spacer()
                 PrimaryButton(title: "添加", onPressed: {
                     if (viewModel.add()){
-                        let prev: Instance = list.last ?? Instance(A: 0, B: 0, C: 0, aC: .white, bC: .white, cC: .white)
-                        list.append(Instance(A: viewModel.setting.A+prev.A, B: viewModel.setting.B+prev.B, C: viewModel.setting.C+prev.C, aC: viewModel.aC, bC: viewModel.bC, cC: viewModel.cC))
-                        
                         showingNewItemView = false
                     }
                 })
@@ -181,5 +177,5 @@ struct AddColumn: View {
 }
 
 #Preview {
-    AddColumn(showingNewItemView: Binding(get: {return true}, set: { _ in}), list: Binding(get: {return []}, set: { _ in}), A: "1", B: "2", C: "3")
+    AddColumn(showingNewItemView: Binding(get: {return true}, set: { _ in}), A: "1", B: "2", C: "3")
 }

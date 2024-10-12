@@ -8,7 +8,6 @@
 import Foundation
 
 class ListingViewModel: ObservableObject {
-    @Published var list: [Instance] = []
     @Published var showingNewItemView: Bool = false
     @Published var showAlert: Bool = false
     @Published var A: String = ""
@@ -29,8 +28,4 @@ class ListingViewModel: ObservableObject {
             }
         }
     }
-    
-//    public func add (A: Int, B: Int, C: Int) {
-//        list.append(Instance(A: A, B: B, C: C))
-//    }
 }

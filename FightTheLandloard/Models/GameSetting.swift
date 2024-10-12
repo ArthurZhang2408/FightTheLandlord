@@ -21,4 +21,7 @@ struct GameSetting: Codable, Identifiable {
     var A: Int = 0
     var B: Int = 0
     var C: Int = 0
+    var aC: String = "white"
+    var bC: String = "white"
+    var cC: String = "white"
 }

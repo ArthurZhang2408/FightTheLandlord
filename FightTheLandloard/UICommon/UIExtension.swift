@@ -22,6 +22,16 @@ extension Font {
     
 }
 
+extension String {
+    var color: Color {
+        switch self {
+        case "green": return .green
+        case "red": return .red
+        default: return .white
+        }
+    }
+}
+
 extension CGFloat {
     
     static var screenWidth: Double {
