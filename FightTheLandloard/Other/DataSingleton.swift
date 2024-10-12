@@ -18,9 +18,27 @@ class DataSingleton: ObservableObject {
     @Published var aRe: Int = 0
     @Published var bRe: Int = 0
     @Published var cRe: Int = 0
+    @Published var room: RoomSetting
+    @Published var listingShowAlert: Bool = false
     
     private init() {
-        
+        room = RoomSetting(id: 1)
+    }
+    
+    public func newGame () {
+        page = "main"
+        gameNum += 1
+        room = RoomSetting(id: gameNum)
+        games = []
+        updateResult()
+    }
+    
+    public func continueGame () {
+        if gameNum == 0 {
+            listingShowAlert = true
+            gameNum = 1
+        }
+        page = "main"
     }
     
     public func add (game: GameSetting) {
@@ -31,7 +49,7 @@ class DataSingleton: ObservableObject {
     }
     
     public func change(game: GameSetting, idx: Int) {
-        var prev = games[idx]
+        let prev = games[idx]
         aRe += game.A - prev.A
         bRe += game.B - prev.B
         cRe += game.C - prev.C

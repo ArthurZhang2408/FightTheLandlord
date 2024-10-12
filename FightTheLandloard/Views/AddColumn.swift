@@ -12,9 +12,6 @@ struct AddColumn: View {
     @StateObject var viewModel: AddColumnViewModel = AddColumnViewModel()
     var height: CGFloat = 40
     var width: CGFloat = 80
-    var A: String
-    var B: String
-    var C: String
     var body: some View {
         NavigationView {
             VStack {
@@ -37,7 +34,7 @@ struct AddColumn: View {
                         .frame(width: width)
                         VStack (spacing: 20) {
                             VStack{
-                                Text(A)
+                                Text(viewModel.instance.room.aName)
                             }
                             .frame(height: height)
                             VStack{
@@ -60,7 +57,7 @@ struct AddColumn: View {
                         .frame(width: width)
                         VStack (spacing: 20) {
                             VStack{
-                                Text(B)
+                                Text(viewModel.instance.room.bName)
                             }
                             .frame(height: height)
                             VStack{
@@ -83,7 +80,7 @@ struct AddColumn: View {
                         .frame(width: width)
                         VStack (spacing: 20) {
                             VStack{
-                                Text(C)
+                                Text(viewModel.instance.room.cName)
                             }
                             .frame(height: height)
                             VStack{
@@ -177,5 +174,5 @@ struct AddColumn: View {
 }
 
 #Preview {
-    AddColumn(showingNewItemView: Binding(get: {return true}, set: { _ in}), A: "1", B: "2", C: "3")
+    AddColumn(showingNewItemView: Binding(get: {return true}, set: { _ in}))
 }
