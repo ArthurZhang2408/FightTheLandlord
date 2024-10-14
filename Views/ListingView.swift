@@ -10,7 +10,6 @@ import SwiftUI
 struct ListingView: View {
     @StateObject var viewModel: ListingViewModel = ListingViewModel()
     @EnvironmentObject var instance: DataSingleton
-    @State var gameIdx: Int = -1
     var height: CGFloat = 10
     var width: CGFloat = 90
     var body: some View {
@@ -57,12 +56,18 @@ struct ListingView: View {
                         .frame(width: width * 4)
                         .swipeActions(allowsFullSwipe: false) {
                             Button {
-                                gameIdx = idx
+                                viewModel.gameIdx = idx
                                 viewModel.showingNewItemView = true
                             } label: {
                                 Label("Mute", systemImage: "bell.slash.fill")
                             }
                             .tint(.indigo)
+                            Button {
+                                viewModel.deleteIdx = idx
+                                viewModel.deletingItem = true
+                            } label: {
+                                Label("Delete", systemImage: "trash.fill")
+                            }
                         }
                     }
                     HStack {
@@ -83,8 +88,8 @@ struct ListingView: View {
             .navigationTitle("今日第\(viewModel.instance.gameNum)局")
             .toolbar{
                 Button {
+                    viewModel.gameIdx = -1
                     viewModel.showingNewItemView = true
-                    gameIdx = -1
                 } label: {
                     Image(systemName: "plus")
                 }
@@ -96,12 +101,21 @@ struct ListingView: View {
             }
             .sheet(isPresented: $viewModel.showingNewItemView)
             {
-                AddColumn( showingNewItemView: $viewModel.showingNewItemView, viewModel: AddColumnViewModel(idx: gameIdx) )
-            }.confirmationDialog("确定", isPresented: $viewModel.showConfirm) {
+                AddColumn( showingNewItemView: $viewModel.showingNewItemView, viewModel: AddColumnViewModel(idx: viewModel.gameIdx) )
+            }
+            .confirmationDialog("确定", isPresented: $viewModel.showConfirm) {
                 Button {
                     viewModel.instance.page = "welcome"
                 } label: {
                     Label("确定结束牌局吗？",
+                    systemImage: "questionmark.circle")
+                }
+            }
+            .confirmationDialog("确定", isPresented: $viewModel.deletingItem) {
+                Button {
+                    viewModel.instance.delete(idx: viewModel.deleteIdx)
+                } label: {
+                    Label("确定删除第\(viewModel.deleteIdx+1)局吗？",
                     systemImage: "questionmark.circle")
                 }
             }

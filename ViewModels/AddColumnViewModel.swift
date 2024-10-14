@@ -217,19 +217,13 @@ class AddColumnViewModel: ObservableObject {
         setting.bpoint = bpoint.point
         setting.cpoint = cpoint.point
         setting.landlordResult = landlordResult=="赢了"
-        let prevA = setting.A
-        let prevB = setting.B
-        let prevC = setting.C
         setting.A = a
         setting.B = b
         setting.C = c
-        instance.aRe += a - prevA
-        instance.bRe += b - prevB
-        instance.cRe += c - prevC
-        if (prevA == 0) {
-            instance.games.append(setting)
+        if gameIdx == -1 {
+            instance.add(game: setting)
         } else {
-            instance.games[gameIdx] = setting
+            instance.change(game: setting, idx: gameIdx)
         }
         return true
     }
