@@ -10,7 +10,9 @@ import Foundation
 class ListingViewModel: ObservableObject {
     @Published var showingNewItemView: Bool = false
     @Published var showConfirm: Bool = false
-    @Published var gS: Int = -1
+    @Published var gameIdx: Int = -1
+    @Published var deletingItem: Bool = false
+    @Published var deleteIdx: Int = -1
     var instance: DataSingleton = DataSingleton.instance
     
     init() {

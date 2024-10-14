@@ -41,7 +41,7 @@ class DataSingleton: ObservableObject {
         page = "main"
     }
     
-    public func add (game: GameSetting) {
+    public func add(game: GameSetting) {
         games.append(game)
         aRe += game.A
         bRe += game.B
@@ -54,6 +54,13 @@ class DataSingleton: ObservableObject {
         bRe += game.B - prev.B
         cRe += game.C - prev.C
         games[idx] = game
+    }
+    
+    public func delete(idx: Int) {
+        aRe -= games[idx].A
+        bRe -= games[idx].B
+        cRe -= games[idx].C
+        games.remove(at: idx)
     }
     
     public func updateResult() {
