@@ -25,8 +25,8 @@ extension Font {
 extension String {
     var color: Color {
         switch self {
-        case "green": return .green
-        case "red": return .red
+        case "green": return DataSingleton.instance.greenWin ? .green : .red
+        case "red": return DataSingleton.instance.greenWin ? .red : .green
         default: return .white
         }
     }
