@@ -20,6 +20,7 @@ class DataSingleton: ObservableObject {
     @Published var cRe: Int = 0
     @Published var room: RoomSetting
     @Published var listingShowAlert: Bool = false
+    @Published var greenWin: Bool = true
     
     private init() {
         room = RoomSetting(id: 1)

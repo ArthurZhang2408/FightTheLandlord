@@ -69,6 +69,8 @@ struct ListingView: View {
                                 Label("Delete", systemImage: "trash.fill")
                             }
                         }
+                    }.onMove { from, to in
+                        viewModel.instance.games.move(fromOffsets: from, toOffset: to)
                     }
                     HStack {
                         Text("总分: ")
@@ -88,8 +90,14 @@ struct ListingView: View {
             .navigationTitle("今日第\(viewModel.instance.gameNum)局")
             .toolbar{
                 Button {
+                    
+                } label: {
+                    Image(systemName: "gear")
+                }
+                Button {
                     viewModel.gameIdx = -1
                     viewModel.showingNewItemView = true
+                    viewModel.instance.greenWin.toggle()
                 } label: {
                     Image(systemName: "plus")
                 }

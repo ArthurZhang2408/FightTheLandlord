@@ -152,8 +152,6 @@ struct AddColumn: View {
                     }
                 }
                 .padding(.top, .topInsets + 20)
-                .padding(.leading, 20)
-                .padding(.trailing, 20)
                 Spacer()
                 PrimaryButton(title: "添加", onPressed: {
                     if (viewModel.add()){
