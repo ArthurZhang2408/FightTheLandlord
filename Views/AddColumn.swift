@@ -11,32 +11,20 @@ struct AddColumn: View {
     @Binding var showingNewItemView: Bool
     @StateObject var viewModel: AddColumnViewModel = AddColumnViewModel(idx: -1)
     var height: CGFloat = 40
-    var width: CGFloat = 80
+    var width: CGFloat = .screenWidth/3.5
+    var leadingPad: CGFloat = 13
     var body: some View {
         NavigationView {
             VStack {
                 VStack (alignment: .center) {
                     HStack {
-                        VStack (spacing: 20) {
-                            VStack{
-                                Text("名字：")
-                            }
-                            .frame(height: height)
-                            VStack{
-                                Text("叫分：")
-                            }
-                            .frame(height: height)
-                            VStack{
-                                Text("加倍：")
-                            }
-                            .frame(height: height)
-                        }
-                        .frame(width: width)
-                        VStack (spacing: 20) {
+                        VStack (alignment: .leading, spacing: 20) {
                             VStack{
                                 Text(viewModel.instance.room.aName)
+//                                Text("A")
                             }
                             .frame(height: height)
+                            .padding(.leading, leadingPad)
                             VStack{
                                 Picker(selection: $viewModel.apoint) {
                                     ForEach(viewModel.points, id: \.self) { curr in
@@ -48,18 +36,20 @@ struct AddColumn: View {
                             .frame(height: height)
                             VStack{
                                 Toggle(isOn: $viewModel.setting.adouble) {
-                                    Label("", systemImage: "flag.fill")
+                                    Text("加倍")
                                 }
                                 .toggleStyle(.button)
                             }
                             .frame(height: height)
                         }
                         .frame(width: width)
-                        VStack (spacing: 20) {
+                        VStack (alignment: .leading, spacing: 20) {
                             VStack{
                                 Text(viewModel.instance.room.bName)
+//                                Text("A")
                             }
                             .frame(height: height)
+                            .padding(.leading, leadingPad)
                             VStack{
                                 Picker(selection: $viewModel.bpoint) {
                                     ForEach(viewModel.points, id: \.self) { curr in
@@ -71,18 +61,20 @@ struct AddColumn: View {
                             .frame(height: height)
                             VStack{
                                 Toggle(isOn: $viewModel.setting.bdouble) {
-                                    Label("", systemImage: "flag.fill")
+                                    Text("加倍")
                                 }
                                 .toggleStyle(.button)
                             }
                             .frame(height: height)
                         }
                         .frame(width: width)
-                        VStack (spacing: 20) {
+                        VStack (alignment: .leading, spacing: 20) {
                             VStack{
                                 Text(viewModel.instance.room.cName)
+//                                Text("A")
                             }
                             .frame(height: height)
+                            .padding(.leading, leadingPad)
                             VStack{
                                 Picker(selection: $viewModel.cpoint) {
                                     ForEach(viewModel.points, id: \.self) { curr in
@@ -94,7 +86,7 @@ struct AddColumn: View {
                             .frame(height: height)
                             VStack{
                                 Toggle(isOn: $viewModel.setting.cdouble) {
-                                    Label("", systemImage: "flag.fill")
+                                    Text("加倍")
                                 }
                                 .toggleStyle(.button)
                             }
@@ -102,53 +94,38 @@ struct AddColumn: View {
                         }
                         .frame(width: width)
                     }
-                    .padding(.bottom, 10)
+                    .padding(.bottom, 30)
                     HStack {
-                        VStack (spacing: 20){
+                        VStack (spacing: 40){
                             VStack{
-                                Text("炸弹：")
+//                                TextField("", text: $viewModel.bombs)
+//                                    .autocorrectionDisabled()
+//                                    .autocapitalization(.none)
+//                                    .keyboardType(.decimalPad)
+//                                    .frame(height: 8)
+//                                    .padding(15)
+//                                    .overlay {
+//                                        RoundedRectangle(cornerRadius:  15)
+//                                            .stroke(Color.gray70, lineWidth: 1)
+//                                    }
+//                                    .foregroundColor(.white)
+//                                    .background(Color.gray60.opacity(0.05))
+//                                    .cornerRadius(15)
+                                RoundTextField(title: "炸弹", text: $viewModel.bombs, height: 35)
                             }
-                            .frame(height: height)
-                            .frame(width: width)
-                            
-                            VStack{
-                                Text("地主：")
-                            }
-                            .frame(height: height)
-                            .frame(width: width)
-                        }
-                        //                    .padding(.trailing, 60)
-                        VStack (spacing: 20){
-                            VStack{
-                                TextField("", text: $viewModel.bombs)
-                                    .autocorrectionDisabled()
-                                    .autocapitalization(/*@START_MENU_TOKEN@*/.none/*@END_MENU_TOKEN@*/)
-                                    .keyboardType(.decimalPad)
-                                    .frame(height: 8)
-                                    .padding(15)
-                                    .overlay {
-                                        RoundedRectangle(cornerRadius:  15)
-                                            .stroke(Color.gray70, lineWidth: 1)
-                                    }
-                                    .foregroundColor(.white)
-                                    .background(Color.gray60.opacity(0.05))
-                                    .cornerRadius(15)
-                            }
-                            .frame(width: 240)
                             .frame(height: height)
                             VStack{
                                 
-                                Picker("landlord", selection: $viewModel.landlordResult) {
+                                Picker("landlord", selection: $viewModel.setting.landlordResult) {
                                     ForEach(viewModel.results, id: \.self) { result in
-                                        Text(result)
+                                        Text(result).tag(result == "地主赢了")
                                     }
                                 }
                                 .pickerStyle(.segmented)
                             }
-                            .frame(width: 240)
                             .frame(height: height)
                         }
-                        .padding(.trailing, 14)
+                        .padding(.horizontal, 50)
                     }
                 }
                 .padding(.top, .topInsets + 20)

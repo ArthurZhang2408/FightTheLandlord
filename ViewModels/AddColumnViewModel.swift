@@ -44,8 +44,7 @@ class AddColumnViewModel: ObservableObject {
     @Published var cpoint: String = "不叫"
     @Published var showAlert: Bool = false
     @Published var errorMessage: String = ""
-    @Published var landlordResult: String = "赢了"
-    let results: [String] = ["赢了", "输了"]
+    let results: [String] = ["地主赢了", "地主输了"]
     var basepoint: Int = 100
     @Published var setting: GameSetting
     @Published var aC: Color = .white
@@ -61,7 +60,6 @@ class AddColumnViewModel: ObservableObject {
         apoint = setting.apoint.point
         bpoint = setting.bpoint.point
         cpoint = setting.cpoint.point
-        landlordResult = setting.landlordResult ? "赢了" : "输了"
     }
     
     @Published var points: [String] = ["不叫", "1分", "2分", "3分"]
@@ -164,7 +162,7 @@ class AddColumnViewModel: ObservableObject {
             b = (setting.bdouble) ? basepoint*2 : basepoint
             c = (setting.cdouble) ? basepoint*2 : basepoint
             a = b + c
-            if landlordResult == "赢了" {
+            if setting.landlordResult {
                 b *= -1
                 c *= -1
                 aC = .green
@@ -182,7 +180,7 @@ class AddColumnViewModel: ObservableObject {
             a = (setting.adouble) ? basepoint*2 : basepoint
             c = (setting.cdouble) ? basepoint*2 : basepoint
             b = a + c
-            if landlordResult == "赢了" {
+            if setting.landlordResult {
                 a *= -1
                 c *= -1
                 bC = .green
@@ -200,7 +198,7 @@ class AddColumnViewModel: ObservableObject {
             b = (setting.bdouble) ? basepoint*2 : basepoint
             a = (setting.adouble) ? basepoint*2 : basepoint
             c = b + a
-            if landlordResult == "赢了" {
+            if setting.landlordResult {
                 b *= -1
                 a *= -1
                 cC = .green
@@ -216,7 +214,6 @@ class AddColumnViewModel: ObservableObject {
         setting.apoint = apoint.point
         setting.bpoint = bpoint.point
         setting.cpoint = cpoint.point
-        setting.landlordResult = landlordResult=="赢了"
         setting.A = a
         setting.B = b
         setting.C = c

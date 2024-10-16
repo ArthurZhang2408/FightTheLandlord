@@ -21,6 +21,8 @@ class DataSingleton: ObservableObject {
     @Published var room: RoomSetting
     @Published var listingShowAlert: Bool = false
     @Published var greenWin: Bool = true
+    @Published var scorePerGame: Bool = true
+    @Published var scores: [ScoreTriple] = []
     
     private init() {
         room = RoomSetting(id: 1)
@@ -31,6 +33,7 @@ class DataSingleton: ObservableObject {
         gameNum += 1
         room = RoomSetting(id: gameNum)
         games = []
+        scores = []
         updateResult()
     }
     
@@ -47,6 +50,7 @@ class DataSingleton: ObservableObject {
         aRe += game.A
         bRe += game.B
         cRe += game.C
+        scores.append(ScoreTriple(A: aRe, B: bRe, C: cRe))
     }
     
     public func change(game: GameSetting, idx: Int) {
@@ -55,6 +59,7 @@ class DataSingleton: ObservableObject {
         bRe += game.B - prev.B
         cRe += game.C - prev.C
         games[idx] = game
+        updateScore(from: idx)
     }
     
     public func delete(idx: Int) {
@@ -62,6 +67,8 @@ class DataSingleton: ObservableObject {
         bRe -= games[idx].B
         cRe -= games[idx].C
         games.remove(at: idx)
+        scores.removeLast()
+        updateScore(from: idx)
     }
     
     public func updateResult() {
@@ -72,6 +79,18 @@ class DataSingleton: ObservableObject {
             aRe += game.A
             bRe += game.B
             cRe += game.C
+        }
+    }
+    
+    public func updateScore(from: Int) {
+        if from >= scores.endIndex {
+            return
+        }
+        scores[from].update(prev: from==0 ? ScoreTriple() : scores[from-1], game: games[from])
+        if from < scores.endIndex-1 {
+            for i in (from+1)...(scores.endIndex-1) {
+                scores[i].update(prev: scores[i-1], game: games[i])
+            }
         }
     }
 }

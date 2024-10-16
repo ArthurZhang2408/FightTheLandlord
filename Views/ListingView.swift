@@ -43,13 +43,13 @@ struct ListingView: View {
                         HStack {
                             Text("\(idx+1): ")
                                 .frame(width: width)
-                            Text(viewModel.instance.games[idx].A.description)
+                            Text((viewModel.instance.scorePerGame ? viewModel.instance.games[idx].A : viewModel.instance.scores[idx].A).description)
                                 .frame(width: width)
                                 .foregroundColor(viewModel.instance.games[idx].aC.color)
-                            Text(viewModel.instance.games[idx].B.description)
+                            Text((viewModel.instance.scorePerGame ? viewModel.instance.games[idx].B : viewModel.instance.scores[idx].B).description)
                                 .frame(width: width)
                                 .foregroundColor(viewModel.instance.games[idx].bC.color)
-                            Text(viewModel.instance.games[idx].C.description)
+                            Text((viewModel.instance.scorePerGame ? viewModel.instance.games[idx].C : viewModel.instance.scores[idx].C).description)
                                 .frame(width: width)
                                 .foregroundColor(viewModel.instance.games[idx].cC.color)
                         }
@@ -71,18 +71,21 @@ struct ListingView: View {
                         }
                     }.onMove { from, to in
                         viewModel.instance.games.move(fromOffsets: from, toOffset: to)
+                        viewModel.instance.updateScore(from: min(from.first ?? 0, to))
                     }
-                    HStack {
-                        Text("总分: ")
-                            .frame(width: width)
-                        Text(viewModel.instance.aRe.description)
-                            .frame(width: width)
-                        Text(viewModel.instance.bRe.description)
-                            .frame(width: width)
-                        Text(viewModel.instance.cRe.description)
-                            .frame(width: width)
+                    if viewModel.instance.scorePerGame {
+                        HStack {
+                            Text("总分: ")
+                                .frame(width: width)
+                            Text(viewModel.instance.aRe.description)
+                                .frame(width: width)
+                            Text(viewModel.instance.bRe.description)
+                                .frame(width: width)
+                            Text(viewModel.instance.cRe.description)
+                                .frame(width: width)
+                        }
+                        .frame(width: width * 4)
                     }
-                    .frame(width: width * 4)
                 }
                 .frame(width: .screenWidth)
             }
@@ -90,14 +93,13 @@ struct ListingView: View {
             .navigationTitle("今日第\(viewModel.instance.gameNum)局")
             .toolbar{
                 Button {
-                    
+                    viewModel.showingSettingView = true
                 } label: {
                     Image(systemName: "gear")
                 }
                 Button {
                     viewModel.gameIdx = -1
                     viewModel.showingNewItemView = true
-                    viewModel.instance.greenWin.toggle()
                 } label: {
                     Image(systemName: "plus")
                 }
@@ -110,6 +112,10 @@ struct ListingView: View {
             .sheet(isPresented: $viewModel.showingNewItemView)
             {
                 AddColumn( showingNewItemView: $viewModel.showingNewItemView, viewModel: AddColumnViewModel(idx: viewModel.gameIdx) )
+            }
+            .sheet(isPresented: $viewModel.showingSettingView)
+            {
+                SettingView().environmentObject(DataSingleton.instance)
             }
             .confirmationDialog("确定", isPresented: $viewModel.showConfirm) {
                 Button {
