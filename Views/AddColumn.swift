@@ -111,7 +111,7 @@ struct AddColumn: View {
 //                                    .foregroundColor(.white)
 //                                    .background(Color.gray60.opacity(0.05))
 //                                    .cornerRadius(15)
-                                RoundTextField(title: "炸弹", text: $viewModel.bombs, height: 35)
+                                RoundTextField(title: "炸弹", text: $viewModel.bombs, keyboardType: .decimal, height: 35)
                             }
                             .frame(height: height)
                             VStack{
