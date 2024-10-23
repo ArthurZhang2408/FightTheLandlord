@@ -111,11 +111,11 @@ struct ListingView: View {
             }
             .sheet(isPresented: $viewModel.showingNewItemView)
             {
-                AddColumn( showingNewItemView: $viewModel.showingNewItemView, viewModel: AddColumnViewModel(idx: viewModel.gameIdx) )
+                AddColumn( showingNewItemView: $viewModel.showingNewItemView, viewModel: AddColumnViewModel(idx: viewModel.gameIdx), turn: (viewModel.gameIdx == -1) ? (viewModel.instance.games.count + viewModel.instance.room.starter) % 3 : -1 )
             }
             .sheet(isPresented: $viewModel.showingSettingView)
             {
-                SettingView().environmentObject(DataSingleton.instance)
+                SettingView(players: [viewModel.instance.room.aName, viewModel.instance.room.bName, viewModel.instance.room.cName]).environmentObject(DataSingleton.instance)
             }
             .confirmationDialog("确定", isPresented: $viewModel.showConfirm) {
                 Button {

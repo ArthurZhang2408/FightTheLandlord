@@ -13,6 +13,7 @@ struct AddColumn: View {
     var height: CGFloat = 40
     var width: CGFloat = .screenWidth/3.5
     var leadingPad: CGFloat = 13
+    let turn: Int
     var body: some View {
         NavigationView {
             VStack {
@@ -21,6 +22,7 @@ struct AddColumn: View {
                         VStack (alignment: .leading, spacing: 20) {
                             VStack{
                                 Text(viewModel.instance.room.aName)
+                                    .foregroundStyle((turn == 0) ? .blue : .white)
 //                                Text("A")
                             }
                             .frame(height: height)
@@ -46,6 +48,7 @@ struct AddColumn: View {
                         VStack (alignment: .leading, spacing: 20) {
                             VStack{
                                 Text(viewModel.instance.room.bName)
+                                    .foregroundStyle((turn == 1) ? .blue : .white)
 //                                Text("A")
                             }
                             .frame(height: height)
@@ -71,6 +74,7 @@ struct AddColumn: View {
                         VStack (alignment: .leading, spacing: 20) {
                             VStack{
                                 Text(viewModel.instance.room.cName)
+                                    .foregroundStyle((turn == 2) ? .blue : .white)
 //                                Text("A")
                             }
                             .frame(height: height)
@@ -149,5 +153,5 @@ struct AddColumn: View {
 }
 
 #Preview {
-    AddColumn(showingNewItemView: Binding(get: {return true}, set: { _ in}))
+    AddColumn(showingNewItemView: Binding(get: {return true}, set: { _ in}), turn: 0)
 }

@@ -12,4 +12,5 @@ struct RoomSetting: Codable, Identifiable {
     var aName: String = ""
     var bName: String = ""
     var cName: String = ""
+    var starter: Int = 0
 }
