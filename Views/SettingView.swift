@@ -12,6 +12,7 @@ struct SettingView: View {
     var width: CGFloat = 80
     let colors: [String] = ["绿色为赢", "红色为赢"]
     let layout: [String] = ["单局分数", "每局总分"]
+    let players: [String]
     @EnvironmentObject var instance: DataSingleton
     var body: some View {
         NavigationView {
@@ -31,6 +32,13 @@ struct SettingView: View {
                 }
                 .pickerStyle(.segmented)
                 
+                Picker("starter", selection: $instance.room.starter) {
+                    ForEach(players, id: \.self) { player in
+                        Text(player).tag(Int(players.firstIndex(of: player) ?? 0))
+                    }
+                }
+                .pickerStyle(.segmented)
+                
                 
                 Spacer()
             }
@@ -41,5 +49,5 @@ struct SettingView: View {
 }
 
 #Preview {
-    SettingView().environmentObject(DataSingleton.instance)
+    SettingView(players: ["a", "b", "c"]).environmentObject(DataSingleton.instance)
 }

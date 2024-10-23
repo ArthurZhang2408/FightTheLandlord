@@ -225,4 +225,11 @@ class AddColumnViewModel: ObservableObject {
         return true
     }
     
+    var colorA: Color {
+        if gameIdx == -1 && instance.games.count % 3 == 0 {
+            
+        }
+        return .white
+    }
+    
 }
