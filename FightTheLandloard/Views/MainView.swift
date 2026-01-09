@@ -20,9 +20,9 @@ struct MainView: View {
     var accountView: some View {
         TabView {
             ListingView()
-                .tabItem { Label("Home", systemImage: "house") }
+                .tabItem { Label("对局", systemImage: "house") }
             StatView()
-                .tabItem { Label("Stat", systemImage: "chart.bar") }
+                .tabItem { Label("统计", systemImage: "chart.bar") }
         }
     }
 }

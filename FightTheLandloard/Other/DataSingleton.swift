@@ -24,6 +24,14 @@ class DataSingleton: ObservableObject {
     @Published var scorePerGame: Bool = true
     @Published var scores: [ScoreTriple] = []
     
+    // Player tracking
+    @Published var playerA: Player?
+    @Published var playerB: Player?
+    @Published var playerC: Player?
+    @Published var currentMatchId: String?
+    @Published var isSavingMatch: Bool = false
+    @Published var saveMatchError: String?
+    
     private init() {
         room = RoomSetting(id: 1)
     }
@@ -34,6 +42,10 @@ class DataSingleton: ObservableObject {
         room = RoomSetting(id: gameNum)
         games = []
         scores = []
+        playerA = nil
+        playerB = nil
+        playerC = nil
+        currentMatchId = nil
         updateResult()
     }
     
@@ -90,6 +102,102 @@ class DataSingleton: ObservableObject {
         if from < scores.endIndex-1 {
             for i in (from+1)...(scores.endIndex-1) {
                 scores[i].update(prev: scores[i-1], game: games[i])
+            }
+        }
+    }
+    
+    // MARK: - Player Name Sync
+    
+    /// Update room player names when players are selected
+    public func syncPlayerNames() {
+        room.aName = playerA?.name ?? ""
+        room.bName = playerB?.name ?? ""
+        room.cName = playerC?.name ?? ""
+    }
+    
+    /// Check if all players are selected
+    public var allPlayersSelected: Bool {
+        return playerA != nil && playerB != nil && playerC != nil
+    }
+    
+    // MARK: - Match Saving
+    
+    /// End the current match and save to Firebase
+    public func endAndSaveMatch(completion: @escaping (Bool) -> Void) {
+        // If no players selected, just end without saving
+        guard let pA = playerA, let pAId = pA.id,
+              let pB = playerB, let pBId = pB.id,
+              let pC = playerC, let pCId = pC.id else {
+            completion(true)
+            return
+        }
+        
+        // Don't save if no games were played
+        guard !games.isEmpty else {
+            completion(true)
+            return
+        }
+        
+        isSavingMatch = true
+        saveMatchError = nil
+        
+        // Create match record
+        var match = MatchRecord(
+            playerAId: pAId,
+            playerBId: pBId,
+            playerCId: pCId,
+            playerAName: pA.name,
+            playerBName: pB.name,
+            playerCName: pC.name,
+            starter: room.starter
+        )
+        
+        // Finalize match with final stats
+        match.finalize(games: games, scores: scores)
+        
+        // Save match to Firebase
+        FirebaseService.shared.saveMatch(match) { [weak self] result in
+            guard let self = self else { return }
+            
+            switch result {
+            case .success(let matchId):
+                self.currentMatchId = matchId
+                
+                // Create game records
+                var gameRecords: [GameRecord] = []
+                for (index, game) in self.games.enumerated() {
+                    let firstBidder = (index + self.room.starter) % 3
+                    let record = GameRecord(
+                        matchId: matchId,
+                        gameIndex: index,
+                        playerAId: pAId,
+                        playerBId: pBId,
+                        playerCId: pCId,
+                        playerAName: pA.name,
+                        playerBName: pB.name,
+                        playerCName: pC.name,
+                        gameSetting: game,
+                        firstBidder: firstBidder
+                    )
+                    gameRecords.append(record)
+                }
+                
+                // Save game records
+                FirebaseService.shared.saveGameRecords(gameRecords, matchId: matchId) { [weak self] result in
+                    self?.isSavingMatch = false
+                    switch result {
+                    case .success:
+                        completion(true)
+                    case .failure(let error):
+                        self?.saveMatchError = error.localizedDescription
+                        completion(false)
+                    }
+                }
+                
+            case .failure(let error):
+                self.isSavingMatch = false
+                self.saveMatchError = error.localizedDescription
+                completion(false)
             }
         }
     }
