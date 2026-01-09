@@ -126,6 +126,17 @@ struct MatchDetailView: View {
     @State private var bRe: Int = 0
     @State private var cRe: Int = 0
     
+    // Display scores: use calculated scores if available, otherwise fall back to match's stored scores
+    private var displayScoreA: Int {
+        games.isEmpty ? match.finalScoreA : aRe
+    }
+    private var displayScoreB: Int {
+        games.isEmpty ? match.finalScoreB : bRe
+    }
+    private var displayScoreC: Int {
+        games.isEmpty ? match.finalScoreC : cRe
+    }
+    
     private var dateFormatter: DateFormatter {
         let formatter = DateFormatter()
         formatter.dateFormat = "yyyy-MM-dd HH:mm"
@@ -152,26 +163,26 @@ struct MatchDetailView: View {
                                 VStack {
                                     Text(match.playerAName)
                                         .font(.headline)
-                                    Text("\(aRe)")
+                                    Text("\(displayScoreA)")
                                         .font(.title2)
                                         .fontWeight(.bold)
-                                        .foregroundColor(aRe > 0 ? .green : (aRe < 0 ? .red : .white))
+                                        .foregroundColor(displayScoreA > 0 ? .green : (displayScoreA < 0 ? .red : .white))
                                 }
                                 VStack {
                                     Text(match.playerBName)
                                         .font(.headline)
-                                    Text("\(bRe)")
+                                    Text("\(displayScoreB)")
                                         .font(.title2)
                                         .fontWeight(.bold)
-                                        .foregroundColor(bRe > 0 ? .green : (bRe < 0 ? .red : .white))
+                                        .foregroundColor(displayScoreB > 0 ? .green : (displayScoreB < 0 ? .red : .white))
                                 }
                                 VStack {
                                     Text(match.playerCName)
                                         .font(.headline)
-                                    Text("\(cRe)")
+                                    Text("\(displayScoreC)")
                                         .font(.title2)
                                         .fontWeight(.bold)
-                                        .foregroundColor(cRe > 0 ? .green : (cRe < 0 ? .red : .white))
+                                        .foregroundColor(displayScoreC > 0 ? .green : (displayScoreC < 0 ? .red : .white))
                                 }
                             }
                         }
@@ -180,30 +191,35 @@ struct MatchDetailView: View {
                     }
                     
                     // Games section - same style as ListingView
-                    Section(header: Text("每局详情")) {
-                        ForEach(games.indices, id: \.self) { idx in
-                            HStack {
-                                Text("\(idx+1): ")
-                                    .frame(width: width)
-                                Text(games[idx].A.description)
-                                    .frame(width: width)
-                                    .foregroundColor(games[idx].aC.color)
-                                Text(games[idx].B.description)
-                                    .frame(width: width)
-                                    .foregroundColor(games[idx].bC.color)
-                                Text(games[idx].C.description)
-                                    .frame(width: width)
-                                    .foregroundColor(games[idx].cC.color)
-                            }
-                            .frame(width: width * 4)
-                            .swipeActions(allowsFullSwipe: false) {
-                                Button {
-                                    editingGameIndex = idx
-                                    showingEditSheet = true
-                                } label: {
-                                    Label("修改", systemImage: "pencil")
+                    Section(header: Text("每局详情 (\(games.count)局)")) {
+                        if games.isEmpty {
+                            Text("暂无详细记录")
+                                .foregroundColor(.gray50)
+                        } else {
+                            ForEach(games.indices, id: \.self) { idx in
+                                HStack {
+                                    Text("\(idx+1): ")
+                                        .frame(width: width)
+                                    Text(games[idx].A.description)
+                                        .frame(width: width)
+                                        .foregroundColor(games[idx].aC.color)
+                                    Text(games[idx].B.description)
+                                        .frame(width: width)
+                                        .foregroundColor(games[idx].bC.color)
+                                    Text(games[idx].C.description)
+                                        .frame(width: width)
+                                        .foregroundColor(games[idx].cC.color)
                                 }
-                                .tint(.indigo)
+                                .frame(width: width * 4)
+                                .swipeActions(allowsFullSwipe: false) {
+                                    Button {
+                                        editingGameIndex = idx
+                                        showingEditSheet = true
+                                    } label: {
+                                        Label("修改", systemImage: "pencil")
+                                    }
+                                    .tint(.indigo)
+                                }
                             }
                         }
                     }
