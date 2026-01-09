@@ -21,6 +21,8 @@ struct MainView: View {
         TabView {
             ListingView()
                 .tabItem { Label("对局", systemImage: "house") }
+            MatchHistoryView()
+                .tabItem { Label("历史", systemImage: "clock.arrow.circlepath") }
             StatView()
                 .tabItem { Label("统计", systemImage: "chart.bar") }
         }

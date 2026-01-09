@@ -41,9 +41,6 @@ struct StatView: View {
                                         .foregroundColor(.primary500)
                                     Text(player.name)
                                         .font(.headline)
-                                    Spacer()
-                                    Image(systemName: "chevron.right")
-                                        .foregroundColor(.gray50)
                                 }
                                 .padding(.vertical, 8)
                             }

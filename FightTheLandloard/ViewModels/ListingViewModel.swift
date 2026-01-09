@@ -25,7 +25,8 @@ class ListingViewModel: ObservableObject {
         instance.endAndSaveMatch { [weak self] success in
             self?.isSaving = false
             if success {
-                self?.instance.page = "welcome"
+                // Clear the current match and start a new one without going to welcome screen
+                self?.instance.startNewMatch()
             }
         }
     }
