@@ -116,6 +116,8 @@ struct MatchDetailView: View {
     @State private var isLoading = true
     @State private var showingEditSheet = false
     @State private var editingGameIndex: Int = -1
+    @State private var showingDeleteConfirm = false
+    @State private var deleteIdx: Int = -1
     
     // For editing - convert GameRecords to GameSettings
     @State private var games: [GameSetting] = []
@@ -134,87 +136,78 @@ struct MatchDetailView: View {
     
     var body: some View {
         VStack {
-            // Header with match info
-            VStack(spacing: 8) {
-                Text(dateFormatter.string(from: match.startedAt))
-                    .font(.subheadline)
-                    .foregroundColor(.gray40)
-                
-                HStack(spacing: 20) {
-                    VStack {
-                        Text(match.playerAName)
-                            .font(.headline)
-                        Text("\(match.finalScoreA)")
-                            .font(.title2)
-                            .fontWeight(.bold)
-                            .foregroundColor(match.finalScoreA > 0 ? .green : (match.finalScoreA < 0 ? .red : .white))
-                    }
-                    VStack {
-                        Text(match.playerBName)
-                            .font(.headline)
-                        Text("\(match.finalScoreB)")
-                            .font(.title2)
-                            .fontWeight(.bold)
-                            .foregroundColor(match.finalScoreB > 0 ? .green : (match.finalScoreB < 0 ? .red : .white))
-                    }
-                    VStack {
-                        Text(match.playerCName)
-                            .font(.headline)
-                        Text("\(match.finalScoreC)")
-                            .font(.title2)
-                            .fontWeight(.bold)
-                            .foregroundColor(match.finalScoreC > 0 ? .green : (match.finalScoreC < 0 ? .red : .white))
-                    }
-                }
-            }
-            .padding()
-            
             if isLoading {
                 ProgressView()
-                Spacer()
             } else {
-                // Game list - same style as ListingView
+                // All content in a single List for proper scrolling
                 List {
-                    ForEach(games.indices, id: \.self) { idx in
-                        HStack {
-                            Text("\(idx+1): ")
-                                .frame(width: width)
-                            Text(games[idx].A.description)
-                                .frame(width: width)
-                                .foregroundColor(games[idx].aC.color)
-                            Text(games[idx].B.description)
-                                .frame(width: width)
-                                .foregroundColor(games[idx].bC.color)
-                            Text(games[idx].C.description)
-                                .frame(width: width)
-                                .foregroundColor(games[idx].cC.color)
-                        }
-                        .frame(width: width * 4)
-                        .swipeActions(allowsFullSwipe: false) {
-                            Button {
-                                editingGameIndex = idx
-                                showingEditSheet = true
-                            } label: {
-                                Label("修改", systemImage: "pencil")
+                    // Header section
+                    Section {
+                        VStack(spacing: 8) {
+                            Text(dateFormatter.string(from: match.startedAt))
+                                .font(.subheadline)
+                                .foregroundColor(.gray40)
+                            
+                            HStack(spacing: 20) {
+                                VStack {
+                                    Text(match.playerAName)
+                                        .font(.headline)
+                                    Text("\(aRe)")
+                                        .font(.title2)
+                                        .fontWeight(.bold)
+                                        .foregroundColor(aRe > 0 ? .green : (aRe < 0 ? .red : .white))
+                                }
+                                VStack {
+                                    Text(match.playerBName)
+                                        .font(.headline)
+                                    Text("\(bRe)")
+                                        .font(.title2)
+                                        .fontWeight(.bold)
+                                        .foregroundColor(bRe > 0 ? .green : (bRe < 0 ? .red : .white))
+                                }
+                                VStack {
+                                    Text(match.playerCName)
+                                        .font(.headline)
+                                    Text("\(cRe)")
+                                        .font(.title2)
+                                        .fontWeight(.bold)
+                                        .foregroundColor(cRe > 0 ? .green : (cRe < 0 ? .red : .white))
+                                }
                             }
-                            .tint(.indigo)
                         }
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 8)
                     }
                     
-                    // Total row
-                    HStack {
-                        Text("总分: ")
-                            .frame(width: width)
-                        Text(aRe.description)
-                            .frame(width: width)
-                        Text(bRe.description)
-                            .frame(width: width)
-                        Text(cRe.description)
-                            .frame(width: width)
+                    // Games section - same style as ListingView
+                    Section(header: Text("每局详情")) {
+                        ForEach(games.indices, id: \.self) { idx in
+                            HStack {
+                                Text("\(idx+1): ")
+                                    .frame(width: width)
+                                Text(games[idx].A.description)
+                                    .frame(width: width)
+                                    .foregroundColor(games[idx].aC.color)
+                                Text(games[idx].B.description)
+                                    .frame(width: width)
+                                    .foregroundColor(games[idx].bC.color)
+                                Text(games[idx].C.description)
+                                    .frame(width: width)
+                                    .foregroundColor(games[idx].cC.color)
+                            }
+                            .frame(width: width * 4)
+                            .swipeActions(allowsFullSwipe: false) {
+                                Button {
+                                    editingGameIndex = idx
+                                    showingEditSheet = true
+                                } label: {
+                                    Label("修改", systemImage: "pencil")
+                                }
+                                .tint(.indigo)
+                            }
+                        }
                     }
-                    .frame(width: width * 4)
                 }
-                .frame(width: .screenWidth)
             }
         }
         .navigationTitle("对局详情")
