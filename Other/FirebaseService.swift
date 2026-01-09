@@ -13,10 +13,13 @@ class FirebaseService: ObservableObject {
     private let db = Firestore.firestore()
     
     @Published var players: [Player] = []
+    @Published var matches: [MatchRecord] = []
     @Published var isLoading: Bool = false
+    @Published var isLoadingMatches: Bool = false
     
     private init() {
         loadPlayers()
+        loadAllMatches()
     }
     
     // MARK: - Players
@@ -70,6 +73,115 @@ class FirebaseService: ObservableObject {
     }
     
     // MARK: - Matches (对局)
+    
+    func loadAllMatches() {
+        isLoadingMatches = true
+        db.collection("matches").order(by: "startedAt", descending: true).addSnapshotListener { [weak self] snapshot, error in
+            guard let self = self else { return }
+            self.isLoadingMatches = false
+            
+            if let error = error {
+                print("Error loading matches: \(error.localizedDescription)")
+                return
+            }
+            
+            guard let documents = snapshot?.documents else { return }
+            
+            self.matches = documents.compactMap { doc in
+                try? doc.data(as: MatchRecord.self)
+            }
+        }
+    }
+    
+    func loadGameRecords(forMatch matchId: String, completion: @escaping (Result<[GameRecord], Error>) -> Void) {
+        db.collection("gameRecords")
+            .whereField("matchId", isEqualTo: matchId)
+            .order(by: "gameIndex")
+            .getDocuments { snapshot, error in
+                if let error = error {
+                    completion(.failure(error))
+                    return
+                }
+                
+                let records = snapshot?.documents.compactMap { doc in
+                    try? doc.data(as: GameRecord.self)
+                } ?? []
+                
+                completion(.success(records))
+            }
+    }
+    
+    func deleteMatch(matchId: String, completion: @escaping (Result<Void, Error>) -> Void) {
+        // First delete all game records for this match
+        db.collection("gameRecords")
+            .whereField("matchId", isEqualTo: matchId)
+            .getDocuments { [weak self] snapshot, error in
+                guard let self = self else { return }
+                
+                if let error = error {
+                    completion(.failure(error))
+                    return
+                }
+                
+                let batch = self.db.batch()
+                
+                // Delete all game records
+                snapshot?.documents.forEach { doc in
+                    batch.deleteDocument(doc.reference)
+                }
+                
+                // Delete the match itself
+                batch.deleteDocument(self.db.collection("matches").document(matchId))
+                
+                batch.commit { error in
+                    if let error = error {
+                        completion(.failure(error))
+                    } else {
+                        completion(.success(()))
+                    }
+                }
+            }
+    }
+    
+    func updateGameRecords(_ records: [GameRecord], matchId: String, completion: @escaping (Result<Void, Error>) -> Void) {
+        // First delete all existing game records for this match
+        db.collection("gameRecords")
+            .whereField("matchId", isEqualTo: matchId)
+            .getDocuments { [weak self] snapshot, error in
+                guard let self = self else { return }
+                
+                if let error = error {
+                    completion(.failure(error))
+                    return
+                }
+                
+                let batch = self.db.batch()
+                
+                // Delete old records
+                snapshot?.documents.forEach { doc in
+                    batch.deleteDocument(doc.reference)
+                }
+                
+                // Add new records
+                for record in records {
+                    let ref = self.db.collection("gameRecords").document()
+                    do {
+                        try batch.setData(from: record, forDocument: ref)
+                    } catch {
+                        completion(.failure(error))
+                        return
+                    }
+                }
+                
+                batch.commit { error in
+                    if let error = error {
+                        completion(.failure(error))
+                    } else {
+                        completion(.success(()))
+                    }
+                }
+            }
+    }
     
     func saveMatch(_ match: MatchRecord, completion: @escaping (Result<String, Error>) -> Void) {
         do {

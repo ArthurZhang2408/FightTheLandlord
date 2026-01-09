@@ -49,6 +49,19 @@ class DataSingleton: ObservableObject {
         updateResult()
     }
     
+    /// Start a new match without changing page (stay on main view)
+    public func startNewMatch() {
+        gameNum += 1
+        room = RoomSetting(id: gameNum)
+        games = []
+        scores = []
+        playerA = nil
+        playerB = nil
+        playerC = nil
+        currentMatchId = nil
+        updateResult()
+    }
+    
     public func continueGame () {
         if gameNum == 0 {
             listingShowAlert = true
