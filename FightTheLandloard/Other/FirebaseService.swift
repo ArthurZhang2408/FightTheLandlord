@@ -125,9 +125,12 @@ class FirebaseService: ObservableObject {
                 completion(.failure(error))
             } else {
                 // Remove duplicates (in case player played in same match as different position)
-                let uniqueMatches = Array(Set(allMatches.compactMap { $0.id }.map { id in
-                    allMatches.first { $0.id == id }!
-                }))
+                var seenIds = Set<String>()
+                let uniqueMatches = allMatches.filter { match in
+                    guard let id = match.id, !seenIds.contains(id) else { return false }
+                    seenIds.insert(id)
+                    return true
+                }
                 completion(.success(uniqueMatches.sorted { ($0.startedAt) > ($1.startedAt) }))
             }
         }
@@ -273,6 +276,7 @@ class FirebaseService: ObservableObject {
                 }
                 
                 // Bid distribution when first bidder
+                // firstBidder uses 0-indexed (0=A, 1=B, 2=C), position uses 1-indexed (1=A, 2=B, 3=C)
                 if record.firstBidder == position - 1 {
                     stats.firstBidderGames += 1
                     let bid = self.getPlayerBid(position: position, record: record)

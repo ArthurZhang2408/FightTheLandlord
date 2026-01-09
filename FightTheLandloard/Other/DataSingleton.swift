@@ -166,6 +166,9 @@ class DataSingleton: ObservableObject {
                 // Create game records
                 var gameRecords: [GameRecord] = []
                 for (index, game) in self.games.enumerated() {
+                    // Calculate who was first bidder for this game
+                    // Uses 0-indexed: 0=A, 1=B, 2=C
+                    // Rotates based on initial starter and game index
                     let firstBidder = (index + self.room.starter) % 3
                     let record = GameRecord(
                         matchId: matchId,
