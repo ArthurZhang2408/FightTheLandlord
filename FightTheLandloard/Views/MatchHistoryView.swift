@@ -473,7 +473,11 @@ struct HistoryEditView: View {
         updatedMatch.finalize(games: games, scores: scores)
         
         // Update match
-        FirebaseService.shared.updateMatch(updatedMatch) { _ in }
+        FirebaseService.shared.updateMatch(updatedMatch) { result in
+            if case .failure(let error) = result {
+                print("Error updating match: \(error.localizedDescription)")
+            }
+        }
         
         // Create game records
         var gameRecords: [GameRecord] = []
@@ -495,7 +499,11 @@ struct HistoryEditView: View {
         }
         
         // Update game records
-        FirebaseService.shared.updateGameRecords(gameRecords, matchId: matchId) { _ in }
+        FirebaseService.shared.updateGameRecords(gameRecords, matchId: matchId) { result in
+            if case .failure(let error) = result {
+                print("Error updating game records: \(error.localizedDescription)")
+            }
+        }
     }
 }
 
