@@ -1,0 +1,374 @@
+//
+//  FirebaseService.swift
+//  FightTheLandloard
+//
+//  Created by Arthur Zhang on 2024-10-20.
+//
+
+import Foundation
+import FirebaseFirestore
+
+class FirebaseService: ObservableObject {
+    static let shared = FirebaseService()
+    private let db = Firestore.firestore()
+    
+    @Published var players: [Player] = []
+    @Published var isLoading: Bool = false
+    
+    private init() {
+        loadPlayers()
+    }
+    
+    // MARK: - Players
+    
+    func loadPlayers() {
+        isLoading = true
+        db.collection("players").order(by: "name").addSnapshotListener { [weak self] snapshot, error in
+            guard let self = self else { return }
+            self.isLoading = false
+            
+            if let error = error {
+                print("Error loading players: \(error.localizedDescription)")
+                return
+            }
+            
+            guard let documents = snapshot?.documents else { return }
+            
+            self.players = documents.compactMap { doc in
+                try? doc.data(as: Player.self)
+            }
+        }
+    }
+    
+    func addPlayer(name: String, completion: @escaping (Result<Player, Error>) -> Void) {
+        // Check for duplicate names
+        if players.contains(where: { $0.name == name }) {
+            completion(.failure(NSError(domain: "", code: -1, userInfo: [NSLocalizedDescriptionKey: "玩家名称已存在"])))
+            return
+        }
+        
+        let player = Player(name: name)
+        
+        do {
+            let ref = try db.collection("players").addDocument(from: player)
+            var newPlayer = player
+            newPlayer.id = ref.documentID
+            completion(.success(newPlayer))
+        } catch {
+            completion(.failure(error))
+        }
+    }
+    
+    func deletePlayer(id: String, completion: @escaping (Result<Void, Error>) -> Void) {
+        db.collection("players").document(id).delete { error in
+            if let error = error {
+                completion(.failure(error))
+            } else {
+                completion(.success(()))
+            }
+        }
+    }
+    
+    // MARK: - Matches (对局)
+    
+    func saveMatch(_ match: MatchRecord, completion: @escaping (Result<String, Error>) -> Void) {
+        do {
+            let ref = try db.collection("matches").addDocument(from: match)
+            completion(.success(ref.documentID))
+        } catch {
+            completion(.failure(error))
+        }
+    }
+    
+    func updateMatch(_ match: MatchRecord, completion: @escaping (Result<Void, Error>) -> Void) {
+        guard let matchId = match.id else {
+            completion(.failure(NSError(domain: "", code: -1, userInfo: [NSLocalizedDescriptionKey: "Match ID is missing"])))
+            return
+        }
+        
+        do {
+            try db.collection("matches").document(matchId).setData(from: match)
+            completion(.success(()))
+        } catch {
+            completion(.failure(error))
+        }
+    }
+    
+    func loadMatches(forPlayer playerId: String, completion: @escaping (Result<[MatchRecord], Error>) -> Void) {
+        // Query matches where this player participated (as A, B, or C)
+        let group = DispatchGroup()
+        var allMatches: [MatchRecord] = []
+        var queryError: Error?
+        
+        for field in ["playerAId", "playerBId", "playerCId"] {
+            group.enter()
+            db.collection("matches")
+                .whereField(field, isEqualTo: playerId)
+                .getDocuments { snapshot, error in
+                    defer { group.leave() }
+                    
+                    if let error = error {
+                        queryError = error
+                        return
+                    }
+                    
+                    let matches = snapshot?.documents.compactMap { doc in
+                        try? doc.data(as: MatchRecord.self)
+                    } ?? []
+                    
+                    allMatches.append(contentsOf: matches)
+                }
+        }
+        
+        group.notify(queue: .main) {
+            if let error = queryError {
+                completion(.failure(error))
+            } else {
+                // Remove duplicates (in case player played in same match as different position)
+                let uniqueMatches = Array(Set(allMatches.compactMap { $0.id }.map { id in
+                    allMatches.first { $0.id == id }!
+                }))
+                completion(.success(uniqueMatches.sorted { ($0.startedAt) > ($1.startedAt) }))
+            }
+        }
+    }
+    
+    // MARK: - Game Records
+    
+    func saveGameRecords(_ records: [GameRecord], matchId: String, completion: @escaping (Result<Void, Error>) -> Void) {
+        let batch = db.batch()
+        
+        for var record in records {
+            var recordWithMatchId = record
+            recordWithMatchId.matchId = matchId
+            
+            let ref = db.collection("gameRecords").document()
+            do {
+                try batch.setData(from: recordWithMatchId, forDocument: ref)
+            } catch {
+                completion(.failure(error))
+                return
+            }
+        }
+        
+        batch.commit { error in
+            if let error = error {
+                completion(.failure(error))
+            } else {
+                completion(.success(()))
+            }
+        }
+    }
+    
+    func loadGameRecords(forPlayer playerId: String, completion: @escaping (Result<[GameRecord], Error>) -> Void) {
+        let group = DispatchGroup()
+        var allRecords: [GameRecord] = []
+        var queryError: Error?
+        
+        for field in ["playerAId", "playerBId", "playerCId"] {
+            group.enter()
+            db.collection("gameRecords")
+                .whereField(field, isEqualTo: playerId)
+                .getDocuments { snapshot, error in
+                    defer { group.leave() }
+                    
+                    if let error = error {
+                        queryError = error
+                        return
+                    }
+                    
+                    let records = snapshot?.documents.compactMap { doc in
+                        try? doc.data(as: GameRecord.self)
+                    } ?? []
+                    
+                    allRecords.append(contentsOf: records)
+                }
+        }
+        
+        group.notify(queue: .main) {
+            if let error = queryError {
+                completion(.failure(error))
+            } else {
+                completion(.success(allRecords.sorted { $0.playedAt > $1.playedAt }))
+            }
+        }
+    }
+    
+    // MARK: - Statistics Calculation
+    
+    func calculateStatistics(forPlayer playerId: String, completion: @escaping (Result<PlayerStatistics, Error>) -> Void) {
+        guard let player = players.first(where: { $0.id == playerId }) else {
+            completion(.failure(NSError(domain: "", code: -1, userInfo: [NSLocalizedDescriptionKey: "Player not found"])))
+            return
+        }
+        
+        var stats = PlayerStatistics(playerId: playerId, playerName: player.name)
+        
+        let group = DispatchGroup()
+        var gameRecords: [GameRecord] = []
+        var matchRecords: [MatchRecord] = []
+        var loadError: Error?
+        
+        // Load game records
+        group.enter()
+        loadGameRecords(forPlayer: playerId) { result in
+            defer { group.leave() }
+            switch result {
+            case .success(let records):
+                gameRecords = records
+            case .failure(let error):
+                loadError = error
+            }
+        }
+        
+        // Load match records
+        group.enter()
+        loadMatches(forPlayer: playerId) { result in
+            defer { group.leave() }
+            switch result {
+            case .success(let matches):
+                matchRecords = matches
+            case .failure(let error):
+                loadError = error
+            }
+        }
+        
+        group.notify(queue: .main) {
+            if let error = loadError {
+                completion(.failure(error))
+                return
+            }
+            
+            // Calculate game statistics
+            stats.totalGames = gameRecords.count
+            
+            for record in gameRecords {
+                let position = self.getPlayerPosition(playerId: playerId, record: record)
+                let isLandlord = record.landlord == position
+                let score = self.getPlayerScore(position: position, record: record)
+                let won = score > 0
+                
+                // Win/Loss count
+                if won {
+                    stats.gamesWon += 1
+                } else if score < 0 {
+                    stats.gamesLost += 1
+                }
+                
+                // Role breakdown
+                if isLandlord {
+                    stats.gamesAsLandlord += 1
+                    if won {
+                        stats.landlordWins += 1
+                    } else {
+                        stats.landlordLosses += 1
+                    }
+                } else {
+                    stats.gamesAsFarmer += 1
+                    if won {
+                        stats.farmerWins += 1
+                    } else {
+                        stats.farmerLosses += 1
+                    }
+                }
+                
+                // Bid distribution when first bidder
+                if record.firstBidder == position - 1 {
+                    stats.firstBidderGames += 1
+                    let bid = self.getPlayerBid(position: position, record: record)
+                    switch bid {
+                    case 0: stats.bidZeroCount += 1
+                    case 1: stats.bidOneCount += 1
+                    case 2: stats.bidTwoCount += 1
+                    case 3: stats.bidThreeCount += 1
+                    default: break
+                    }
+                }
+                
+                // Score stats
+                stats.totalScore += score
+                stats.bestGameScore = max(stats.bestGameScore, score)
+                stats.worstGameScore = min(stats.worstGameScore, score)
+            }
+            
+            // Calculate match statistics
+            stats.totalMatches = matchRecords.count
+            
+            for match in matchRecords {
+                let position = self.getPlayerPositionInMatch(playerId: playerId, match: match)
+                let finalScore = self.getPlayerFinalScore(position: position, match: match)
+                let maxSnapshot = self.getPlayerMaxSnapshot(position: position, match: match)
+                let minSnapshot = self.getPlayerMinSnapshot(position: position, match: match)
+                
+                if finalScore > 0 {
+                    stats.matchesWon += 1
+                } else if finalScore < 0 {
+                    stats.matchesLost += 1
+                } else {
+                    stats.matchesTied += 1
+                }
+                
+                stats.bestMatchScore = max(stats.bestMatchScore, finalScore)
+                stats.worstMatchScore = min(stats.worstMatchScore, finalScore)
+                stats.bestSnapshot = max(stats.bestSnapshot, maxSnapshot)
+                stats.worstSnapshot = min(stats.worstSnapshot, minSnapshot)
+            }
+            
+            completion(.success(stats))
+        }
+    }
+    
+    // MARK: - Helper Methods
+    
+    private func getPlayerPosition(playerId: String, record: GameRecord) -> Int {
+        if record.playerAId == playerId { return 1 }
+        if record.playerBId == playerId { return 2 }
+        return 3
+    }
+    
+    private func getPlayerScore(position: Int, record: GameRecord) -> Int {
+        switch position {
+        case 1: return record.scoreA
+        case 2: return record.scoreB
+        default: return record.scoreC
+        }
+    }
+    
+    private func getPlayerBid(position: Int, record: GameRecord) -> Int {
+        switch position {
+        case 1: return record.apoint
+        case 2: return record.bpoint
+        default: return record.cpoint
+        }
+    }
+    
+    private func getPlayerPositionInMatch(playerId: String, match: MatchRecord) -> Int {
+        if match.playerAId == playerId { return 1 }
+        if match.playerBId == playerId { return 2 }
+        return 3
+    }
+    
+    private func getPlayerFinalScore(position: Int, match: MatchRecord) -> Int {
+        switch position {
+        case 1: return match.finalScoreA
+        case 2: return match.finalScoreB
+        default: return match.finalScoreC
+        }
+    }
+    
+    private func getPlayerMaxSnapshot(position: Int, match: MatchRecord) -> Int {
+        switch position {
+        case 1: return match.maxSnapshotA
+        case 2: return match.maxSnapshotB
+        default: return match.maxSnapshotC
+        }
+    }
+    
+    private func getPlayerMinSnapshot(position: Int, match: MatchRecord) -> Int {
+        switch position {
+        case 1: return match.minSnapshotA
+        case 2: return match.minSnapshotB
+        default: return match.minSnapshotC
+        }
+    }
+}
