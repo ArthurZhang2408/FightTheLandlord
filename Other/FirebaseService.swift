@@ -96,18 +96,24 @@ class FirebaseService: ObservableObject {
     func loadGameRecords(forMatch matchId: String, completion: @escaping (Result<[GameRecord], Error>) -> Void) {
         db.collection("gameRecords")
             .whereField("matchId", isEqualTo: matchId)
-            .order(by: "gameIndex")
             .getDocuments { snapshot, error in
-                if let error = error {
-                    completion(.failure(error))
-                    return
+                DispatchQueue.main.async {
+                    if let error = error {
+                        print("Error loading game records: \(error.localizedDescription)")
+                        completion(.failure(error))
+                        return
+                    }
+                    
+                    var records = snapshot?.documents.compactMap { doc in
+                        try? doc.data(as: GameRecord.self)
+                    } ?? []
+                    
+                    // Sort by gameIndex locally to avoid needing a composite index
+                    records.sort { $0.gameIndex < $1.gameIndex }
+                    
+                    print("Loaded \(records.count) game records for match \(matchId)")
+                    completion(.success(records))
                 }
-                
-                let records = snapshot?.documents.compactMap { doc in
-                    try? doc.data(as: GameRecord.self)
-                } ?? []
-                
-                completion(.success(records))
             }
     }
     
