@@ -198,6 +198,29 @@ class FirebaseService: ObservableObject {
         }
     }
     
+    func loadMatch(matchId: String, completion: @escaping (Result<MatchRecord, Error>) -> Void) {
+        db.collection("matches").document(matchId).getDocument { snapshot, error in
+            DispatchQueue.main.async {
+                if let error = error {
+                    completion(.failure(error))
+                    return
+                }
+                
+                guard let snapshot = snapshot, snapshot.exists else {
+                    completion(.failure(NSError(domain: "", code: -1, userInfo: [NSLocalizedDescriptionKey: "Match not found"])))
+                    return
+                }
+                
+                do {
+                    let match = try snapshot.data(as: MatchRecord.self)
+                    completion(.success(match))
+                } catch {
+                    completion(.failure(error))
+                }
+            }
+        }
+    }
+    
     func updateMatch(_ match: MatchRecord, completion: @escaping (Result<Void, Error>) -> Void) {
         guard let matchId = match.id else {
             completion(.failure(NSError(domain: "", code: -1, userInfo: [NSLocalizedDescriptionKey: "Match ID is missing"])))
@@ -360,20 +383,32 @@ class FirebaseService: ObservableObject {
                 return
             }
             
+            // Sort game records by date for streak calculation
+            let sortedGameRecords = gameRecords.sorted { $0.playedAt < $1.playedAt }
+            var currentWinStreak = 0
+            var currentLossStreak = 0
+            
             // Calculate game statistics
             stats.totalGames = gameRecords.count
             
-            for record in gameRecords {
+            for record in sortedGameRecords {
                 let position = self.getPlayerPosition(playerId: playerId, record: record)
                 let isLandlord = record.landlord == position
                 let score = self.getPlayerScore(position: position, record: record)
                 let won = score > 0
+                let doubled = self.getPlayerDoubled(position: position, record: record)
                 
-                // Win/Loss count
+                // Win/Loss count and streaks
                 if won {
                     stats.gamesWon += 1
+                    currentWinStreak += 1
+                    currentLossStreak = 0
+                    stats.maxWinStreak = max(stats.maxWinStreak, currentWinStreak)
                 } else if score < 0 {
                     stats.gamesLost += 1
+                    currentLossStreak += 1
+                    currentWinStreak = 0
+                    stats.maxLossStreak = max(stats.maxLossStreak, currentLossStreak)
                 }
                 
                 // Role breakdown
@@ -384,12 +419,30 @@ class FirebaseService: ObservableObject {
                     } else {
                         stats.landlordLosses += 1
                     }
+                    // Spring count (landlord wins with spring)
+                    if record.spring && record.landlordResult {
+                        stats.springCount += 1
+                    }
                 } else {
                     stats.gamesAsFarmer += 1
                     if won {
                         stats.farmerWins += 1
                     } else {
                         stats.farmerLosses += 1
+                    }
+                    // Spring against count (landlord wins with spring, player is farmer)
+                    if record.spring && record.landlordResult {
+                        stats.springAgainstCount += 1
+                    }
+                }
+                
+                // Doubled game statistics
+                if doubled {
+                    stats.doubledGames += 1
+                    if won {
+                        stats.doubledWins += 1
+                    } else {
+                        stats.doubledLosses += 1
                     }
                 }
                 
@@ -413,10 +466,19 @@ class FirebaseService: ObservableObject {
                 stats.worstGameScore = min(stats.worstGameScore, score)
             }
             
+            // Store current streaks
+            stats.currentWinStreak = currentWinStreak
+            stats.currentLossStreak = currentLossStreak
+            
+            // Sort matches by date for streak calculation
+            let sortedMatches = matchRecords.sorted { $0.startedAt < $1.startedAt }
+            var currentMatchWinStreak = 0
+            var currentMatchLossStreak = 0
+            
             // Calculate match statistics
             stats.totalMatches = matchRecords.count
             
-            for match in matchRecords {
+            for match in sortedMatches {
                 let position = self.getPlayerPositionInMatch(playerId: playerId, match: match)
                 let finalScore = self.getPlayerFinalScore(position: position, match: match)
                 let maxSnapshot = self.getPlayerMaxSnapshot(position: position, match: match)
@@ -424,8 +486,14 @@ class FirebaseService: ObservableObject {
                 
                 if finalScore > 0 {
                     stats.matchesWon += 1
+                    currentMatchWinStreak += 1
+                    currentMatchLossStreak = 0
+                    stats.maxMatchWinStreak = max(stats.maxMatchWinStreak, currentMatchWinStreak)
                 } else if finalScore < 0 {
                     stats.matchesLost += 1
+                    currentMatchLossStreak += 1
+                    currentMatchWinStreak = 0
+                    stats.maxMatchLossStreak = max(stats.maxMatchLossStreak, currentMatchLossStreak)
                 } else {
                     stats.matchesTied += 1
                 }
@@ -435,6 +503,10 @@ class FirebaseService: ObservableObject {
                 stats.bestSnapshot = max(stats.bestSnapshot, maxSnapshot)
                 stats.worstSnapshot = min(stats.worstSnapshot, minSnapshot)
             }
+            
+            // Store current match streaks
+            stats.currentMatchWinStreak = currentMatchWinStreak
+            stats.currentMatchLossStreak = currentMatchLossStreak
             
             completion(.success(stats))
         }
@@ -453,6 +525,14 @@ class FirebaseService: ObservableObject {
         case 1: return record.scoreA
         case 2: return record.scoreB
         default: return record.scoreC
+        }
+    }
+    
+    private func getPlayerDoubled(position: Int, record: GameRecord) -> Bool {
+        switch position {
+        case 1: return record.adouble
+        case 2: return record.bdouble
+        default: return record.cdouble
         }
     }
     

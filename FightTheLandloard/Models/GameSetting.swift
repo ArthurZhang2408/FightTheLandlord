@@ -16,6 +16,7 @@ struct GameSetting: Codable, Identifiable {
     var adouble: Bool = false
     var bdouble: Bool = false
     var cdouble: Bool = false
+    var spring: Bool = false         // 春天 - doubles the score
     var landlordResult: Bool = true
     var landlord: Int = 1
     var A: Int = 0

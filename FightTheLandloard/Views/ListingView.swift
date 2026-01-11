@@ -129,6 +129,11 @@ struct ListingView: View {
             {
                 SettingView(players: [viewModel.instance.room.aName, viewModel.instance.room.bName, viewModel.instance.room.cName]).environmentObject(DataSingleton.instance)
             }
+            .sheet(isPresented: $viewModel.showingMatchStats) {
+                if let matchId = viewModel.savedMatchId {
+                    MatchStatsView(matchId: matchId, isPresented: $viewModel.showingMatchStats)
+                }
+            }
             .confirmationDialog("确定", isPresented: $viewModel.showConfirm) {
                 Button {
                     viewModel.endMatch()
@@ -150,6 +155,15 @@ struct ListingView: View {
                     title: Text("错误"),
                     message: Text("没有可以继续的游戏，已开始新的牌局")
                 )
+            }
+            .disabled(viewModel.isSaving)
+            .overlay {
+                if viewModel.isSaving {
+                    ProgressView("保存中...")
+                        .padding()
+                        .background(Color.gray80.opacity(0.9))
+                        .cornerRadius(10)
+                }
             }
         }
     }

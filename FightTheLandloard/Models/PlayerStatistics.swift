@@ -47,6 +47,25 @@ struct PlayerStatistics {
     var bestSnapshot: Int = 0        // Highest cumulative score within any match
     var worstSnapshot: Int = 0       // Lowest cumulative score within any match
     
+    // Streak statistics
+    var currentWinStreak: Int = 0    // Current consecutive wins
+    var currentLossStreak: Int = 0   // Current consecutive losses
+    var maxWinStreak: Int = 0        // Maximum consecutive wins
+    var maxLossStreak: Int = 0       // Maximum consecutive losses
+    var currentMatchWinStreak: Int = 0  // Current consecutive match wins
+    var currentMatchLossStreak: Int = 0 // Current consecutive match losses
+    var maxMatchWinStreak: Int = 0   // Maximum consecutive match wins
+    var maxMatchLossStreak: Int = 0  // Maximum consecutive match losses
+    
+    // Spring (春天) statistics
+    var springCount: Int = 0         // Times player got spring as landlord
+    var springAgainstCount: Int = 0  // Times player was spring against as farmer
+    
+    // Doubled game statistics
+    var doubledGames: Int = 0        // Games where player doubled
+    var doubledWins: Int = 0         // Wins when player doubled
+    var doubledLosses: Int = 0       // Losses when player doubled
+    
     // Computed properties
     var winRate: Double {
         guard totalGames > 0 else { return 0 }
@@ -71,6 +90,11 @@ struct PlayerStatistics {
     var averageScorePerGame: Double {
         guard totalGames > 0 else { return 0 }
         return Double(totalScore) / Double(totalGames)
+    }
+    
+    var doubledWinRate: Double {
+        guard doubledGames > 0 else { return 0 }
+        return Double(doubledWins) / Double(doubledGames) * 100
     }
     
     init(playerId: String, playerName: String) {

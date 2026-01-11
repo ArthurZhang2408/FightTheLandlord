@@ -137,6 +137,12 @@ class DataSingleton: ObservableObject {
     
     /// End the current match and save to Firebase
     public func endAndSaveMatch(completion: @escaping (Bool) -> Void) {
+        // Prevent double-saving
+        guard !isSavingMatch else {
+            completion(false)
+            return
+        }
+        
         // If no players selected, just end without saving
         guard let pA = playerA, let pAId = pA.id,
               let pB = playerB, let pBId = pB.id,
@@ -200,20 +206,24 @@ class DataSingleton: ObservableObject {
                 
                 // Save game records
                 FirebaseService.shared.saveGameRecords(gameRecords, matchId: matchId) { [weak self] result in
-                    self?.isSavingMatch = false
-                    switch result {
-                    case .success:
-                        completion(true)
-                    case .failure(let error):
-                        self?.saveMatchError = error.localizedDescription
-                        completion(false)
+                    DispatchQueue.main.async {
+                        self?.isSavingMatch = false
+                        switch result {
+                        case .success:
+                            completion(true)
+                        case .failure(let error):
+                            self?.saveMatchError = error.localizedDescription
+                            completion(false)
+                        }
                     }
                 }
                 
             case .failure(let error):
-                self.isSavingMatch = false
-                self.saveMatchError = error.localizedDescription
-                completion(false)
+                DispatchQueue.main.async {
+                    self.isSavingMatch = false
+                    self.saveMatchError = error.localizedDescription
+                    completion(false)
+                }
             }
         }
     }

@@ -209,6 +209,24 @@ struct StatisticsView: View {
                 StatRow(label: "农民胜率", value: String(format: "%.1f%%", stats.farmerWinRate))
             }
             
+            // Spring and Doubled Statistics
+            StatSection(title: "特殊情况") {
+                StatRow(label: "春天次数", value: "\(stats.springCount)")
+                StatRow(label: "被春次数", value: "\(stats.springAgainstCount)")
+                StatRow(label: "加倍次数", value: "\(stats.doubledGames)")
+                if stats.doubledGames > 0 {
+                    StatRow(label: "加倍胜率", value: String(format: "%.1f%%", stats.doubledWinRate))
+                }
+            }
+            
+            // Streak Statistics
+            StatSection(title: "连胜连败") {
+                StatRow(label: "当前连胜", value: "\(stats.currentWinStreak)")
+                StatRow(label: "当前连败", value: "\(stats.currentLossStreak)")
+                StatRow(label: "最长连胜", value: "\(stats.maxWinStreak)")
+                StatRow(label: "最长连败", value: "\(stats.maxLossStreak)")
+            }
+            
             // Bid Statistics (when first bidder)
             if stats.firstBidderGames > 0 {
                 StatSection(title: "先叫时叫分分布") {
@@ -227,6 +245,10 @@ struct StatisticsView: View {
                 StatRow(label: "对局失败", value: "\(stats.matchesLost)")
                 StatRow(label: "对局平局", value: "\(stats.matchesTied)")
                 StatRow(label: "对局胜率", value: String(format: "%.1f%%", stats.matchWinRate))
+                StatRow(label: "对局当前连胜", value: "\(stats.currentMatchWinStreak)")
+                StatRow(label: "对局当前连败", value: "\(stats.currentMatchLossStreak)")
+                StatRow(label: "对局最长连胜", value: "\(stats.maxMatchWinStreak)")
+                StatRow(label: "对局最长连败", value: "\(stats.maxMatchLossStreak)")
             }
             
             // Score Records

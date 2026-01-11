@@ -33,6 +33,7 @@ struct GameRecord: Codable, Identifiable {
     var adouble: Bool            // Player A doubled
     var bdouble: Bool            // Player B doubled
     var cdouble: Bool            // Player C doubled
+    var spring: Bool             // 春天 - doubles the score
     var landlordResult: Bool     // Landlord won
     var landlord: Int            // 1=A, 2=B, 3=C
     
@@ -62,6 +63,7 @@ struct GameRecord: Codable, Identifiable {
         self.adouble = gameSetting.adouble
         self.bdouble = gameSetting.bdouble
         self.cdouble = gameSetting.cdouble
+        self.spring = gameSetting.spring
         self.landlordResult = gameSetting.landlordResult
         self.landlord = gameSetting.landlord
         self.scoreA = gameSetting.A
