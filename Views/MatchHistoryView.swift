@@ -295,7 +295,7 @@ struct MatchDetailView: View {
                     setting.adouble = record.adouble
                     setting.bdouble = record.bdouble
                     setting.cdouble = record.cdouble
-                    setting.spring = record.spring
+                    setting.spring = record.isSpring
                     setting.landlordResult = record.landlordResult
                     setting.landlord = record.landlord
                     setting.A = record.scoreA
@@ -742,7 +742,7 @@ struct MatchPlayerStatRow: View {
     private var landlordWins: Int { playerGames.filter { $0.1 && $0.2 > 0 }.count }
     private var farmerCount: Int { playerGames.filter { !$0.1 }.count }
     private var farmerWins: Int { playerGames.filter { !$0.1 && $0.2 > 0 }.count }
-    private var springCount: Int { playerGames.filter { $0.0.spring && $0.1 && $0.0.landlordResult }.count }
+    private var springCount: Int { playerGames.filter { $0.0.isSpring && $0.1 && $0.0.landlordResult }.count }
     private var doubledGames: Int {
         playerGames.filter { record, _, _ in
             switch position {

@@ -33,7 +33,7 @@ struct GameRecord: Codable, Identifiable {
     var adouble: Bool            // Player A doubled
     var bdouble: Bool            // Player B doubled
     var cdouble: Bool            // Player C doubled
-    var spring: Bool             // 春天 - doubles the score
+    var spring: Bool?            // 春天 - doubles the score (optional for backward compatibility)
     var landlordResult: Bool     // Landlord won
     var landlord: Int            // 1=A, 2=B, 3=C
     
@@ -44,6 +44,11 @@ struct GameRecord: Codable, Identifiable {
     
     // Who was first to bid this game (0=A, 1=B, 2=C)
     var firstBidder: Int
+    
+    // Computed property for safe access to spring value
+    var isSpring: Bool {
+        return spring ?? false
+    }
     
     init(matchId: String, gameIndex: Int, playerAId: String, playerBId: String, playerCId: String,
          playerAName: String, playerBName: String, playerCName: String, gameSetting: GameSetting, firstBidder: Int) {

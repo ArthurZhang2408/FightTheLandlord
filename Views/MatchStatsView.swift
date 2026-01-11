@@ -136,7 +136,7 @@ struct MatchSummarySection: View {
             
             HStack {
                 StatBadge(label: "总局数", value: "\(match.totalGames)")
-                StatBadge(label: "春天", value: "\(games.filter { $0.spring }.count)")
+                StatBadge(label: "春天", value: "\(games.filter { $0.isSpring }.count)")
             }
         }
         .padding()
@@ -191,12 +191,12 @@ struct PlayerMatchStatsSection: View {
     
     private var springCount: Int {
         // Spring as landlord (landlord wins with spring)
-        playerGames.filter { $0.0.spring && $0.1 && $0.0.landlordResult }.count
+        playerGames.filter { $0.0.isSpring && $0.1 && $0.0.landlordResult }.count
     }
     
     private var springAgainstCount: Int {
         // Spring against as farmer (landlord wins with spring, player is farmer)
-        playerGames.filter { $0.0.spring && !$0.1 && $0.0.landlordResult }.count
+        playerGames.filter { $0.0.isSpring && !$0.1 && $0.0.landlordResult }.count
     }
     
     private var doubledGames: Int {
