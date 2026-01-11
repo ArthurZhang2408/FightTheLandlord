@@ -420,7 +420,7 @@ class FirebaseService: ObservableObject {
                         stats.landlordLosses += 1
                     }
                     // Spring count (landlord wins with spring)
-                    if record.spring && record.landlordResult {
+                    if record.isSpring && record.landlordResult {
                         stats.springCount += 1
                     }
                 } else {
@@ -431,7 +431,7 @@ class FirebaseService: ObservableObject {
                         stats.farmerLosses += 1
                     }
                     // Spring against count (landlord wins with spring, player is farmer)
-                    if record.spring && record.landlordResult {
+                    if record.isSpring && record.landlordResult {
                         stats.springAgainstCount += 1
                     }
                 }
