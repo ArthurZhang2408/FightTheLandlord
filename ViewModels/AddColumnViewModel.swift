@@ -150,6 +150,12 @@ class AddColumnViewModel: ObservableObject {
         }
         let xrate: Int = Int(bombs) ?? 0
         basepoint <<= xrate
+        
+        // Apply spring multiplier (doubles the score)
+        if setting.spring {
+            basepoint *= 2
+        }
+        
         var a: Int, b: Int, c: Int
         setting.aC = "white"
         setting.bC = "white"

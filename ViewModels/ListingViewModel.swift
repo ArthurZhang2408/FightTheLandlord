@@ -15,18 +15,33 @@ class ListingViewModel: ObservableObject {
     @Published var deletingItem: Bool = false
     @Published var deleteIdx: Int = -1
     @Published var isSaving: Bool = false
+    @Published var showingMatchStats: Bool = false
+    @Published var savedMatchId: String? = nil
     var instance: DataSingleton = DataSingleton.instance
     
     init() {
     }
     
     func endMatch() {
+        // Prevent multiple taps
+        guard !isSaving else { return }
+        
         isSaving = true
+        
+        // Store match ID for showing stats
         instance.endAndSaveMatch { [weak self] success in
-            self?.isSaving = false
-            if success {
-                // Clear the current match and start a new one without going to welcome screen
-                self?.instance.startNewMatch()
+            DispatchQueue.main.async {
+                guard let self = self else { return }
+                self.isSaving = false
+                if success {
+                    // Store match ID to show statistics
+                    self.savedMatchId = self.instance.currentMatchId
+                    if self.savedMatchId != nil {
+                        self.showingMatchStats = true
+                    }
+                    // Clear the current match and start a new one
+                    self.instance.startNewMatch()
+                }
             }
         }
     }

@@ -223,10 +223,37 @@ struct MatchDetailView: View {
                             }
                         }
                     }
+                    
+                    // Statistics section for each player
+                    if !gameRecords.isEmpty {
+                        Section(header: Text("玩家统计")) {
+                            ForEach([
+                                (match.playerAId, match.playerAName, 1),
+                                (match.playerBId, match.playerBName, 2),
+                                (match.playerCId, match.playerCName, 3)
+                            ], id: \.0) { (playerId, playerName, position) in
+                                MatchPlayerStatRow(
+                                    playerName: playerName,
+                                    position: position,
+                                    games: gameRecords,
+                                    finalScore: position == 1 ? displayScoreA : (position == 2 ? displayScoreB : displayScoreC)
+                                )
+                            }
+                        }
+                    }
                 }
             }
         }
         .navigationTitle("对局详情")
+        .toolbar {
+            ToolbarItem(placement: .navigationBarTrailing) {
+                if let matchId = match.id {
+                    NavigationLink(destination: FullMatchStatsView(matchId: matchId)) {
+                        Image(systemName: "chart.bar")
+                    }
+                }
+            }
+        }
         .onAppear {
             loadGameRecords()
         }
@@ -268,6 +295,7 @@ struct MatchDetailView: View {
                     setting.adouble = record.adouble
                     setting.bdouble = record.bdouble
                     setting.cdouble = record.cdouble
+                    setting.spring = record.spring
                     setting.landlordResult = record.landlordResult
                     setting.landlord = record.landlord
                     setting.A = record.scoreA
@@ -423,6 +451,13 @@ struct HistoryEditView: View {
                         VStack(spacing: 40) {
                             VStack {
                                 RoundTextField(title: "炸弹", text: $viewModel.bombs, keyboardType: .decimal, height: 35)
+                            }
+                            .frame(height: height)
+                            VStack {
+                                Toggle(isOn: $viewModel.setting.spring) {
+                                    Text("春天")
+                                }
+                                .toggleStyle(.button)
                             }
                             .frame(height: height)
                             VStack {
@@ -612,6 +647,12 @@ class HistoryEditViewModel: ObservableObject {
         }
         let xrate: Int = Int(bombs) ?? 0
         basepoint <<= xrate
+        
+        // Apply spring multiplier (doubles the score)
+        if setting.spring {
+            basepoint *= 2
+        }
+        
         var a: Int, b: Int, c: Int
         setting.aC = "white"
         setting.bC = "white"
@@ -671,6 +712,162 @@ class HistoryEditViewModel: ObservableObject {
         setting.B = b
         setting.C = c
         return true
+    }
+}
+
+// MARK: - Match Player Stats Row
+
+struct MatchPlayerStatRow: View {
+    let playerName: String
+    let position: Int
+    let games: [GameRecord]
+    let finalScore: Int
+    
+    private var playerGames: [(GameRecord, Bool, Int)] {
+        games.map { record in
+            let isLandlord = record.landlord == position
+            let score: Int
+            switch position {
+            case 1: score = record.scoreA
+            case 2: score = record.scoreB
+            default: score = record.scoreC
+            }
+            return (record, isLandlord, score)
+        }
+    }
+    
+    private var gamesWon: Int { playerGames.filter { $0.2 > 0 }.count }
+    private var gamesLost: Int { playerGames.filter { $0.2 < 0 }.count }
+    private var landlordCount: Int { playerGames.filter { $0.1 }.count }
+    private var landlordWins: Int { playerGames.filter { $0.1 && $0.2 > 0 }.count }
+    private var farmerCount: Int { playerGames.filter { !$0.1 }.count }
+    private var farmerWins: Int { playerGames.filter { !$0.1 && $0.2 > 0 }.count }
+    private var springCount: Int { playerGames.filter { $0.0.spring && $0.1 && $0.0.landlordResult }.count }
+    private var doubledGames: Int {
+        playerGames.filter { record, _, _ in
+            switch position {
+            case 1: return record.adouble
+            case 2: return record.bdouble
+            default: return record.cdouble
+            }
+        }.count
+    }
+    private var doubledWins: Int {
+        playerGames.filter { record, _, score in
+            let doubled: Bool
+            switch position {
+            case 1: doubled = record.adouble
+            case 2: doubled = record.bdouble
+            default: doubled = record.cdouble
+            }
+            return doubled && score > 0
+        }.count
+    }
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Text(playerName)
+                    .font(.headline)
+                    .foregroundColor(.primary500)
+                Spacer()
+                Text("\(finalScore)")
+                    .font(.headline)
+                    .foregroundColor(finalScore > 0 ? .green : (finalScore < 0 ? .red : .white))
+            }
+            
+            HStack(spacing: 16) {
+                StatItem(label: "胜率", value: games.count > 0 ? String(format: "%.0f%%", Double(gamesWon)/Double(games.count)*100) : "0%")
+                StatItem(label: "地主", value: "\(landlordWins)/\(landlordCount)")
+                StatItem(label: "农民", value: "\(farmerWins)/\(farmerCount)")
+                StatItem(label: "春天", value: "\(springCount)")
+                if doubledGames > 0 {
+                    StatItem(label: "加倍胜率", value: String(format: "%.0f%%", Double(doubledWins)/Double(doubledGames)*100))
+                }
+            }
+            .font(.caption)
+        }
+        .padding(.vertical, 4)
+    }
+}
+
+struct StatItem: View {
+    let label: String
+    let value: String
+    
+    var body: some View {
+        VStack(spacing: 2) {
+            Text(value)
+                .fontWeight(.medium)
+            Text(label)
+                .foregroundColor(.gray50)
+        }
+    }
+}
+
+// MARK: - Full Match Stats View
+
+struct FullMatchStatsView: View {
+    let matchId: String
+    
+    @State private var match: MatchRecord?
+    @State private var gameRecords: [GameRecord] = []
+    @State private var isLoading = true
+    
+    var body: some View {
+        ScrollView {
+            if isLoading {
+                ProgressView()
+                    .padding(.top, 100)
+            } else if let match = match {
+                VStack(spacing: 20) {
+                    // Match summary
+                    MatchSummarySection(match: match, games: gameRecords)
+                    
+                    // Per-player statistics for this match
+                    if !gameRecords.isEmpty {
+                        ForEach([
+                            (match.playerAId, match.playerAName, 1),
+                            (match.playerBId, match.playerBName, 2),
+                            (match.playerCId, match.playerCName, 3)
+                        ], id: \.0) { (playerId, playerName, position) in
+                            PlayerMatchStatsSection(
+                                playerName: playerName,
+                                position: position,
+                                games: gameRecords,
+                                match: match
+                            )
+                        }
+                    }
+                }
+                .padding()
+            } else {
+                Text("无法加载对局数据")
+                    .foregroundColor(.gray50)
+                    .padding(.top, 100)
+            }
+        }
+        .navigationTitle("详细统计")
+        .onAppear {
+            loadMatchData()
+        }
+    }
+    
+    private func loadMatchData() {
+        FirebaseService.shared.loadMatch(matchId: matchId) { result in
+            switch result {
+            case .success(let m):
+                self.match = m
+                FirebaseService.shared.loadGameRecords(forMatch: matchId) { result in
+                    self.isLoading = false
+                    if case .success(let records) = result {
+                        self.gameRecords = records
+                    }
+                }
+            case .failure:
+                self.isLoading = false
+            }
+        }
     }
 }
 
