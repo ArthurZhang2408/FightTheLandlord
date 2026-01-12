@@ -62,6 +62,17 @@ class DataSingleton: ObservableObject {
         updateResult()
     }
     
+    /// Clear the current match without saving or incrementing match number (used when no games played)
+    public func clearCurrentMatch() {
+        games = []
+        scores = []
+        playerA = nil
+        playerB = nil
+        playerC = nil
+        currentMatchId = nil
+        updateResult()
+    }
+    
     public func continueGame () {
         if gameNum == 0 {
             listingShowAlert = true

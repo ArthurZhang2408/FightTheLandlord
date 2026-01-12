@@ -102,7 +102,7 @@ struct ListingView: View {
                 .frame(width: .screenWidth)
             }
             .padding()
-            .navigationTitle("第\(viewModel.instance.gameNum)场对局")
+            .navigationTitle("当前对局")
             .toolbar{
                 Button {
                     viewModel.showingSettingView = true

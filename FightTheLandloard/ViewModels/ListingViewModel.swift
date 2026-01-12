@@ -26,6 +26,12 @@ class ListingViewModel: ObservableObject {
         // Prevent multiple taps
         guard !isSaving else { return }
         
+        // If no games played, just clear without saving or incrementing
+        if instance.games.isEmpty {
+            instance.clearCurrentMatch()
+            return
+        }
+        
         isSaving = true
         
         // Store match ID for showing stats
