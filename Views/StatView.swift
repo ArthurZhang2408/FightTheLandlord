@@ -52,13 +52,15 @@ struct StatView: View {
                                 }
                                 .padding(.vertical, 8)
                             }
-                            .swipeActions(allowsFullSwipe: false) {
-                                Button(role: .destructive) {
+                            .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+                                // Use non-destructive role to prevent immediate visual deletion
+                                Button {
                                     playerToDelete = player
                                     showingDeleteConfirm = true
                                 } label: {
                                     Label("删除", systemImage: "trash")
                                 }
+                                .tint(.red)
                             }
                         }
                     }
@@ -78,13 +80,16 @@ struct StatView: View {
             .sheet(isPresented: $showingAddPlayer) {
                 AddPlayerView(isPresented: $showingAddPlayer)
             }
-            .confirmationDialog("确定删除该玩家吗？", isPresented: $showingDeleteConfirm, titleVisibility: .visible) {
+            .alert("确定删除该玩家吗？", isPresented: $showingDeleteConfirm) {
+                Button("取消", role: .cancel) {
+                    playerToDelete = nil
+                }
                 Button("删除", role: .destructive) {
                     if let player = playerToDelete, let id = player.id {
                         firebaseService.deletePlayer(id: id) { _ in }
                     }
+                    playerToDelete = nil
                 }
-                Button("取消", role: .cancel) {}
             }
         }
     }

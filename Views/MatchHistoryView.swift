@@ -39,13 +39,15 @@ struct MatchHistoryView: View {
                             } label: {
                                 MatchRowView(match: match)
                             }
-                            .swipeActions(allowsFullSwipe: false) {
-                                Button(role: .destructive) {
+                            .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+                                // Use non-destructive role to prevent immediate visual deletion
+                                Button {
                                     matchToDelete = match
                                     showingDeleteConfirm = true
                                 } label: {
                                     Label("删除", systemImage: "trash")
                                 }
+                                .tint(.red)
                             }
                         }
                     }
@@ -55,13 +57,16 @@ struct MatchHistoryView: View {
             .navigationDestination(for: MatchRecord.self) { match in
                 MatchDetailView(match: match)
             }
-            .confirmationDialog("确定删除该对局吗？", isPresented: $showingDeleteConfirm, titleVisibility: .visible) {
+            .alert("确定删除该对局吗？", isPresented: $showingDeleteConfirm) {
+                Button("取消", role: .cancel) {
+                    matchToDelete = nil
+                }
                 Button("删除", role: .destructive) {
                     if let match = matchToDelete, let id = match.id {
                         firebaseService.deleteMatch(matchId: id) { _ in }
                     }
+                    matchToDelete = nil
                 }
-                Button("取消", role: .cancel) {}
             }
         }
     }
