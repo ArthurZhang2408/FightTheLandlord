@@ -191,10 +191,22 @@ class FirebaseService: ObservableObject {
     
     func saveMatch(_ match: MatchRecord, completion: @escaping (Result<String, Error>) -> Void) {
         do {
-            let ref = try db.collection("matches").addDocument(from: match)
-            completion(.success(ref.documentID))
+            var ref: DocumentReference?
+            ref = try db.collection("matches").addDocument(from: match) { error in
+                DispatchQueue.main.async {
+                    if let error = error {
+                        completion(.failure(error))
+                    } else if let documentId = ref?.documentID {
+                        completion(.success(documentId))
+                    } else {
+                        completion(.failure(NSError(domain: "", code: -1, userInfo: [NSLocalizedDescriptionKey: "Failed to get document ID"])))
+                    }
+                }
+            }
         } catch {
-            completion(.failure(error))
+            DispatchQueue.main.async {
+                completion(.failure(error))
+            }
         }
     }
     
@@ -228,10 +240,19 @@ class FirebaseService: ObservableObject {
         }
         
         do {
-            try db.collection("matches").document(matchId).setData(from: match)
-            completion(.success(()))
+            try db.collection("matches").document(matchId).setData(from: match) { error in
+                DispatchQueue.main.async {
+                    if let error = error {
+                        completion(.failure(error))
+                    } else {
+                        completion(.success(()))
+                    }
+                }
+            }
         } catch {
-            completion(.failure(error))
+            DispatchQueue.main.async {
+                completion(.failure(error))
+            }
         }
     }
     
