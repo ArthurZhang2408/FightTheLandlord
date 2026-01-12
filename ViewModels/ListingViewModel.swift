@@ -32,22 +32,17 @@ class ListingViewModel: ObservableObject {
             return
         }
         
-        isSaving = true
+        // Fire-and-forget approach: save in background, update UI immediately
+        // This prevents the UI from getting stuck even if Firebase has issues
+        let matchId = instance.endAndSaveMatchSync()
         
-        // Store match ID for showing stats
-        instance.endAndSaveMatch { [weak self] success in
-            // Callback is already on main thread from DataSingleton
-            guard let self = self else { return }
-            self.isSaving = false
-            if success {
-                // Store match ID to show statistics
-                self.savedMatchId = self.instance.currentMatchId
-                if self.savedMatchId != nil {
-                    self.showingMatchStats = true
-                }
-                // Clear the current match and start a new one
-                self.instance.startNewMatch()
-            }
+        // Show match stats if we have a match ID
+        if let matchId = matchId {
+            self.savedMatchId = matchId
+            self.showingMatchStats = true
         }
+        
+        // Clear the current match and start a new one immediately
+        instance.startNewMatch()
     }
 }
