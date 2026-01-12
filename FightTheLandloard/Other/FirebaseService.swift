@@ -94,24 +94,41 @@ class FirebaseService: ObservableObject {
     }
     
     func loadGameRecords(forMatch matchId: String, completion: @escaping (Result<[GameRecord], Error>) -> Void) {
+        print("[FirebaseService] Loading game records for match: \(matchId)")
         db.collection("gameRecords")
             .whereField("matchId", isEqualTo: matchId)
             .getDocuments { snapshot, error in
                 DispatchQueue.main.async {
                     if let error = error {
-                        print("Error loading game records: \(error.localizedDescription)")
+                        print("[FirebaseService] Error loading game records: \(error.localizedDescription)")
                         completion(.failure(error))
                         return
                     }
                     
-                    var records = snapshot?.documents.compactMap { doc in
-                        try? doc.data(as: GameRecord.self)
-                    } ?? []
+                    guard let documents = snapshot?.documents else {
+                        print("[FirebaseService] No documents found for match \(matchId)")
+                        completion(.success([]))
+                        return
+                    }
+                    
+                    print("[FirebaseService] Found \(documents.count) documents, attempting to decode...")
+                    
+                    var records: [GameRecord] = []
+                    for doc in documents {
+                        do {
+                            let record = try doc.data(as: GameRecord.self)
+                            records.append(record)
+                        } catch {
+                            print("[FirebaseService] Failed to decode document \(doc.documentID): \(error.localizedDescription)")
+                            // Log the actual data for debugging
+                            print("[FirebaseService] Document data: \(doc.data())")
+                        }
+                    }
                     
                     // Sort by gameIndex locally to avoid needing a composite index
                     records.sort { $0.gameIndex < $1.gameIndex }
                     
-                    print("Loaded \(records.count) game records for match \(matchId)")
+                    print("[FirebaseService] Successfully loaded \(records.count) game records for match \(matchId)")
                     completion(.success(records))
                 }
             }
@@ -190,20 +207,25 @@ class FirebaseService: ObservableObject {
     }
     
     func saveMatch(_ match: MatchRecord, completion: @escaping (Result<String, Error>) -> Void) {
+        print("[FirebaseService] Saving match...")
         do {
             var ref: DocumentReference?
             ref = try db.collection("matches").addDocument(from: match) { error in
                 DispatchQueue.main.async {
                     if let error = error {
+                        print("[FirebaseService] Failed to save match: \(error.localizedDescription)")
                         completion(.failure(error))
                     } else if let documentId = ref?.documentID {
+                        print("[FirebaseService] Match saved with ID: \(documentId)")
                         completion(.success(documentId))
                     } else {
+                        print("[FirebaseService] Failed to get document ID")
                         completion(.failure(NSError(domain: "", code: -1, userInfo: [NSLocalizedDescriptionKey: "Failed to get document ID"])))
                     }
                 }
             }
         } catch {
+            print("[FirebaseService] Failed to encode match: \(error.localizedDescription)")
             DispatchQueue.main.async {
                 completion(.failure(error))
             }
@@ -301,16 +323,26 @@ class FirebaseService: ObservableObject {
     // MARK: - Game Records
     
     func saveGameRecords(_ records: [GameRecord], matchId: String, completion: @escaping (Result<Void, Error>) -> Void) {
+        guard !records.isEmpty else {
+            print("[FirebaseService] No records to save")
+            DispatchQueue.main.async {
+                completion(.success(()))
+            }
+            return
+        }
+        
         let batch = db.batch()
         
-        for var record in records {
+        for record in records {
             var recordWithMatchId = record
             recordWithMatchId.matchId = matchId
             
             let ref = db.collection("gameRecords").document()
             do {
                 try batch.setData(from: recordWithMatchId, forDocument: ref)
+                print("[FirebaseService] Added game record \(record.gameIndex) to batch")
             } catch {
+                print("[FirebaseService] Error encoding game record \(record.gameIndex): \(error.localizedDescription)")
                 DispatchQueue.main.async {
                     completion(.failure(error))
                 }
@@ -318,11 +350,14 @@ class FirebaseService: ObservableObject {
             }
         }
         
+        print("[FirebaseService] Committing batch with \(records.count) records...")
         batch.commit { error in
             DispatchQueue.main.async {
                 if let error = error {
+                    print("[FirebaseService] Batch commit failed: \(error.localizedDescription)")
                     completion(.failure(error))
                 } else {
+                    print("[FirebaseService] Batch commit succeeded")
                     completion(.success(()))
                 }
             }
@@ -472,8 +507,8 @@ class FirebaseService: ObservableObject {
                 }
                 
                 // Bid distribution when first bidder
-                // firstBidder uses 0-indexed (0=A, 1=B, 2=C), position uses 1-indexed (1=A, 2=B, 3=C)
-                if record.firstBidder == position - 1 {
+                // firstBidderIndex uses 0-indexed (0=A, 1=B, 2=C), position uses 1-indexed (1=A, 2=B, 3=C)
+                if record.firstBidderIndex == position - 1 {
                     stats.firstBidderGames += 1
                     let bid = self.getPlayerBid(position: position, record: record)
                     switch bid {

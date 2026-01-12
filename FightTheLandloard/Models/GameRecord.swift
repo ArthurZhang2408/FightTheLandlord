@@ -43,11 +43,17 @@ struct GameRecord: Codable, Identifiable {
     var scoreC: Int
     
     // Who was first to bid this game (0=A, 1=B, 2=C)
-    var firstBidder: Int
+    // Optional for backward compatibility with old records
+    var firstBidder: Int?
     
     // Computed property for safe access to spring value
     var isSpring: Bool {
         return spring ?? false
+    }
+    
+    // Computed property for safe access to firstBidder value
+    var firstBidderIndex: Int {
+        return firstBidder ?? 0
     }
     
     init(matchId: String, gameIndex: Int, playerAId: String, playerBId: String, playerCId: String,

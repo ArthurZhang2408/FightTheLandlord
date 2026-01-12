@@ -149,15 +149,10 @@ class DataSingleton: ObservableObject {
     /// End the current match and save to Firebase
     /// Completion is always called on main thread
     public func endAndSaveMatch(completion: @escaping (Bool) -> Void) {
-        let mainCompletion: (Bool) -> Void = { success in
-            DispatchQueue.main.async {
-                completion(success)
-            }
-        }
-        
         // Prevent double-saving
         guard !isSavingMatch else {
-            mainCompletion(false)
+            print("[DataSingleton] Already saving, ignoring duplicate request")
+            DispatchQueue.main.async { completion(false) }
             return
         }
         
@@ -165,18 +160,25 @@ class DataSingleton: ObservableObject {
         guard let pA = playerA, let pAId = pA.id,
               let pB = playerB, let pBId = pB.id,
               let pC = playerC, let pCId = pC.id else {
-            mainCompletion(true)
+            print("[DataSingleton] No players selected, skipping save")
+            DispatchQueue.main.async { completion(true) }
             return
         }
         
         // Don't save if no games were played
         guard !games.isEmpty else {
-            mainCompletion(true)
+            print("[DataSingleton] No games played, skipping save")
+            DispatchQueue.main.async { completion(true) }
             return
         }
         
         isSavingMatch = true
         saveMatchError = nil
+        
+        // Capture values synchronously to avoid threading issues
+        let gamesToSave = self.games
+        let scoresToSave = self.scores
+        let starter = self.room.starter
         
         // Create match record
         var match = MatchRecord(
@@ -186,32 +188,24 @@ class DataSingleton: ObservableObject {
             playerAName: pA.name,
             playerBName: pB.name,
             playerCName: pC.name,
-            starter: room.starter
+            starter: starter
         )
         
         // Finalize match with final stats
-        match.finalize(games: games, scores: scores)
+        match.finalize(games: gamesToSave, scores: scoresToSave)
+        
+        print("[DataSingleton] Saving match with \(gamesToSave.count) games...")
         
         // Save match to Firebase
         FirebaseService.shared.saveMatch(match) { [weak self] result in
-            guard let self = self else { 
-                mainCompletion(false)
-                return 
-            }
-            
             switch result {
             case .success(let matchId):
-                DispatchQueue.main.async {
-                    self.currentMatchId = matchId
-                }
+                print("[DataSingleton] Match saved with ID: \(matchId)")
                 
                 // Create game records
                 var gameRecords: [GameRecord] = []
-                for (index, game) in self.games.enumerated() {
-                    // Calculate who was first bidder for this game
-                    // Uses 0-indexed: 0=A, 1=B, 2=C
-                    // Rotates based on initial starter and game index
-                    let firstBidder = (index + self.room.starter) % 3
+                for (index, game) in gamesToSave.enumerated() {
+                    let firstBidder = (index + starter) % 3
                     let record = GameRecord(
                         matchId: matchId,
                         gameIndex: index,
@@ -227,25 +221,31 @@ class DataSingleton: ObservableObject {
                     gameRecords.append(record)
                 }
                 
+                print("[DataSingleton] Saving \(gameRecords.count) game records...")
+                
                 // Save game records
-                FirebaseService.shared.saveGameRecords(gameRecords, matchId: matchId) { [weak self] result in
+                FirebaseService.shared.saveGameRecords(gameRecords, matchId: matchId) { result in
                     DispatchQueue.main.async {
                         self?.isSavingMatch = false
+                        self?.currentMatchId = matchId
                         switch result {
                         case .success:
-                            mainCompletion(true)
+                            print("[DataSingleton] Game records saved successfully")
+                            completion(true)
                         case .failure(let error):
+                            print("[DataSingleton] Failed to save game records: \(error.localizedDescription)")
                             self?.saveMatchError = error.localizedDescription
-                            mainCompletion(false)
+                            completion(false)
                         }
                     }
                 }
                 
             case .failure(let error):
+                print("[DataSingleton] Failed to save match: \(error.localizedDescription)")
                 DispatchQueue.main.async {
-                    self.isSavingMatch = false
-                    self.saveMatchError = error.localizedDescription
-                    mainCompletion(false)
+                    self?.isSavingMatch = false
+                    self?.saveMatchError = error.localizedDescription
+                    completion(false)
                 }
             }
         }
