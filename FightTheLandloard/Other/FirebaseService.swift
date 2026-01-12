@@ -209,26 +209,14 @@ class FirebaseService: ObservableObject {
     func saveMatch(_ match: MatchRecord, completion: @escaping (Result<String, Error>) -> Void) {
         print("[FirebaseService] Saving match...")
         do {
-            var ref: DocumentReference?
-            ref = try db.collection("matches").addDocument(from: match) { error in
-                DispatchQueue.main.async {
-                    if let error = error {
-                        print("[FirebaseService] Failed to save match: \(error.localizedDescription)")
-                        completion(.failure(error))
-                    } else if let documentId = ref?.documentID {
-                        print("[FirebaseService] Match saved with ID: \(documentId)")
-                        completion(.success(documentId))
-                    } else {
-                        print("[FirebaseService] Failed to get document ID")
-                        completion(.failure(NSError(domain: "", code: -1, userInfo: [NSLocalizedDescriptionKey: "Failed to get document ID"])))
-                    }
-                }
-            }
+            // addDocument returns DocumentReference synchronously
+            // The document ID is available immediately
+            let ref = try db.collection("matches").addDocument(from: match)
+            print("[FirebaseService] Match saved with ID: \(ref.documentID)")
+            completion(.success(ref.documentID))
         } catch {
-            print("[FirebaseService] Failed to encode match: \(error.localizedDescription)")
-            DispatchQueue.main.async {
-                completion(.failure(error))
-            }
+            print("[FirebaseService] Failed to encode/save match: \(error.localizedDescription)")
+            completion(.failure(error))
         }
     }
     
@@ -325,9 +313,7 @@ class FirebaseService: ObservableObject {
     func saveGameRecords(_ records: [GameRecord], matchId: String, completion: @escaping (Result<Void, Error>) -> Void) {
         guard !records.isEmpty else {
             print("[FirebaseService] No records to save")
-            DispatchQueue.main.async {
-                completion(.success(()))
-            }
+            completion(.success(()))
             return
         }
         
@@ -343,23 +329,19 @@ class FirebaseService: ObservableObject {
                 print("[FirebaseService] Added game record \(record.gameIndex) to batch")
             } catch {
                 print("[FirebaseService] Error encoding game record \(record.gameIndex): \(error.localizedDescription)")
-                DispatchQueue.main.async {
-                    completion(.failure(error))
-                }
+                completion(.failure(error))
                 return
             }
         }
         
         print("[FirebaseService] Committing batch with \(records.count) records...")
         batch.commit { error in
-            DispatchQueue.main.async {
-                if let error = error {
-                    print("[FirebaseService] Batch commit failed: \(error.localizedDescription)")
-                    completion(.failure(error))
-                } else {
-                    print("[FirebaseService] Batch commit succeeded")
-                    completion(.success(()))
-                }
+            if let error = error {
+                print("[FirebaseService] Batch commit failed: \(error.localizedDescription)")
+                completion(.failure(error))
+            } else {
+                print("[FirebaseService] Batch commit succeeded")
+                completion(.success(()))
             }
         }
     }
