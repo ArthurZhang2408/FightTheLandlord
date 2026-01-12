@@ -147,10 +147,17 @@ class DataSingleton: ObservableObject {
     // MARK: - Match Saving
     
     /// End the current match and save to Firebase
+    /// Completion is always called on main thread
     public func endAndSaveMatch(completion: @escaping (Bool) -> Void) {
+        let mainCompletion: (Bool) -> Void = { success in
+            DispatchQueue.main.async {
+                completion(success)
+            }
+        }
+        
         // Prevent double-saving
         guard !isSavingMatch else {
-            completion(false)
+            mainCompletion(false)
             return
         }
         
@@ -158,13 +165,13 @@ class DataSingleton: ObservableObject {
         guard let pA = playerA, let pAId = pA.id,
               let pB = playerB, let pBId = pB.id,
               let pC = playerC, let pCId = pC.id else {
-            completion(true)
+            mainCompletion(true)
             return
         }
         
         // Don't save if no games were played
         guard !games.isEmpty else {
-            completion(true)
+            mainCompletion(true)
             return
         }
         
@@ -187,11 +194,16 @@ class DataSingleton: ObservableObject {
         
         // Save match to Firebase
         FirebaseService.shared.saveMatch(match) { [weak self] result in
-            guard let self = self else { return }
+            guard let self = self else { 
+                mainCompletion(false)
+                return 
+            }
             
             switch result {
             case .success(let matchId):
-                self.currentMatchId = matchId
+                DispatchQueue.main.async {
+                    self.currentMatchId = matchId
+                }
                 
                 // Create game records
                 var gameRecords: [GameRecord] = []
@@ -221,10 +233,10 @@ class DataSingleton: ObservableObject {
                         self?.isSavingMatch = false
                         switch result {
                         case .success:
-                            completion(true)
+                            mainCompletion(true)
                         case .failure(let error):
                             self?.saveMatchError = error.localizedDescription
-                            completion(false)
+                            mainCompletion(false)
                         }
                     }
                 }
@@ -233,7 +245,7 @@ class DataSingleton: ObservableObject {
                 DispatchQueue.main.async {
                     self.isSavingMatch = false
                     self.saveMatchError = error.localizedDescription
-                    completion(false)
+                    mainCompletion(false)
                 }
             }
         }
