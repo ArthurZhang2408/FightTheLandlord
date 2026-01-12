@@ -8,13 +8,14 @@
 import SwiftUI
 
 struct StatView: View {
-    @StateObject private var firebaseService = FirebaseService.shared
+    @ObservedObject private var firebaseService = FirebaseService.shared
     @State private var showingAddPlayer = false
     @State private var playerToDelete: Player?
     @State private var showingDeleteConfirm = false
+    @State private var navigationPath = NavigationPath()
     
     var body: some View {
-        NavigationView {
+        NavigationStack(path: $navigationPath) {
             VStack {
                 if firebaseService.isLoading {
                     ProgressView()
@@ -34,13 +35,20 @@ struct StatView: View {
                 } else {
                     List {
                         ForEach(firebaseService.players) { player in
-                            NavigationLink(destination: PlayerDetailView(player: player)) {
+                            Button {
+                                navigationPath.append(player)
+                            } label: {
                                 HStack {
                                     Image(systemName: "person.circle.fill")
                                         .font(.title2)
                                         .foregroundColor(.primary500)
                                     Text(player.name)
                                         .font(.headline)
+                                        .foregroundColor(.primary)
+                                    Spacer()
+                                    Image(systemName: "chevron.right")
+                                        .foregroundColor(.gray)
+                                        .font(.caption)
                                 }
                                 .padding(.vertical, 8)
                             }
@@ -57,6 +65,9 @@ struct StatView: View {
                 }
             }
             .navigationTitle("玩家统计")
+            .navigationDestination(for: Player.self) { player in
+                PlayerDetailView(player: player)
+            }
             .toolbar {
                 Button {
                     showingAddPlayer = true

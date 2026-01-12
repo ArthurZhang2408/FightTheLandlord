@@ -8,12 +8,13 @@
 import SwiftUI
 
 struct MatchHistoryView: View {
-    @StateObject private var firebaseService = FirebaseService.shared
+    @ObservedObject private var firebaseService = FirebaseService.shared
     @State private var matchToDelete: MatchRecord?
     @State private var showingDeleteConfirm = false
+    @State private var navigationPath = NavigationPath()
     
     var body: some View {
-        NavigationView {
+        NavigationStack(path: $navigationPath) {
             VStack {
                 if firebaseService.isLoadingMatches {
                     ProgressView()
@@ -33,7 +34,9 @@ struct MatchHistoryView: View {
                 } else {
                     List {
                         ForEach(firebaseService.matches) { match in
-                            NavigationLink(destination: MatchDetailView(match: match)) {
+                            Button {
+                                navigationPath.append(match)
+                            } label: {
                                 MatchRowView(match: match)
                             }
                             .swipeActions(allowsFullSwipe: false) {
@@ -49,6 +52,9 @@ struct MatchHistoryView: View {
                 }
             }
             .navigationTitle("历史对局")
+            .navigationDestination(for: MatchRecord.self) { match in
+                MatchDetailView(match: match)
+            }
             .confirmationDialog("确定删除该对局吗？", isPresented: $showingDeleteConfirm, titleVisibility: .visible) {
                 Button("删除", role: .destructive) {
                     if let match = matchToDelete, let id = match.id {
