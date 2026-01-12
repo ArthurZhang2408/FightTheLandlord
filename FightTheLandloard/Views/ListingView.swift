@@ -156,15 +156,6 @@ struct ListingView: View {
                     message: Text("没有可以继续的游戏，已开始新的牌局")
                 )
             }
-            .disabled(viewModel.isSaving)
-            .overlay {
-                if viewModel.isSaving {
-                    ProgressView("保存中...")
-                        .padding()
-                        .background(Color.gray80.opacity(0.9))
-                        .cornerRadius(10)
-                }
-            }
         }
     }
 }

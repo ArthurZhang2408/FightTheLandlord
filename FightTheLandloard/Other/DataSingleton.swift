@@ -146,37 +146,28 @@ class DataSingleton: ObservableObject {
     
     // MARK: - Match Saving
     
-    /// End the current match and save to Firebase
-    /// Completion is always called on main thread
-    public func endAndSaveMatch(completion: @escaping (Bool) -> Void) {
-        // Helper to ensure completion is always called on main thread
-        let mainComplete: (Bool) -> Void = { success in
-            DispatchQueue.main.async {
-                completion(success)
-            }
-        }
-        
+    /// End the current match and save to Firebase synchronously (fire-and-forget)
+    /// Returns the match ID if saving was initiated, nil otherwise
+    /// The actual Firebase save happens in the background
+    public func endAndSaveMatchSync() -> String? {
         // Prevent double-saving
         guard !isSavingMatch else {
             print("[DataSingleton] Already saving, ignoring duplicate request")
-            mainComplete(false)
-            return
+            return nil
         }
         
-        // If no players selected, just end without saving
+        // If no players selected, skip save
         guard let pA = playerA, let pAId = pA.id,
               let pB = playerB, let pBId = pB.id,
               let pC = playerC, let pCId = pC.id else {
             print("[DataSingleton] No players selected, skipping save")
-            mainComplete(true)
-            return
+            return nil
         }
         
         // Don't save if no games were played
         guard !games.isEmpty else {
             print("[DataSingleton] No games played, skipping save")
-            mainComplete(true)
-            return
+            return nil
         }
         
         isSavingMatch = true
@@ -222,42 +213,28 @@ class DataSingleton: ObservableObject {
             gameRecords.append(record)
         }
         
-        // Save match to Firebase
-        FirebaseService.shared.saveMatch(match) { [weak self] result in
-            switch result {
-            case .success(let matchId):
-                print("[DataSingleton] Match saved with ID: \(matchId)")
-                
-                DispatchQueue.main.async {
-                    self?.currentMatchId = matchId
-                }
-                
-                print("[DataSingleton] Saving \(gameRecords.count) game records...")
-                
-                // Save game records with the matchId
-                FirebaseService.shared.saveGameRecords(gameRecords, matchId: matchId) { [weak self] result in
-                    DispatchQueue.main.async {
-                        self?.isSavingMatch = false
-                        switch result {
-                        case .success:
-                            print("[DataSingleton] Game records saved successfully")
-                            mainComplete(true)
-                        case .failure(let error):
-                            print("[DataSingleton] Failed to save game records: \(error.localizedDescription)")
-                            self?.saveMatchError = error.localizedDescription
-                            mainComplete(false)
-                        }
-                    }
-                }
-                
-            case .failure(let error):
-                print("[DataSingleton] Failed to save match: \(error.localizedDescription)")
-                DispatchQueue.main.async {
-                    self?.isSavingMatch = false
-                    self?.saveMatchError = error.localizedDescription
-                    mainComplete(false)
-                }
-            }
+        // Save match to Firebase synchronously (returns document reference immediately)
+        // The actual network operation happens in background
+        do {
+            let matchId = try FirebaseService.shared.saveMatchSync(match)
+            print("[DataSingleton] Match saved with ID: \(matchId)")
+            
+            self.currentMatchId = matchId
+            
+            print("[DataSingleton] Saving \(gameRecords.count) game records in background...")
+            
+            // Save game records in background (fire-and-forget)
+            FirebaseService.shared.saveGameRecordsBackground(gameRecords, matchId: matchId)
+            
+            // Reset saving state
+            self.isSavingMatch = false
+            
+            return matchId
+        } catch {
+            print("[DataSingleton] Failed to save match: \(error.localizedDescription)")
+            self.isSavingMatch = false
+            self.saveMatchError = error.localizedDescription
+            return nil
         }
     }
 }

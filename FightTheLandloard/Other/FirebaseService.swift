@@ -220,6 +220,48 @@ class FirebaseService: ObservableObject {
         }
     }
     
+    /// Synchronous save that returns the document ID immediately
+    /// The actual network write happens in background
+    func saveMatchSync(_ match: MatchRecord) throws -> String {
+        print("[FirebaseService] Saving match synchronously...")
+        let ref = try db.collection("matches").addDocument(from: match)
+        print("[FirebaseService] Match saved with ID: \(ref.documentID)")
+        return ref.documentID
+    }
+    
+    /// Fire-and-forget game records saving
+    /// Saves records in background without blocking or callbacks
+    func saveGameRecordsBackground(_ records: [GameRecord], matchId: String) {
+        guard !records.isEmpty else {
+            print("[FirebaseService] No records to save")
+            return
+        }
+        
+        let batch = db.batch()
+        
+        for record in records {
+            var recordWithMatchId = record
+            recordWithMatchId.matchId = matchId
+            
+            let ref = db.collection("gameRecords").document()
+            do {
+                try batch.setData(from: recordWithMatchId, forDocument: ref)
+            } catch {
+                print("[FirebaseService] Error encoding game record \(record.gameIndex): \(error.localizedDescription)")
+                return
+            }
+        }
+        
+        print("[FirebaseService] Committing batch with \(records.count) records in background...")
+        batch.commit { error in
+            if let error = error {
+                print("[FirebaseService] Background batch commit failed: \(error.localizedDescription)")
+            } else {
+                print("[FirebaseService] Background batch commit succeeded")
+            }
+        }
+    }
+    
     func loadMatch(matchId: String, completion: @escaping (Result<MatchRecord, Error>) -> Void) {
         db.collection("matches").document(matchId).getDocument { snapshot, error in
             DispatchQueue.main.async {
