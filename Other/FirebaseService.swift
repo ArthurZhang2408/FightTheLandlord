@@ -311,16 +311,20 @@ class FirebaseService: ObservableObject {
             do {
                 try batch.setData(from: recordWithMatchId, forDocument: ref)
             } catch {
-                completion(.failure(error))
+                DispatchQueue.main.async {
+                    completion(.failure(error))
+                }
                 return
             }
         }
         
         batch.commit { error in
-            if let error = error {
-                completion(.failure(error))
-            } else {
-                completion(.success(()))
+            DispatchQueue.main.async {
+                if let error = error {
+                    completion(.failure(error))
+                } else {
+                    completion(.success(()))
+                }
             }
         }
     }

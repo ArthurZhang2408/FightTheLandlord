@@ -9,7 +9,7 @@ import Foundation
 import FirebaseFirestore
 
 /// A permanent record of a match (对局) - a session with multiple games
-struct MatchRecord: Codable, Identifiable {
+struct MatchRecord: Codable, Identifiable, Hashable {
     @DocumentID var id: String?
     var startedAt: Date
     var endedAt: Date?
@@ -61,6 +61,14 @@ struct MatchRecord: Codable, Identifiable {
         self.minSnapshotB = 0
         self.minSnapshotC = 0
         self.initialStarter = starter
+    }
+    
+    func hash(into hasher: inout Hasher) {
+        hasher.combine(id)
+    }
+    
+    static func == (lhs: MatchRecord, rhs: MatchRecord) -> Bool {
+        return lhs.id == rhs.id
     }
     
     /// Update match record with final statistics
