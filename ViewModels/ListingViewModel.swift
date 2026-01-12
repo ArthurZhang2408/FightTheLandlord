@@ -36,18 +36,17 @@ class ListingViewModel: ObservableObject {
         
         // Store match ID for showing stats
         instance.endAndSaveMatch { [weak self] success in
-            DispatchQueue.main.async {
-                guard let self = self else { return }
-                self.isSaving = false
-                if success {
-                    // Store match ID to show statistics
-                    self.savedMatchId = self.instance.currentMatchId
-                    if self.savedMatchId != nil {
-                        self.showingMatchStats = true
-                    }
-                    // Clear the current match and start a new one
-                    self.instance.startNewMatch()
+            // Callback is already on main thread from DataSingleton
+            guard let self = self else { return }
+            self.isSaving = false
+            if success {
+                // Store match ID to show statistics
+                self.savedMatchId = self.instance.currentMatchId
+                if self.savedMatchId != nil {
+                    self.showingMatchStats = true
                 }
+                // Clear the current match and start a new one
+                self.instance.startNewMatch()
             }
         }
     }
