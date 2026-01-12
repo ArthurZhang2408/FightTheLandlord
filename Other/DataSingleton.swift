@@ -175,11 +175,6 @@ class DataSingleton: ObservableObject {
         isSavingMatch = true
         saveMatchError = nil
         
-        // Capture values synchronously to avoid threading issues
-        let gamesToSave = self.games
-        let scoresToSave = self.scores
-        let starter = self.room.starter
-        
         // Create match record
         var match = MatchRecord(
             playerAId: pAId,
@@ -188,24 +183,27 @@ class DataSingleton: ObservableObject {
             playerAName: pA.name,
             playerBName: pB.name,
             playerCName: pC.name,
-            starter: starter
+            starter: room.starter
         )
         
         // Finalize match with final stats
-        match.finalize(games: gamesToSave, scores: scoresToSave)
+        match.finalize(games: games, scores: scores)
         
-        print("[DataSingleton] Saving match with \(gamesToSave.count) games...")
+        print("[DataSingleton] Saving match with \(games.count) games...")
         
         // Save match to Firebase
         FirebaseService.shared.saveMatch(match) { [weak self] result in
+            guard let self = self else { return }
+            
             switch result {
             case .success(let matchId):
                 print("[DataSingleton] Match saved with ID: \(matchId)")
+                self.currentMatchId = matchId
                 
-                // Create game records
+                // Create game records from self.games (still available)
                 var gameRecords: [GameRecord] = []
-                for (index, game) in gamesToSave.enumerated() {
-                    let firstBidder = (index + starter) % 3
+                for (index, game) in self.games.enumerated() {
+                    let firstBidder = (index + self.room.starter) % 3
                     let record = GameRecord(
                         matchId: matchId,
                         gameIndex: index,
@@ -224,10 +222,9 @@ class DataSingleton: ObservableObject {
                 print("[DataSingleton] Saving \(gameRecords.count) game records...")
                 
                 // Save game records
-                FirebaseService.shared.saveGameRecords(gameRecords, matchId: matchId) { result in
+                FirebaseService.shared.saveGameRecords(gameRecords, matchId: matchId) { [weak self] result in
                     DispatchQueue.main.async {
                         self?.isSavingMatch = false
-                        self?.currentMatchId = matchId
                         switch result {
                         case .success:
                             print("[DataSingleton] Game records saved successfully")
@@ -243,8 +240,8 @@ class DataSingleton: ObservableObject {
             case .failure(let error):
                 print("[DataSingleton] Failed to save match: \(error.localizedDescription)")
                 DispatchQueue.main.async {
-                    self?.isSavingMatch = false
-                    self?.saveMatchError = error.localizedDescription
+                    self.isSavingMatch = false
+                    self.saveMatchError = error.localizedDescription
                     completion(false)
                 }
             }
