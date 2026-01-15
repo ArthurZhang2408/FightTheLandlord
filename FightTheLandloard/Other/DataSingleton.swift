@@ -24,6 +24,10 @@ class DataSingleton: ObservableObject {
     @Published var scorePerGame: Bool = true
     @Published var scores: [ScoreTriple] = []
     
+    // Tab selection
+    @Published var selectedTab: Int = 0  // 0 = 对局, 1 = 历史, 2 = 统计
+    @Published var navigateToMatchId: String?  // When set, History tab will navigate to this match
+    
     // Player tracking
     @Published var playerA: Player?
     @Published var playerB: Player?

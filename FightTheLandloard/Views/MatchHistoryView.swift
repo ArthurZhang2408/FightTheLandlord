@@ -9,6 +9,7 @@ import SwiftUI
 
 struct MatchHistoryView: View {
     @ObservedObject private var firebaseService = FirebaseService.shared
+    @ObservedObject private var dataSingleton = DataSingleton.instance
     @State private var matchToDelete: MatchRecord?
     @State private var showingDeleteConfirm = false
     @State private var navigationPath = NavigationPath()
@@ -66,6 +67,35 @@ struct MatchHistoryView: View {
                         firebaseService.deleteMatch(matchId: id) { _ in }
                     }
                     matchToDelete = nil
+                }
+            }
+            .onChange(of: dataSingleton.navigateToMatchId) { newMatchId in
+                if let matchId = newMatchId {
+                    // Find the match in the list and navigate to it
+                    if let match = firebaseService.matches.first(where: { $0.id == matchId }) {
+                        navigationPath.append(match)
+                        // Clear the navigation trigger
+                        dataSingleton.navigateToMatchId = nil
+                    }
+                    // If match not found yet, keep the trigger - onChange of matches will handle it
+                }
+            }
+            .onChange(of: firebaseService.matches) { _ in
+                // Check if we have a pending navigation when matches are updated
+                if let matchId = dataSingleton.navigateToMatchId {
+                    if let match = firebaseService.matches.first(where: { $0.id == matchId }) {
+                        navigationPath.append(match)
+                        dataSingleton.navigateToMatchId = nil
+                    }
+                }
+            }
+            .onAppear {
+                // Check for pending navigation when view appears
+                if let matchId = dataSingleton.navigateToMatchId {
+                    if let match = firebaseService.matches.first(where: { $0.id == matchId }) {
+                        navigationPath.append(match)
+                        dataSingleton.navigateToMatchId = nil
+                    }
                 }
             }
         }

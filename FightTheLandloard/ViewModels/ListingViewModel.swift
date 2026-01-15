@@ -15,8 +15,6 @@ class ListingViewModel: ObservableObject {
     @Published var deletingItem: Bool = false
     @Published var deleteIdx: Int = -1
     @Published var isSaving: Bool = false
-    @Published var showingMatchStats: Bool = false
-    @Published var savedMatchId: String? = nil
     var instance: DataSingleton = DataSingleton.instance
     
     init() {
@@ -36,13 +34,13 @@ class ListingViewModel: ObservableObject {
         // This prevents the UI from getting stuck even if Firebase has issues
         let matchId = instance.endAndSaveMatchSync()
         
-        // Show match stats if we have a match ID
-        if let matchId = matchId {
-            self.savedMatchId = matchId
-            self.showingMatchStats = true
-        }
-        
         // Clear the current match and start a new one immediately
         instance.startNewMatch()
+        
+        // Navigate to History tab and the newly saved match
+        if let matchId = matchId {
+            instance.navigateToMatchId = matchId
+            instance.selectedTab = 1  // History tab
+        }
     }
 }
