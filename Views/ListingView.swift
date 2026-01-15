@@ -129,11 +129,6 @@ struct ListingView: View {
             {
                 SettingView(players: [viewModel.instance.room.aName, viewModel.instance.room.bName, viewModel.instance.room.cName]).environmentObject(DataSingleton.instance)
             }
-            .sheet(isPresented: $viewModel.showingMatchStats) {
-                if let matchId = viewModel.savedMatchId {
-                    MatchStatsView(matchId: matchId, isPresented: $viewModel.showingMatchStats)
-                }
-            }
             .confirmationDialog("确定", isPresented: $viewModel.showConfirm) {
                 Button {
                     viewModel.endMatch()
