@@ -16,6 +16,8 @@ struct ChartConfig {
     let isFullscreen: Bool
     /// Threshold for showing data points (hide if more than this many points visible)
     static let pointVisibilityThreshold = 50
+    /// Minimum visible points when fully zoomed in (configurable parameter)
+    static let minVisiblePoints = 5
     /// Whether to show the expand button
     let showExpandButton: Bool
     /// Action when expand button is tapped
@@ -337,8 +339,19 @@ struct ZoomableChartContainer: View {
         scores.count
     }
     
+    /// Maximum zoom scale based on minimum visible points
+    private var maxScale: CGFloat {
+        guard totalPoints > ChartConfig.minVisiblePoints else { return 1.0 }
+        return CGFloat(totalPoints) / CGFloat(ChartConfig.minVisiblePoints)
+    }
+    
+    /// Whether zoom is enabled (need more than minVisiblePoints)
+    private var zoomEnabled: Bool {
+        totalPoints > ChartConfig.minVisiblePoints
+    }
+    
     private var visibleRange: Int {
-        max(2, Int(Double(totalPoints) / Double(scale)))
+        max(ChartConfig.minVisiblePoints, Int(Double(totalPoints) / Double(scale)))
     }
     
     private var shouldShowPoints: Bool {
@@ -353,19 +366,25 @@ struct ZoomableChartContainer: View {
     }
     
     private var xDomainEnd: Int {
-        min(totalPoints - 1, xDomainStart + visibleRange)
+        min(totalPoints - 1, xDomainStart + visibleRange - 1)
     }
     
     var body: some View {
         VStack(spacing: 0) {
             // Zoom info
             HStack {
-                Text("缩放: \(String(format: "%.1fx", scale))")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-                if scale > 1 {
-                    Text("(\(xDomainStart + 1)-\(xDomainEnd + 1) / \(totalPoints))")
-                        .font(.caption2)
+                if zoomEnabled {
+                    Text("缩放: \(String(format: "%.1fx", scale))")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                    if scale > 1 {
+                        Text("(\(xDomainStart + 1)-\(xDomainEnd + 1) / \(totalPoints))")
+                            .font(.caption2)
+                            .foregroundColor(.secondary)
+                    }
+                } else {
+                    Text("数据点: \(totalPoints)")
+                        .font(.caption)
                         .foregroundColor(.secondary)
                 }
                 Spacer()
@@ -425,12 +444,14 @@ struct ZoomableChartContainer: View {
             .chartYAxisLabel("累计得分")
             .chartXScale(domain: xDomainStart...xDomainEnd)
             .padding(.horizontal)
+            .clipped() // Prevent chart from drawing outside its bounds
             .contentShape(Rectangle())
             .gesture(
+                zoomEnabled ?
                 MagnificationGesture()
                     .onChanged { value in
                         let newScale = lastScale * value
-                        scale = min(max(newScale, 1.0), 10.0)
+                        scale = min(max(newScale, 1.0), maxScale)
                     }
                     .onEnded { _ in
                         lastScale = scale
@@ -438,11 +459,12 @@ struct ZoomableChartContainer: View {
                         panOffset = min(1.0, max(0, panOffset))
                         lastPanOffset = panOffset
                     }
+                : nil
             )
             .simultaneousGesture(
                 DragGesture()
                     .onChanged { value in
-                        if scale > 1 {
+                        if scale > 1 && zoomEnabled {
                             // Pan sensitivity based on chart width
                             let dragSensitivity = 1.0 / chartWidth
                             let newOffset = lastPanOffset - value.translation.width * dragSensitivity
@@ -517,8 +539,19 @@ struct ZoomableMultiPlayerChartContainer: View {
         playerData.map { $0.scores.count }.max() ?? 0
     }
     
+    /// Maximum zoom scale based on minimum visible points
+    private var maxScale: CGFloat {
+        guard maxDataCount > ChartConfig.minVisiblePoints else { return 1.0 }
+        return CGFloat(maxDataCount) / CGFloat(ChartConfig.minVisiblePoints)
+    }
+    
+    /// Whether zoom is enabled (need more than minVisiblePoints)
+    private var zoomEnabled: Bool {
+        maxDataCount > ChartConfig.minVisiblePoints
+    }
+    
     private var visibleRange: Int {
-        max(2, Int(Double(maxDataCount) / Double(scale)))
+        max(ChartConfig.minVisiblePoints, Int(Double(maxDataCount) / Double(scale)))
     }
     
     private var shouldShowPoints: Bool {
@@ -533,19 +566,25 @@ struct ZoomableMultiPlayerChartContainer: View {
     }
     
     private var xDomainEnd: Int {
-        min(maxDataCount - 1, xDomainStart + visibleRange)
+        min(maxDataCount - 1, xDomainStart + visibleRange - 1)
     }
     
     var body: some View {
         VStack(spacing: 0) {
             // Zoom info and legend
             HStack {
-                Text("缩放: \(String(format: "%.1fx", scale))")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-                if scale > 1 {
-                    Text("(\(xDomainStart + 1)-\(xDomainEnd + 1) / \(maxDataCount))")
-                        .font(.caption2)
+                if zoomEnabled {
+                    Text("缩放: \(String(format: "%.1fx", scale))")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                    if scale > 1 {
+                        Text("(\(xDomainStart + 1)-\(xDomainEnd + 1) / \(maxDataCount))")
+                            .font(.caption2)
+                            .foregroundColor(.secondary)
+                    }
+                } else {
+                    Text("数据点: \(maxDataCount)")
+                        .font(.caption)
                         .foregroundColor(.secondary)
                 }
                 Spacer()
@@ -616,12 +655,14 @@ struct ZoomableMultiPlayerChartContainer: View {
             .chartLegend(.hidden) // We have custom legend above
             .chartForegroundStyleScale(domain: playerData.map { $0.name }, range: playerData.map { $0.color })
             .padding(.horizontal)
+            .clipped() // Prevent chart from drawing outside its bounds
             .contentShape(Rectangle())
             .gesture(
+                zoomEnabled ?
                 MagnificationGesture()
                     .onChanged { value in
                         let newScale = lastScale * value
-                        scale = min(max(newScale, 1.0), 10.0)
+                        scale = min(max(newScale, 1.0), maxScale)
                     }
                     .onEnded { _ in
                         lastScale = scale
@@ -629,11 +670,12 @@ struct ZoomableMultiPlayerChartContainer: View {
                         panOffset = min(1.0, max(0, panOffset))
                         lastPanOffset = panOffset
                     }
+                : nil
             )
             .simultaneousGesture(
                 DragGesture()
                     .onChanged { value in
-                        if scale > 1 {
+                        if scale > 1 && zoomEnabled {
                             // Pan sensitivity based on chart width
                             let dragSensitivity = 1.0 / chartWidth
                             let newOffset = lastPanOffset - value.translation.width * dragSensitivity
