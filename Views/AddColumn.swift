@@ -15,9 +15,9 @@ struct AddColumn: View {
     var body: some View {
         NavigationStack {
             Form {
-                // MARK: - Players Section (Bid + Double combined)
+                // MARK: - Players Section (Bid + Double in card format)
                 Section {
-                    CompactPlayerRow(
+                    PlayerBidCard(
                         name: viewModel.instance.room.aName.isEmpty ? "玩家A" : viewModel.instance.room.aName,
                         isFirstBidder: turn == 0,
                         selectedBid: $viewModel.apoint,
@@ -25,7 +25,7 @@ struct AddColumn: View {
                         options: viewModel.points
                     )
                     
-                    CompactPlayerRow(
+                    PlayerBidCard(
                         name: viewModel.instance.room.bName.isEmpty ? "玩家B" : viewModel.instance.room.bName,
                         isFirstBidder: turn == 1,
                         selectedBid: $viewModel.bpoint,
@@ -33,7 +33,7 @@ struct AddColumn: View {
                         options: viewModel.points
                     )
                     
-                    CompactPlayerRow(
+                    PlayerBidCard(
                         name: viewModel.instance.room.cName.isEmpty ? "玩家C" : viewModel.instance.room.cName,
                         isFirstBidder: turn == 2,
                         selectedBid: $viewModel.cpoint,
@@ -41,12 +41,7 @@ struct AddColumn: View {
                         options: viewModel.points
                     )
                 } header: {
-                    HStack {
-                        Text("叫分")
-                        Spacer()
-                        Text("加倍")
-                            .foregroundColor(.secondary)
-                    }
+                    Text("玩家叫分")
                 } footer: {
                     if let landlord = determineLandlord() {
                         Text("👑 \(landlord) 成为地主")
@@ -177,9 +172,9 @@ struct AddColumn: View {
     }
 }
 
-// MARK: - Compact Player Row (Bid + Double in one row)
+// MARK: - Player Bid Card
 
-struct CompactPlayerRow: View {
+struct PlayerBidCard: View {
     let name: String
     let isFirstBidder: Bool
     @Binding var selectedBid: String
@@ -187,36 +182,38 @@ struct CompactPlayerRow: View {
     let options: [String]
     
     var body: some View {
-        HStack(spacing: 8) {
-            // Player name with first bidder indicator
-            HStack(spacing: 4) {
+        VStack(alignment: .leading, spacing: 12) {
+            // Player name row
+            HStack {
                 if isFirstBidder {
                     Image(systemName: "hand.point.right.fill")
-                        .font(.caption)
                         .foregroundColor(.orange)
                 }
                 Text(name)
-                    .font(.subheadline)
-                    .fontWeight(.medium)
-                    .lineLimit(1)
+                    .font(.headline)
+                
+                Spacer()
+                
+                // Double toggle with label
+                HStack(spacing: 6) {
+                    Text("加倍")
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                    Toggle("", isOn: $isDoubled)
+                        .labelsHidden()
+                }
             }
-            .frame(width: 70, alignment: .leading)
             
-            // Bid picker (compact)
-            Picker("", selection: $selectedBid) {
+            // Bid picker (full width)
+            Picker("叫分", selection: $selectedBid) {
                 ForEach(options, id: \.self) { option in
-                    Text(option == "不叫" ? "不叫" : option.replacingOccurrences(of: "分", with: ""))
+                    Text(option)
                         .tag(option)
                 }
             }
             .pickerStyle(.segmented)
-            .frame(maxWidth: .infinity)
-            
-            // Double toggle
-            Toggle("", isOn: $isDoubled)
-                .labelsHidden()
-                .frame(width: 50)
         }
+        .padding(.vertical, 4)
     }
 }
 
