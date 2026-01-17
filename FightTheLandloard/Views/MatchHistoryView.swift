@@ -1041,6 +1041,8 @@ struct FullMatchStatsView: View {
 struct ScoreLineChart: View {
     let scores: [ScoreTriple]
     let playerNames: (String, String, String)
+    var showExpandButton: Bool = true
+    @State private var showFullscreen = false
     
     private struct ScorePoint: Identifiable {
         let id = UUID()
@@ -1066,24 +1068,43 @@ struct ScoreLineChart: View {
     
     var body: some View {
         if #available(iOS 16.0, *) {
-            Chart {
-                ForEach(dataPoints) { point in
-                    LineMark(
-                        x: .value("局数", point.gameIndex),
-                        y: .value("分数", point.score)
-                    )
-                    .foregroundStyle(by: .value("玩家", point.player))
-                    
-                    PointMark(
-                        x: .value("局数", point.gameIndex),
-                        y: .value("分数", point.score)
-                    )
-                    .foregroundStyle(by: .value("玩家", point.player))
+            VStack(spacing: 8) {
+                if showExpandButton {
+                    HStack {
+                        Spacer()
+                        Button {
+                            showFullscreen = true
+                        } label: {
+                            Image(systemName: "arrow.up.left.and.arrow.down.right")
+                                .font(.caption)
+                                .foregroundColor(.accentColor)
+                        }
+                        .buttonStyle(.plain)
+                    }
                 }
+                
+                Chart {
+                    ForEach(dataPoints) { point in
+                        LineMark(
+                            x: .value("局数", point.gameIndex),
+                            y: .value("分数", point.score)
+                        )
+                        .foregroundStyle(by: .value("玩家", point.player))
+                        
+                        PointMark(
+                            x: .value("局数", point.gameIndex),
+                            y: .value("分数", point.score)
+                        )
+                        .foregroundStyle(by: .value("玩家", point.player))
+                    }
+                }
+                .chartXAxisLabel("局数")
+                .chartYAxisLabel("累计得分")
+                .chartLegend(position: .bottom)
             }
-            .chartXAxisLabel("局数")
-            .chartYAxisLabel("累计得分")
-            .chartLegend(position: .bottom)
+            .fullScreenCover(isPresented: $showFullscreen) {
+                FullscreenChartView(scores: scores, playerNames: playerNames)
+            }
         } else {
             // Fallback for older iOS versions
             VStack(spacing: 8) {
@@ -1130,6 +1151,98 @@ struct ScoreLineChart: View {
             }
             .frame(maxWidth: .infinity)
         }
+    }
+}
+
+// MARK: - Fullscreen Chart View (Landscape)
+
+@available(iOS 16.0, *)
+struct FullscreenChartView: View {
+    let scores: [ScoreTriple]
+    let playerNames: (String, String, String)
+    @Environment(\.dismiss) private var dismiss
+    
+    private struct ScorePoint: Identifiable {
+        let id = UUID()
+        let gameIndex: Int
+        let player: String
+        let score: Int
+    }
+    
+    private var dataPoints: [ScorePoint] {
+        var points: [ScorePoint] = []
+        points.append(ScorePoint(gameIndex: 0, player: playerNames.0, score: 0))
+        points.append(ScorePoint(gameIndex: 0, player: playerNames.1, score: 0))
+        points.append(ScorePoint(gameIndex: 0, player: playerNames.2, score: 0))
+        
+        for (idx, score) in scores.enumerated() {
+            points.append(ScorePoint(gameIndex: idx + 1, player: playerNames.0, score: score.A))
+            points.append(ScorePoint(gameIndex: idx + 1, player: playerNames.1, score: score.B))
+            points.append(ScorePoint(gameIndex: idx + 1, player: playerNames.2, score: score.C))
+        }
+        return points
+    }
+    
+    var body: some View {
+        NavigationStack {
+            GeometryReader { geometry in
+                let isLandscape = geometry.size.width > geometry.size.height
+                
+                VStack {
+                    if isLandscape {
+                        // Landscape: chart takes full width
+                        chartView
+                            .padding()
+                    } else {
+                        // Portrait: show hint to rotate
+                        VStack(spacing: 20) {
+                            Image(systemName: "rotate.right")
+                                .font(.system(size: 40))
+                                .foregroundColor(.secondary)
+                            Text("旋转设备查看完整图表")
+                                .foregroundColor(.secondary)
+                            
+                            chartView
+                                .frame(height: 300)
+                                .padding()
+                        }
+                    }
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            }
+            .navigationTitle("得分走势")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("关闭") {
+                        dismiss()
+                    }
+                }
+            }
+        }
+    }
+    
+    private var chartView: some View {
+        Chart {
+            ForEach(dataPoints) { point in
+                LineMark(
+                    x: .value("局数", point.gameIndex),
+                    y: .value("分数", point.score)
+                )
+                .foregroundStyle(by: .value("玩家", point.player))
+                .lineStyle(StrokeStyle(lineWidth: 2))
+                
+                PointMark(
+                    x: .value("局数", point.gameIndex),
+                    y: .value("分数", point.score)
+                )
+                .foregroundStyle(by: .value("玩家", point.player))
+                .symbolSize(50)
+            }
+        }
+        .chartXAxisLabel("局数")
+        .chartYAxisLabel("累计得分")
+        .chartLegend(position: .bottom)
     }
 }
 

@@ -179,6 +179,8 @@ struct AddPlayerView: View {
 struct PlayerDetailView: View {
     let player: Player
     @State private var statistics: PlayerStatistics?
+    @State private var gameRecords: [GameRecord] = []
+    @State private var matchRecords: [MatchRecord] = []
     @State private var isLoading = true
     @State private var errorMessage: String?
     
@@ -195,7 +197,13 @@ struct PlayerDetailView: View {
                         .foregroundColor(.secondary)
                 }
             } else if let stats = statistics {
-                StatisticsView(stats: stats, playerName: player.name)
+                StatisticsView(
+                    stats: stats, 
+                    playerName: player.name,
+                    playerId: player.id ?? "",
+                    gameRecords: gameRecords,
+                    matchRecords: matchRecords
+                )
             }
         }
         .navigationTitle(player.name)
@@ -212,12 +220,42 @@ struct PlayerDetailView: View {
             return
         }
         
+        let group = DispatchGroup()
+        var loadError: Error?
+        
+        // Load statistics
+        group.enter()
         FirebaseService.shared.calculateStatistics(forPlayer: playerId) { result in
-            isLoading = false
+            defer { group.leave() }
             switch result {
             case .success(let stats):
                 statistics = stats
             case .failure(let error):
+                loadError = error
+            }
+        }
+        
+        // Load game records for chart
+        group.enter()
+        FirebaseService.shared.loadGameRecords(forPlayer: playerId) { result in
+            defer { group.leave() }
+            if case .success(let records) = result {
+                gameRecords = records.sorted { $0.playedAt < $1.playedAt }
+            }
+        }
+        
+        // Load match records for chart
+        group.enter()
+        FirebaseService.shared.loadMatches(forPlayer: playerId) { result in
+            defer { group.leave() }
+            if case .success(let matches) = result {
+                matchRecords = matches.sorted { $0.startedAt < $1.startedAt }
+            }
+        }
+        
+        group.notify(queue: .main) {
+            isLoading = false
+            if let error = loadError {
                 errorMessage = error.localizedDescription
             }
         }
@@ -227,7 +265,12 @@ struct PlayerDetailView: View {
 struct StatisticsView: View {
     let stats: PlayerStatistics
     let playerName: String
+    let playerId: String
+    let gameRecords: [GameRecord]
+    let matchRecords: [MatchRecord]
     @ObservedObject private var dataSingleton = DataSingleton.instance
+    @State private var showGameChart = true // true = 小局, false = 大局
+    @State private var showFullscreenChart = false
     
     private func scoreColor(_ score: Int) -> Color {
         if score == 0 { return .primary }
@@ -239,8 +282,89 @@ struct StatisticsView: View {
         }
     }
     
+    // Calculate cumulative scores for each game
+    private var gameScoreHistory: [Int] {
+        var cumulative = 0
+        var scores: [Int] = [0] // Start at 0
+        for record in gameRecords {
+            let position = getPlayerPosition(playerId: playerId, record: record)
+            let score = getPlayerScore(position: position, record: record)
+            cumulative += score
+            scores.append(cumulative)
+        }
+        return scores
+    }
+    
+    // Calculate cumulative scores for each match
+    private var matchScoreHistory: [Int] {
+        var cumulative = 0
+        var scores: [Int] = [0] // Start at 0
+        for match in matchRecords {
+            let position = getPlayerPositionInMatch(playerId: playerId, match: match)
+            let finalScore = getPlayerFinalScore(position: position, match: match)
+            cumulative += finalScore
+            scores.append(cumulative)
+        }
+        return scores
+    }
+    
+    private func getPlayerPosition(playerId: String, record: GameRecord) -> Int {
+        if record.playerAId == playerId { return 1 }
+        if record.playerBId == playerId { return 2 }
+        return 3
+    }
+    
+    private func getPlayerScore(position: Int, record: GameRecord) -> Int {
+        switch position {
+        case 1: return record.scoreA
+        case 2: return record.scoreB
+        default: return record.scoreC
+        }
+    }
+    
+    private func getPlayerPositionInMatch(playerId: String, match: MatchRecord) -> Int {
+        if match.playerAId == playerId { return 1 }
+        if match.playerBId == playerId { return 2 }
+        return 3
+    }
+    
+    private func getPlayerFinalScore(position: Int, match: MatchRecord) -> Int {
+        switch position {
+        case 1: return match.finalScoreA
+        case 2: return match.finalScoreB
+        default: return match.finalScoreC
+        }
+    }
+    
     var body: some View {
         List {
+            // Score History Chart
+            if gameRecords.count >= 2 || matchRecords.count >= 2 {
+                Section {
+                    VStack(spacing: 12) {
+                        // Toggle between game and match view
+                        Picker("视图", selection: $showGameChart) {
+                            Text("小局走势").tag(true)
+                            Text("大局走势").tag(false)
+                        }
+                        .pickerStyle(.segmented)
+                        
+                        PlayerScoreHistoryChart(
+                            scores: showGameChart ? gameScoreHistory : matchScoreHistory,
+                            playerName: playerName,
+                            xAxisLabel: showGameChart ? "小局" : "大局",
+                            showExpandButton: true,
+                            onExpand: { showFullscreenChart = true }
+                        )
+                        .frame(height: 200)
+                    }
+                } header: {
+                    Text("得分走势")
+                } footer: {
+                    Text(showGameChart ? "显示每一小局后的累计分数" : "显示每一大局后的累计分数")
+                }
+            }
+            
             // Win Rate Chart
             if stats.totalGames > 0 {
                 Section {
@@ -354,6 +478,14 @@ struct StatisticsView: View {
             }
         }
         .listStyle(.insetGrouped)
+        .fullScreenCover(isPresented: $showFullscreenChart) {
+            PlayerScoreHistoryFullscreen(
+                gameScores: gameScoreHistory,
+                matchScores: matchScoreHistory,
+                playerName: playerName,
+                initialShowGameChart: showGameChart
+            )
+        }
     }
 }
 
@@ -625,6 +757,272 @@ struct StatRow: View {
             Text(value)
                 .foregroundColor(valueColor)
                 .fontWeight(.medium)
+        }
+    }
+}
+
+// MARK: - Player Score History Chart
+
+struct PlayerScoreHistoryChart: View {
+    let scores: [Int]
+    let playerName: String
+    let xAxisLabel: String
+    var showExpandButton: Bool = false
+    var onExpand: (() -> Void)? = nil
+    
+    private struct ScorePoint: Identifiable {
+        let id = UUID()
+        let index: Int
+        let score: Int
+    }
+    
+    private var dataPoints: [ScorePoint] {
+        scores.enumerated().map { ScorePoint(index: $0.offset, score: $0.element) }
+    }
+    
+    var body: some View {
+        if #available(iOS 16.0, *) {
+            VStack(spacing: 8) {
+                if showExpandButton {
+                    HStack {
+                        Spacer()
+                        Button {
+                            onExpand?()
+                        } label: {
+                            Image(systemName: "arrow.up.left.and.arrow.down.right")
+                                .font(.caption)
+                                .foregroundColor(.accentColor)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+                
+                Chart {
+                    ForEach(dataPoints) { point in
+                        LineMark(
+                            x: .value(xAxisLabel, point.index),
+                            y: .value("分数", point.score)
+                        )
+                        .foregroundStyle(Color.accentColor)
+                        .lineStyle(StrokeStyle(lineWidth: 2))
+                        
+                        AreaMark(
+                            x: .value(xAxisLabel, point.index),
+                            y: .value("分数", point.score)
+                        )
+                        .foregroundStyle(
+                            LinearGradient(
+                                colors: [Color.accentColor.opacity(0.3), Color.accentColor.opacity(0.05)],
+                                startPoint: .top,
+                                endPoint: .bottom
+                            )
+                        )
+                    }
+                    
+                    // Zero line
+                    RuleMark(y: .value("零分线", 0))
+                        .foregroundStyle(.secondary.opacity(0.5))
+                        .lineStyle(StrokeStyle(dash: [5, 3]))
+                }
+                .chartXAxisLabel(xAxisLabel)
+                .chartYAxisLabel("累计得分")
+            }
+        } else {
+            // Fallback for older iOS versions
+            VStack(spacing: 12) {
+                Text("得分走势")
+                    .font(.headline)
+                if let lastScore = scores.last {
+                    Text("当前累计: \(lastScore)")
+                        .font(.title2)
+                        .fontWeight(.bold)
+                        .foregroundColor(lastScore >= 0 ? .green : .red)
+                }
+                Text("共 \(scores.count - 1) \(xAxisLabel)")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
+            .frame(maxWidth: .infinity)
+        }
+    }
+}
+
+// MARK: - Fullscreen Player Score History
+
+struct PlayerScoreHistoryFullscreen: View {
+    let gameScores: [Int]
+    let matchScores: [Int]
+    let playerName: String
+    let initialShowGameChart: Bool
+    
+    @State private var showGameChart: Bool
+    @Environment(\.dismiss) private var dismiss
+    
+    init(gameScores: [Int], matchScores: [Int], playerName: String, initialShowGameChart: Bool) {
+        self.gameScores = gameScores
+        self.matchScores = matchScores
+        self.playerName = playerName
+        self.initialShowGameChart = initialShowGameChart
+        self._showGameChart = State(initialValue: initialShowGameChart)
+    }
+    
+    private var currentScores: [Int] {
+        showGameChart ? gameScores : matchScores
+    }
+    
+    private var xAxisLabel: String {
+        showGameChart ? "小局" : "大局"
+    }
+    
+    private struct ScorePoint: Identifiable {
+        let id = UUID()
+        let index: Int
+        let score: Int
+    }
+    
+    private var dataPoints: [ScorePoint] {
+        currentScores.enumerated().map { ScorePoint(index: $0.offset, score: $0.element) }
+    }
+    
+    var body: some View {
+        NavigationStack {
+            GeometryReader { geometry in
+                let isLandscape = geometry.size.width > geometry.size.height
+                
+                VStack(spacing: 16) {
+                    // Toggle between game and match view
+                    Picker("视图", selection: $showGameChart) {
+                        Text("小局走势").tag(true)
+                        Text("大局走势").tag(false)
+                    }
+                    .pickerStyle(.segmented)
+                    .padding(.horizontal)
+                    
+                    if isLandscape {
+                        // Landscape: chart takes full space
+                        chartView
+                            .padding()
+                    } else {
+                        // Portrait: show hint to rotate
+                        VStack(spacing: 20) {
+                            HStack(spacing: 8) {
+                                Image(systemName: "rotate.right")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                                Text("旋转设备查看完整图表")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                            }
+                            
+                            chartView
+                                .padding(.horizontal)
+                        }
+                    }
+                    
+                    // Stats summary
+                    if let lastScore = currentScores.last {
+                        HStack(spacing: 24) {
+                            VStack {
+                                Text("当前累计")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                                Text("\(lastScore)")
+                                    .font(.title2)
+                                    .fontWeight(.bold)
+                                    .foregroundColor(lastScore >= 0 ? .green : .red)
+                            }
+                            
+                            VStack {
+                                Text("最高")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                                Text("\(currentScores.max() ?? 0)")
+                                    .font(.title2)
+                                    .fontWeight(.bold)
+                                    .foregroundColor(.green)
+                            }
+                            
+                            VStack {
+                                Text("最低")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                                Text("\(currentScores.min() ?? 0)")
+                                    .font(.title2)
+                                    .fontWeight(.bold)
+                                    .foregroundColor(.red)
+                            }
+                            
+                            VStack {
+                                Text(showGameChart ? "总小局" : "总大局")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                                Text("\(currentScores.count - 1)")
+                                    .font(.title2)
+                                    .fontWeight(.bold)
+                            }
+                        }
+                        .padding()
+                        .background(Color(.systemGray6))
+                        .cornerRadius(12)
+                        .padding(.horizontal)
+                    }
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            }
+            .navigationTitle("\(playerName) - 得分走势")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("关闭") {
+                        dismiss()
+                    }
+                }
+            }
+        }
+    }
+    
+    @ViewBuilder
+    private var chartView: some View {
+        if #available(iOS 16.0, *) {
+            Chart {
+                ForEach(dataPoints) { point in
+                    LineMark(
+                        x: .value(xAxisLabel, point.index),
+                        y: .value("分数", point.score)
+                    )
+                    .foregroundStyle(Color.accentColor)
+                    .lineStyle(StrokeStyle(lineWidth: 2.5))
+                    
+                    AreaMark(
+                        x: .value(xAxisLabel, point.index),
+                        y: .value("分数", point.score)
+                    )
+                    .foregroundStyle(
+                        LinearGradient(
+                            colors: [Color.accentColor.opacity(0.3), Color.accentColor.opacity(0.05)],
+                            startPoint: .top,
+                            endPoint: .bottom
+                        )
+                    )
+                    
+                    PointMark(
+                        x: .value(xAxisLabel, point.index),
+                        y: .value("分数", point.score)
+                    )
+                    .foregroundStyle(Color.accentColor)
+                    .symbolSize(30)
+                }
+                
+                // Zero line
+                RuleMark(y: .value("零分线", 0))
+                    .foregroundStyle(.secondary.opacity(0.5))
+                    .lineStyle(StrokeStyle(dash: [5, 3]))
+            }
+            .chartXAxisLabel(xAxisLabel)
+            .chartYAxisLabel("累计得分")
+        } else {
+            Text("需要 iOS 16.0 或更高版本")
+                .foregroundColor(.secondary)
         }
     }
 }
