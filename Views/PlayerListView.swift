@@ -847,7 +847,7 @@ struct PlayerScoreHistoryChart: View {
     }
 }
 
-// MARK: - Fullscreen Player Score History
+// MARK: - Fullscreen Player Score History (Landscape Only)
 
 struct PlayerScoreHistoryFullscreen: View {
     let gameScores: [Int]
@@ -884,100 +884,98 @@ struct PlayerScoreHistoryFullscreen: View {
         currentScores.enumerated().map { ScorePoint(index: $0.offset, score: $0.element) }
     }
     
+    private func forceLandscape() {
+        let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene
+        windowScene?.requestGeometryUpdate(.iOS(interfaceOrientations: .landscape))
+        UIDevice.current.setValue(UIInterfaceOrientation.landscapeRight.rawValue, forKey: "orientation")
+    }
+    
+    private func restorePortrait() {
+        let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene
+        windowScene?.requestGeometryUpdate(.iOS(interfaceOrientations: .portrait))
+        UIDevice.current.setValue(UIInterfaceOrientation.portrait.rawValue, forKey: "orientation")
+    }
+    
     var body: some View {
         NavigationStack {
-            GeometryReader { geometry in
-                let isLandscape = geometry.size.width > geometry.size.height
-                
-                VStack(spacing: 16) {
-                    // Toggle between game and match view
-                    Picker("视图", selection: $showGameChart) {
-                        Text("小局走势").tag(true)
-                        Text("大局走势").tag(false)
-                    }
-                    .pickerStyle(.segmented)
-                    .padding(.horizontal)
-                    
-                    if isLandscape {
-                        // Landscape: chart takes full space
-                        chartView
-                            .padding()
-                    } else {
-                        // Portrait: show hint to rotate
-                        VStack(spacing: 20) {
-                            HStack(spacing: 8) {
-                                Image(systemName: "rotate.right")
-                                    .font(.caption)
-                                    .foregroundColor(.secondary)
-                                Text("旋转设备查看完整图表")
-                                    .font(.caption)
-                                    .foregroundColor(.secondary)
-                            }
-                            
-                            chartView
-                                .padding(.horizontal)
-                        }
-                    }
-                    
-                    // Stats summary
-                    if let lastScore = currentScores.last {
-                        HStack(spacing: 24) {
-                            VStack {
-                                Text("当前累计")
-                                    .font(.caption)
-                                    .foregroundColor(.secondary)
-                                Text("\(lastScore)")
-                                    .font(.title2)
-                                    .fontWeight(.bold)
-                                    .foregroundColor(lastScore >= 0 ? .green : .red)
-                            }
-                            
-                            VStack {
-                                Text("最高")
-                                    .font(.caption)
-                                    .foregroundColor(.secondary)
-                                Text("\(currentScores.max() ?? 0)")
-                                    .font(.title2)
-                                    .fontWeight(.bold)
-                                    .foregroundColor(.green)
-                            }
-                            
-                            VStack {
-                                Text("最低")
-                                    .font(.caption)
-                                    .foregroundColor(.secondary)
-                                Text("\(currentScores.min() ?? 0)")
-                                    .font(.title2)
-                                    .fontWeight(.bold)
-                                    .foregroundColor(.red)
-                            }
-                            
-                            VStack {
-                                Text(showGameChart ? "总小局" : "总大局")
-                                    .font(.caption)
-                                    .foregroundColor(.secondary)
-                                Text("\(currentScores.count - 1)")
-                                    .font(.title2)
-                                    .fontWeight(.bold)
-                            }
-                        }
-                        .padding()
-                        .background(Color(.systemGray6))
-                        .cornerRadius(12)
-                        .padding(.horizontal)
-                    }
+            VStack(spacing: 16) {
+                // Toggle between game and match view
+                Picker("视图", selection: $showGameChart) {
+                    Text("小局走势").tag(true)
+                    Text("大局走势").tag(false)
                 }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .pickerStyle(.segmented)
+                .padding(.horizontal)
+                
+                // Chart takes full space in landscape
+                chartView
+                    .padding()
+                
+                // Stats summary (horizontal for landscape)
+                if let lastScore = currentScores.last {
+                    HStack(spacing: 24) {
+                        VStack {
+                            Text("当前累计")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                            Text("\(lastScore)")
+                                .font(.title2)
+                                .fontWeight(.bold)
+                                .foregroundColor(lastScore >= 0 ? .green : .red)
+                        }
+                        
+                        VStack {
+                            Text("最高")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                            Text("\(currentScores.max() ?? 0)")
+                                .font(.title2)
+                                .fontWeight(.bold)
+                                .foregroundColor(.green)
+                        }
+                        
+                        VStack {
+                            Text("最低")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                            Text("\(currentScores.min() ?? 0)")
+                                .font(.title2)
+                                .fontWeight(.bold)
+                                .foregroundColor(.red)
+                        }
+                        
+                        VStack {
+                            Text(showGameChart ? "总小局" : "总大局")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                            Text("\(currentScores.count - 1)")
+                                .font(.title2)
+                                .fontWeight(.bold)
+                        }
+                    }
+                    .padding()
+                    .background(Color(.systemGray6))
+                    .cornerRadius(12)
+                    .padding(.horizontal)
+                }
             }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
             .navigationTitle("\(playerName) - 得分走势")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("关闭") {
+                        restorePortrait()
                         dismiss()
                     }
                 }
             }
+        }
+        .onAppear {
+            forceLandscape()
+        }
+        .onDisappear {
+            restorePortrait()
         }
     }
     
