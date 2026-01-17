@@ -1154,7 +1154,7 @@ struct ScoreLineChart: View {
     }
 }
 
-// MARK: - Fullscreen Chart View (Landscape)
+// MARK: - Fullscreen Chart View (Landscape Only)
 
 @available(iOS 16.0, *)
 struct FullscreenChartView: View {
@@ -1185,41 +1185,38 @@ struct FullscreenChartView: View {
     
     var body: some View {
         NavigationStack {
-            GeometryReader { geometry in
-                let isLandscape = geometry.size.width > geometry.size.height
-                
-                VStack {
-                    if isLandscape {
-                        // Landscape: chart takes full width
-                        chartView
-                            .padding()
-                    } else {
-                        // Portrait: show hint to rotate
-                        VStack(spacing: 20) {
-                            Image(systemName: "rotate.right")
-                                .font(.system(size: 40))
-                                .foregroundColor(.secondary)
-                            Text("旋转设备查看完整图表")
-                                .foregroundColor(.secondary)
-                            
-                            chartView
-                                .frame(height: 300)
-                                .padding()
-                        }
-                    }
-                }
+            chartView
+                .padding()
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
-            }
             .navigationTitle("得分走势")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("关闭") {
+                        restorePortrait()
                         dismiss()
                     }
                 }
             }
         }
+        .onAppear {
+            forceLandscape()
+        }
+        .onDisappear {
+            restorePortrait()
+        }
+    }
+    
+    private func forceLandscape() {
+        let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene
+        windowScene?.requestGeometryUpdate(.iOS(interfaceOrientations: .landscape))
+        UIDevice.current.setValue(UIInterfaceOrientation.landscapeRight.rawValue, forKey: "orientation")
+    }
+    
+    private func restorePortrait() {
+        let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene
+        windowScene?.requestGeometryUpdate(.iOS(interfaceOrientations: .portrait))
+        UIDevice.current.setValue(UIInterfaceOrientation.portrait.rawValue, forKey: "orientation")
     }
     
     private var chartView: some View {
