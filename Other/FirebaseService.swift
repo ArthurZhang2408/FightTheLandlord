@@ -43,20 +43,34 @@ class FirebaseService: ObservableObject {
         }
     }
     
-    func addPlayer(name: String, completion: @escaping (Result<Player, Error>) -> Void) {
+    func addPlayer(name: String, color: PlayerColor? = nil, completion: @escaping (Result<Player, Error>) -> Void) {
         // Check for duplicate names
         if players.contains(where: { $0.name == name }) {
             completion(.failure(NSError(domain: "", code: -1, userInfo: [NSLocalizedDescriptionKey: "玩家名称已存在"])))
             return
         }
         
-        let player = Player(name: name)
+        let player = Player(name: name, playerColor: color ?? .blue)
         
         do {
             let ref = try db.collection("players").addDocument(from: player)
             var newPlayer = player
             newPlayer.id = ref.documentID
             completion(.success(newPlayer))
+        } catch {
+            completion(.failure(error))
+        }
+    }
+    
+    func updatePlayer(_ player: Player, completion: @escaping (Result<Void, Error>) -> Void) {
+        guard let playerId = player.id else {
+            completion(.failure(NSError(domain: "", code: -1, userInfo: [NSLocalizedDescriptionKey: "玩家ID无效"])))
+            return
+        }
+        
+        do {
+            try db.collection("players").document(playerId).setData(from: player)
+            completion(.success(()))
         } catch {
             completion(.failure(error))
         }

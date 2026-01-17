@@ -1041,75 +1041,57 @@ struct FullMatchStatsView: View {
 struct ScoreLineChart: View {
     let scores: [ScoreTriple]
     let playerNames: (String, String, String)
+    let playerColors: (Color, Color, Color)
     var showExpandButton: Bool = true
     @State private var showFullscreen = false
     
-    private struct ScorePoint: Identifiable {
-        let id = UUID()
-        let gameIndex: Int
-        let player: String
-        let score: Int
+    init(scores: [ScoreTriple], playerNames: (String, String, String), playerColors: (Color, Color, Color)? = nil, showExpandButton: Bool = true) {
+        self.scores = scores
+        self.playerNames = playerNames
+        // Default colors if not provided
+        self.playerColors = playerColors ?? (.blue, .green, .orange)
+        self.showExpandButton = showExpandButton
     }
     
-    private var dataPoints: [ScorePoint] {
-        var points: [ScorePoint] = []
-        // Add starting point (0, 0, 0)
-        points.append(ScorePoint(gameIndex: 0, player: playerNames.0, score: 0))
-        points.append(ScorePoint(gameIndex: 0, player: playerNames.1, score: 0))
-        points.append(ScorePoint(gameIndex: 0, player: playerNames.2, score: 0))
+    private var playerData: [(name: String, scores: [Int], color: Color)] {
+        var scoreA: [Int] = [0]
+        var scoreB: [Int] = [0]
+        var scoreC: [Int] = [0]
         
-        for (idx, score) in scores.enumerated() {
-            points.append(ScorePoint(gameIndex: idx + 1, player: playerNames.0, score: score.A))
-            points.append(ScorePoint(gameIndex: idx + 1, player: playerNames.1, score: score.B))
-            points.append(ScorePoint(gameIndex: idx + 1, player: playerNames.2, score: score.C))
+        for score in scores {
+            scoreA.append(score.A)
+            scoreB.append(score.B)
+            scoreC.append(score.C)
         }
-        return points
+        
+        return [
+            (name: playerNames.0, scores: scoreA, color: playerColors.0),
+            (name: playerNames.1, scores: scoreB, color: playerColors.1),
+            (name: playerNames.2, scores: scoreC, color: playerColors.2)
+        ]
     }
     
     var body: some View {
         if #available(iOS 16.0, *) {
             VStack(spacing: 8) {
-                if showExpandButton {
-                    HStack {
-                        Spacer()
-                        Button {
-                            showFullscreen = true
-                        } label: {
-                            Image(systemName: "arrow.up.left.and.arrow.down.right")
-                                .font(.caption)
-                                .foregroundColor(.accentColor)
-                        }
-                        .buttonStyle(.plain)
-                    }
-                }
-                
-                Chart {
-                    ForEach(dataPoints) { point in
-                        LineMark(
-                            x: .value("局数", point.gameIndex),
-                            y: .value("分数", point.score)
-                        )
-                        .foregroundStyle(by: .value("玩家", point.player))
-                        
-                        PointMark(
-                            x: .value("局数", point.gameIndex),
-                            y: .value("分数", point.score)
-                        )
-                        .foregroundStyle(by: .value("玩家", point.player))
-                    }
-                }
-                .chartXAxisLabel("局数")
-                .chartYAxisLabel("累计得分")
-                .chartLegend(position: .bottom)
+                MultiPlayerLineChart(
+                    playerData: playerData,
+                    xAxisLabel: "局数",
+                    config: showExpandButton ? .small { showFullscreen = true } : .smallWithoutExpand
+                )
             }
             .fullScreenCover(isPresented: $showFullscreen) {
-                FullscreenChartView(scores: scores, playerNames: playerNames)
+                FullscreenMultiPlayerChartView(
+                    playerData: playerData,
+                    xAxisLabel: "局数",
+                    title: "得分走势"
+                )
             }
         } else {
             // Fallback for older iOS versions
             VStack(spacing: 8) {
                 HStack(spacing: 16) {
-                    ForEach([(playerNames.0, Color.blue), (playerNames.1, Color.green), (playerNames.2, Color.orange)], id: \.0) { name, color in
+                    ForEach([(playerNames.0, playerColors.0), (playerNames.1, playerColors.1), (playerNames.2, playerColors.2)], id: \.0) { name, color in
                         HStack(spacing: 4) {
                             Circle()
                                 .fill(color)
@@ -1125,7 +1107,7 @@ struct ScoreLineChart: View {
                         VStack {
                             Text("\(lastScore.A)")
                                 .font(.headline)
-                                .foregroundColor(.blue)
+                                .foregroundColor(playerColors.0)
                             Text(playerNames.0)
                                 .font(.caption)
                                 .foregroundColor(.secondary)
@@ -1133,7 +1115,7 @@ struct ScoreLineChart: View {
                         VStack {
                             Text("\(lastScore.B)")
                                 .font(.headline)
-                                .foregroundColor(.green)
+                                .foregroundColor(playerColors.1)
                             Text(playerNames.1)
                                 .font(.caption)
                                 .foregroundColor(.secondary)
@@ -1141,7 +1123,7 @@ struct ScoreLineChart: View {
                         VStack {
                             Text("\(lastScore.C)")
                                 .font(.headline)
-                                .foregroundColor(.orange)
+                                .foregroundColor(playerColors.2)
                             Text(playerNames.2)
                                 .font(.caption)
                                 .foregroundColor(.secondary)
@@ -1151,95 +1133,6 @@ struct ScoreLineChart: View {
             }
             .frame(maxWidth: .infinity)
         }
-    }
-}
-
-// MARK: - Fullscreen Chart View (Landscape Only)
-
-@available(iOS 16.0, *)
-struct FullscreenChartView: View {
-    let scores: [ScoreTriple]
-    let playerNames: (String, String, String)
-    @Environment(\.dismiss) private var dismiss
-    
-    private struct ScorePoint: Identifiable {
-        let id = UUID()
-        let gameIndex: Int
-        let player: String
-        let score: Int
-    }
-    
-    private var dataPoints: [ScorePoint] {
-        var points: [ScorePoint] = []
-        points.append(ScorePoint(gameIndex: 0, player: playerNames.0, score: 0))
-        points.append(ScorePoint(gameIndex: 0, player: playerNames.1, score: 0))
-        points.append(ScorePoint(gameIndex: 0, player: playerNames.2, score: 0))
-        
-        for (idx, score) in scores.enumerated() {
-            points.append(ScorePoint(gameIndex: idx + 1, player: playerNames.0, score: score.A))
-            points.append(ScorePoint(gameIndex: idx + 1, player: playerNames.1, score: score.B))
-            points.append(ScorePoint(gameIndex: idx + 1, player: playerNames.2, score: score.C))
-        }
-        return points
-    }
-    
-    var body: some View {
-        NavigationStack {
-            chartView
-                .padding()
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .navigationTitle("得分走势")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("关闭") {
-                        restorePortrait()
-                        dismiss()
-                    }
-                }
-            }
-        }
-        .onAppear {
-            forceLandscape()
-        }
-        .onDisappear {
-            restorePortrait()
-        }
-    }
-    
-    private func forceLandscape() {
-        let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene
-        windowScene?.requestGeometryUpdate(.iOS(interfaceOrientations: .landscape))
-        UIDevice.current.setValue(UIInterfaceOrientation.landscapeRight.rawValue, forKey: "orientation")
-    }
-    
-    private func restorePortrait() {
-        let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene
-        windowScene?.requestGeometryUpdate(.iOS(interfaceOrientations: .portrait))
-        UIDevice.current.setValue(UIInterfaceOrientation.portrait.rawValue, forKey: "orientation")
-    }
-    
-    private var chartView: some View {
-        Chart {
-            ForEach(dataPoints) { point in
-                LineMark(
-                    x: .value("局数", point.gameIndex),
-                    y: .value("分数", point.score)
-                )
-                .foregroundStyle(by: .value("玩家", point.player))
-                .lineStyle(StrokeStyle(lineWidth: 2))
-                
-                PointMark(
-                    x: .value("局数", point.gameIndex),
-                    y: .value("分数", point.score)
-                )
-                .foregroundStyle(by: .value("玩家", point.player))
-                .symbolSize(50)
-            }
-        }
-        .chartXAxisLabel("局数")
-        .chartYAxisLabel("累计得分")
-        .chartLegend(position: .bottom)
     }
 }
 

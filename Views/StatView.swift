@@ -13,16 +13,39 @@ struct StatView: View {
     @State private var playerToDelete: Player?
     @State private var showingDeleteConfirm = false
     @State private var navigationPath = NavigationPath()
+    @State private var showingCompareView = false
     
     var body: some View {
         NavigationStack(path: $navigationPath) {
-            Group {
-                if firebaseService.isLoading {
-                    ProgressView("加载中...")
-                } else if firebaseService.players.isEmpty {
-                    emptyStateView
-                } else {
-                    playerListView
+            ZStack(alignment: .bottomTrailing) {
+                Group {
+                    if firebaseService.isLoading {
+                        ProgressView("加载中...")
+                    } else if firebaseService.players.isEmpty {
+                        emptyStateView
+                    } else {
+                        playerListView
+                    }
+                }
+                
+                // Compare button (only show when there are 2+ players)
+                if firebaseService.players.count >= 2 {
+                    Button {
+                        showingCompareView = true
+                    } label: {
+                        HStack {
+                            Image(systemName: "chart.line.uptrend.xyaxis")
+                            Text("对比")
+                        }
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 10)
+                        .background(Color.accentColor)
+                        .foregroundColor(.white)
+                        .cornerRadius(20)
+                        .shadow(radius: 4)
+                    }
+                    .padding(.trailing, 20)
+                    .padding(.bottom, 20)
                 }
             }
             .navigationTitle("玩家统计")
@@ -41,6 +64,9 @@ struct StatView: View {
             }
             .sheet(isPresented: $showingAddPlayer) {
                 AddPlayerView(isPresented: $showingAddPlayer)
+            }
+            .sheet(isPresented: $showingCompareView) {
+                PlayerCompareView(players: firebaseService.players)
             }
             .alert("确定删除该玩家吗？", isPresented: $showingDeleteConfirm) {
                 Button("取消", role: .cancel) {
@@ -96,14 +122,14 @@ struct StatView: View {
                     navigationPath.append(player)
                 } label: {
                     HStack(spacing: 12) {
-                        // Avatar
+                        // Avatar with player color
                         ZStack {
                             Circle()
-                                .fill(Color.accentColor.opacity(0.15))
+                                .fill(player.displayColor.opacity(0.15))
                                 .frame(width: 44, height: 44)
                             Text(String(player.name.prefix(1)))
                                 .font(.headline)
-                                .foregroundColor(.accentColor)
+                                .foregroundColor(player.displayColor)
                         }
                         
                         // Name
@@ -112,6 +138,11 @@ struct StatView: View {
                             .foregroundColor(.primary)
                         
                         Spacer()
+                        
+                        // Color indicator
+                        Circle()
+                            .fill(player.displayColor)
+                            .frame(width: 10, height: 10)
                         
                         Image(systemName: "chevron.right")
                             .font(.caption)
@@ -131,6 +162,230 @@ struct StatView: View {
             }
         }
         .listStyle(.insetGrouped)
+    }
+}
+
+// MARK: - Player Compare View
+
+struct PlayerCompareView: View {
+    let players: [Player]
+    @Environment(\.dismiss) private var dismiss
+    @State private var selectedPlayers: Set<String> = []
+    @State private var chartMode: ChartMode = .games
+    @State private var showFullscreen = false
+    @State private var playerDataCache: [String: (gameScores: [Int], matchScores: [Int])] = [:]
+    @State private var isLoading = true
+    
+    enum ChartMode: String, CaseIterable {
+        case games = "小局走势"
+        case matches = "大局走势"
+    }
+    
+    init(players: [Player]) {
+        self.players = players
+        // Default select all players
+        self._selectedPlayers = State(initialValue: Set(players.compactMap { $0.id }))
+    }
+    
+    private var selectedPlayerData: [(name: String, scores: [Int], color: Color)] {
+        players.filter { selectedPlayers.contains($0.id ?? "") }.compactMap { player in
+            guard let playerId = player.id,
+                  let cache = playerDataCache[playerId] else { return nil }
+            let scores = chartMode == .games ? cache.gameScores : cache.matchScores
+            return (name: player.name, scores: scores, color: player.displayColor)
+        }
+    }
+    
+    var body: some View {
+        NavigationStack {
+            VStack(spacing: 0) {
+                if isLoading {
+                    Spacer()
+                    ProgressView("加载数据中...")
+                    Spacer()
+                } else {
+                    // Player selection
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 8) {
+                            ForEach(players) { player in
+                                PlayerChip(
+                                    player: player,
+                                    isSelected: selectedPlayers.contains(player.id ?? ""),
+                                    onTap: {
+                                        if let id = player.id {
+                                            if selectedPlayers.contains(id) {
+                                                selectedPlayers.remove(id)
+                                            } else {
+                                                selectedPlayers.insert(id)
+                                            }
+                                        }
+                                    }
+                                )
+                            }
+                        }
+                        .padding(.horizontal)
+                        .padding(.vertical, 8)
+                    }
+                    .background(Color(.systemGray6))
+                    
+                    // Chart
+                    if selectedPlayerData.isEmpty {
+                        Spacer()
+                        Text("请选择至少一名玩家")
+                            .foregroundColor(.secondary)
+                        Spacer()
+                    } else {
+                        if #available(iOS 16.0, *) {
+                            VStack {
+                                MultiPlayerLineChart(
+                                    playerData: selectedPlayerData,
+                                    xAxisLabel: chartMode == .games ? "小局" : "大局",
+                                    config: .small { showFullscreen = true }
+                                )
+                                .frame(height: 300)
+                                .padding()
+                            }
+                            .fullScreenCover(isPresented: $showFullscreen) {
+                                FullscreenMultiPlayerChartView(
+                                    playerData: selectedPlayerData,
+                                    xAxisLabel: chartMode == .games ? "小局" : "大局",
+                                    title: "玩家对比 - \(chartMode.rawValue)"
+                                )
+                            }
+                        } else {
+                            Text("需要 iOS 16.0 或更高版本")
+                                .foregroundColor(.secondary)
+                        }
+                        
+                        Spacer()
+                    }
+                }
+            }
+            .navigationTitle("玩家对比")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("关闭") {
+                        dismiss()
+                    }
+                }
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Menu {
+                        ForEach(ChartMode.allCases, id: \.self) { mode in
+                            Button(action: { chartMode = mode }) {
+                                Label(mode.rawValue, systemImage: chartMode == mode ? "checkmark" : "")
+                            }
+                        }
+                    } label: {
+                        Image(systemName: "line.3.horizontal.decrease.circle")
+                    }
+                }
+            }
+            .onAppear {
+                loadAllPlayerData()
+            }
+        }
+    }
+    
+    private func loadAllPlayerData() {
+        let group = DispatchGroup()
+        
+        for player in players {
+            guard let playerId = player.id else { continue }
+            
+            group.enter()
+            
+            // Load game records
+            var gameScores: [Int] = [0]
+            var matchScores: [Int] = [0]
+            
+            let innerGroup = DispatchGroup()
+            
+            innerGroup.enter()
+            FirebaseService.shared.loadGameRecords(forPlayer: playerId) { result in
+                defer { innerGroup.leave() }
+                if case .success(let records) = result {
+                    var cumulative = 0
+                    let sorted = records.sorted { $0.playedAt < $1.playedAt }
+                    for record in sorted {
+                        let position: Int
+                        if record.playerAId == playerId { position = 1 }
+                        else if record.playerBId == playerId { position = 2 }
+                        else { position = 3 }
+                        
+                        let score: Int
+                        switch position {
+                        case 1: score = record.scoreA
+                        case 2: score = record.scoreB
+                        default: score = record.scoreC
+                        }
+                        cumulative += score
+                        gameScores.append(cumulative)
+                    }
+                }
+            }
+            
+            innerGroup.enter()
+            FirebaseService.shared.loadMatches(forPlayer: playerId) { result in
+                defer { innerGroup.leave() }
+                if case .success(let matches) = result {
+                    var cumulative = 0
+                    let sorted = matches.sorted { $0.startedAt < $1.startedAt }
+                    for match in sorted {
+                        let position: Int
+                        if match.playerAId == playerId { position = 1 }
+                        else if match.playerBId == playerId { position = 2 }
+                        else { position = 3 }
+                        
+                        let score: Int
+                        switch position {
+                        case 1: score = match.finalScoreA
+                        case 2: score = match.finalScoreB
+                        default: score = match.finalScoreC
+                        }
+                        cumulative += score
+                        matchScores.append(cumulative)
+                    }
+                }
+            }
+            
+            innerGroup.notify(queue: .main) {
+                playerDataCache[playerId] = (gameScores: gameScores, matchScores: matchScores)
+                group.leave()
+            }
+        }
+        
+        group.notify(queue: .main) {
+            isLoading = false
+        }
+    }
+}
+
+struct PlayerChip: View {
+    let player: Player
+    let isSelected: Bool
+    let onTap: () -> Void
+    
+    var body: some View {
+        Button(action: onTap) {
+            HStack(spacing: 6) {
+                Circle()
+                    .fill(player.displayColor)
+                    .frame(width: 12, height: 12)
+                Text(player.name)
+                    .font(.subheadline)
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 6)
+            .background(isSelected ? player.displayColor.opacity(0.2) : Color(.systemGray5))
+            .foregroundColor(isSelected ? player.displayColor : .secondary)
+            .cornerRadius(16)
+            .overlay(
+                RoundedRectangle(cornerRadius: 16)
+                    .stroke(isSelected ? player.displayColor : Color.clear, lineWidth: 1.5)
+            )
+        }
+        .buttonStyle(.plain)
     }
 }
 
