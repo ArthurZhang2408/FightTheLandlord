@@ -140,8 +140,10 @@ struct AddColumn: View {
                 ToolbarItem(placement: .confirmationAction) {
                     Button("完成") {
                         // Check if no one bid - auto advance to next first bidder
+                        // When no one bids, the current game cannot proceed.
+                        // We advance the starter position so the next game will have
+                        // a different player bidding first (like passing the deck in real play).
                         if allNotBid() {
-                            // Advance the starter for next game
                             viewModel.instance.room.starter = (viewModel.instance.room.starter + 1) % 3
                             showingNewItemView = false
                             return
