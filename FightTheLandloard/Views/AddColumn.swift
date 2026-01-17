@@ -482,5 +482,5 @@ struct ResultButton: View {
 }
 
 #Preview {
-    AddColumn(showingNewItemView: Binding(get: {return true}, set: { _ in}), turn: 0)
+    AddColumn(showingNewItemView: .constant(true), turn: 0)
 }
