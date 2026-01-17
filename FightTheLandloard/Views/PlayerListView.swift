@@ -77,15 +77,21 @@ struct PlayerListView: View {
                     HStack(spacing: 12) {
                         ZStack {
                             Circle()
-                                .fill(Color.accentColor.opacity(0.15))
+                                .fill(player.displayColor.opacity(0.15))
                                 .frame(width: 44, height: 44)
                             Text(String(player.name.prefix(1)))
                                 .font(.headline)
-                                .foregroundColor(.accentColor)
+                                .foregroundColor(player.displayColor)
                         }
                         
                         Text(player.name)
                             .font(.body)
+                        
+                        Spacer()
+                        
+                        Circle()
+                            .fill(player.displayColor)
+                            .frame(width: 10, height: 10)
                     }
                     .padding(.vertical, 4)
                 }
@@ -107,6 +113,7 @@ struct AddPlayerView: View {
     @Binding var isPresented: Bool
     @StateObject private var firebaseService = FirebaseService.shared
     @State private var playerName = ""
+    @State private var selectedColor: PlayerColor = .blue
     @State private var showError = false
     @State private var errorMessage = ""
     @State private var isLoading = false
@@ -126,6 +133,14 @@ struct AddPlayerView: View {
                     Text("玩家信息")
                 } footer: {
                     Text("名称将用于显示在记分板和统计中")
+                }
+                
+                Section {
+                    PlayerColorPicker(selectedColor: $selectedColor)
+                } header: {
+                    Text("玩家颜色")
+                } footer: {
+                    Text("颜色用于在对比图表中区分不同玩家")
                 }
             }
             .navigationTitle("添加玩家")
@@ -163,7 +178,7 @@ struct AddPlayerView: View {
         guard !name.isEmpty else { return }
         
         isLoading = true
-        firebaseService.addPlayer(name: name) { result in
+        firebaseService.addPlayer(name: name, color: selectedColor) { result in
             isLoading = false
             switch result {
             case .success:
@@ -183,6 +198,13 @@ struct PlayerDetailView: View {
     @State private var matchRecords: [MatchRecord] = []
     @State private var isLoading = true
     @State private var errorMessage: String?
+    @State private var showingColorPicker = false
+    @State private var selectedColor: PlayerColor
+    
+    init(player: Player) {
+        self.player = player
+        self._selectedColor = State(initialValue: player.playerColor ?? .blue)
+    }
     
     var body: some View {
         Group {
@@ -201,6 +223,7 @@ struct PlayerDetailView: View {
                     stats: stats, 
                     playerName: player.name,
                     playerId: player.id ?? "",
+                    playerColor: player.displayColor,
                     gameRecords: gameRecords,
                     matchRecords: matchRecords
                 )
@@ -208,6 +231,28 @@ struct PlayerDetailView: View {
         }
         .navigationTitle(player.name)
         .navigationBarTitleDisplayMode(.large)
+        .toolbar {
+            ToolbarItem(placement: .navigationBarTrailing) {
+                Button {
+                    showingColorPicker = true
+                } label: {
+                    Circle()
+                        .fill(player.displayColor)
+                        .frame(width: 24, height: 24)
+                        .overlay(
+                            Circle()
+                                .stroke(Color.secondary.opacity(0.3), lineWidth: 1)
+                        )
+                }
+            }
+        }
+        .sheet(isPresented: $showingColorPicker) {
+            PlayerColorPickerSheet(
+                player: player,
+                selectedColor: $selectedColor,
+                isPresented: $showingColorPicker
+            )
+        }
         .onAppear {
             loadStatistics()
         }
@@ -262,10 +307,82 @@ struct PlayerDetailView: View {
     }
 }
 
+// MARK: - Color Picker Sheet
+
+struct PlayerColorPickerSheet: View {
+    let player: Player
+    @Binding var selectedColor: PlayerColor
+    @Binding var isPresented: Bool
+    @State private var isSaving = false
+    
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section {
+                    ForEach(PlayerColor.allCases, id: \.self) { color in
+                        Button {
+                            selectedColor = color
+                        } label: {
+                            HStack {
+                                Circle()
+                                    .fill(color.color)
+                                    .frame(width: 24, height: 24)
+                                Text(color.displayName)
+                                    .foregroundColor(.primary)
+                                Spacer()
+                                if selectedColor == color {
+                                    Image(systemName: "checkmark")
+                                        .foregroundColor(.accentColor)
+                                }
+                            }
+                        }
+                    }
+                } header: {
+                    Text("选择颜色")
+                } footer: {
+                    Text("颜色用于在对比图表中区分不同玩家")
+                }
+            }
+            .navigationTitle("玩家颜色")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("取消") {
+                        isPresented = false
+                    }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    if isSaving {
+                        ProgressView()
+                    } else {
+                        Button("保存") {
+                            saveColor()
+                        }
+                    }
+                }
+            }
+        }
+    }
+    
+    private func saveColor() {
+        guard let playerId = player.id else { return }
+        isSaving = true
+        
+        var updatedPlayer = player
+        updatedPlayer.playerColor = selectedColor
+        
+        FirebaseService.shared.updatePlayer(updatedPlayer) { result in
+            isSaving = false
+            isPresented = false
+        }
+    }
+}
+
 struct StatisticsView: View {
     let stats: PlayerStatistics
     let playerName: String
     let playerId: String
+    let playerColor: Color
     let gameRecords: [GameRecord]
     let matchRecords: [MatchRecord]
     @ObservedObject private var dataSingleton = DataSingleton.instance
@@ -338,30 +455,47 @@ struct StatisticsView: View {
     
     var body: some View {
         List {
-            // Score History Chart
+            // Score History Chart - Clean minimal design
             if gameRecords.count >= 2 || matchRecords.count >= 2 {
                 Section {
-                    VStack(spacing: 12) {
-                        // Toggle between game and match view
-                        Picker("视图", selection: $showGameChart) {
-                            Text("小局走势").tag(true)
-                            Text("大局走势").tag(false)
-                        }
-                        .pickerStyle(.segmented)
-                        
-                        PlayerScoreHistoryChart(
+                    if #available(iOS 16.0, *) {
+                        SinglePlayerLineChart(
                             scores: showGameChart ? gameScoreHistory : matchScoreHistory,
                             playerName: playerName,
+                            playerColor: playerColor,
                             xAxisLabel: showGameChart ? "小局" : "大局",
-                            showExpandButton: true,
-                            onExpand: { showFullscreenChart = true }
+                            config: .small { showFullscreenChart = true }
                         )
                         .frame(height: 200)
+                    } else {
+                        ChartFallbackView(
+                            lastScore: (showGameChart ? gameScoreHistory : matchScoreHistory).last ?? 0,
+                            count: (showGameChart ? gameScoreHistory : matchScoreHistory).count - 1,
+                            label: showGameChart ? "小局" : "大局"
+                        )
                     }
                 } header: {
-                    Text("得分走势")
-                } footer: {
-                    Text(showGameChart ? "显示每一小局后的累计分数" : "显示每一大局后的累计分数")
+                    HStack {
+                        Text("得分走势")
+                        Spacer()
+                        // Toggle button in header
+                        Menu {
+                            Button(action: { showGameChart = true }) {
+                                Label("小局走势", systemImage: showGameChart ? "checkmark" : "")
+                            }
+                            Button(action: { showGameChart = false }) {
+                                Label("大局走势", systemImage: !showGameChart ? "checkmark" : "")
+                            }
+                        } label: {
+                            HStack(spacing: 4) {
+                                Text(showGameChart ? "小局" : "大局")
+                                    .font(.caption)
+                                Image(systemName: "chevron.down")
+                                    .font(.caption2)
+                            }
+                            .foregroundColor(.accentColor)
+                        }
+                    }
                 }
             }
             
@@ -479,13 +613,39 @@ struct StatisticsView: View {
         }
         .listStyle(.insetGrouped)
         .fullScreenCover(isPresented: $showFullscreenChart) {
-            PlayerScoreHistoryFullscreen(
-                gameScores: gameScoreHistory,
-                matchScores: matchScoreHistory,
-                playerName: playerName,
-                initialShowGameChart: showGameChart
-            )
+            if #available(iOS 16.0, *) {
+                FullscreenSinglePlayerChartView(
+                    gameScores: gameScoreHistory,
+                    matchScores: matchScoreHistory,
+                    playerName: playerName,
+                    playerColor: playerColor,
+                    initialShowGameChart: showGameChart
+                )
+            }
         }
+    }
+}
+
+// MARK: - Chart Fallback View (for iOS < 16)
+
+struct ChartFallbackView: View {
+    let lastScore: Int
+    let count: Int
+    let label: String
+    
+    var body: some View {
+        VStack(spacing: 12) {
+            Text("得分走势")
+                .font(.headline)
+            Text("当前累计: \(lastScore)")
+                .font(.title2)
+                .fontWeight(.bold)
+                .foregroundColor(lastScore >= 0 ? .green : .red)
+            Text("共 \(count) \(label)")
+                .font(.caption)
+                .foregroundColor(.secondary)
+        }
+        .frame(maxWidth: .infinity)
     }
 }
 
@@ -757,270 +917,6 @@ struct StatRow: View {
             Text(value)
                 .foregroundColor(valueColor)
                 .fontWeight(.medium)
-        }
-    }
-}
-
-// MARK: - Player Score History Chart
-
-struct PlayerScoreHistoryChart: View {
-    let scores: [Int]
-    let playerName: String
-    let xAxisLabel: String
-    var showExpandButton: Bool = false
-    var onExpand: (() -> Void)? = nil
-    
-    private struct ScorePoint: Identifiable {
-        let id = UUID()
-        let index: Int
-        let score: Int
-    }
-    
-    private var dataPoints: [ScorePoint] {
-        scores.enumerated().map { ScorePoint(index: $0.offset, score: $0.element) }
-    }
-    
-    var body: some View {
-        if #available(iOS 16.0, *) {
-            VStack(spacing: 8) {
-                if showExpandButton {
-                    HStack {
-                        Spacer()
-                        Button {
-                            onExpand?()
-                        } label: {
-                            Image(systemName: "arrow.up.left.and.arrow.down.right")
-                                .font(.caption)
-                                .foregroundColor(.accentColor)
-                        }
-                        .buttonStyle(.plain)
-                    }
-                }
-                
-                Chart {
-                    ForEach(dataPoints) { point in
-                        LineMark(
-                            x: .value(xAxisLabel, point.index),
-                            y: .value("分数", point.score)
-                        )
-                        .foregroundStyle(Color.accentColor)
-                        .lineStyle(StrokeStyle(lineWidth: 2))
-                        
-                        AreaMark(
-                            x: .value(xAxisLabel, point.index),
-                            y: .value("分数", point.score)
-                        )
-                        .foregroundStyle(
-                            LinearGradient(
-                                colors: [Color.accentColor.opacity(0.3), Color.accentColor.opacity(0.05)],
-                                startPoint: .top,
-                                endPoint: .bottom
-                            )
-                        )
-                    }
-                    
-                    // Zero line
-                    RuleMark(y: .value("零分线", 0))
-                        .foregroundStyle(.secondary.opacity(0.5))
-                        .lineStyle(StrokeStyle(dash: [5, 3]))
-                }
-                .chartXAxisLabel(xAxisLabel)
-                .chartYAxisLabel("累计得分")
-            }
-        } else {
-            // Fallback for older iOS versions
-            VStack(spacing: 12) {
-                Text("得分走势")
-                    .font(.headline)
-                if let lastScore = scores.last {
-                    Text("当前累计: \(lastScore)")
-                        .font(.title2)
-                        .fontWeight(.bold)
-                        .foregroundColor(lastScore >= 0 ? .green : .red)
-                }
-                Text("共 \(scores.count - 1) \(xAxisLabel)")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-            }
-            .frame(maxWidth: .infinity)
-        }
-    }
-}
-
-// MARK: - Fullscreen Player Score History (Landscape Only)
-
-struct PlayerScoreHistoryFullscreen: View {
-    let gameScores: [Int]
-    let matchScores: [Int]
-    let playerName: String
-    let initialShowGameChart: Bool
-    
-    @State private var showGameChart: Bool
-    @Environment(\.dismiss) private var dismiss
-    
-    init(gameScores: [Int], matchScores: [Int], playerName: String, initialShowGameChart: Bool) {
-        self.gameScores = gameScores
-        self.matchScores = matchScores
-        self.playerName = playerName
-        self.initialShowGameChart = initialShowGameChart
-        self._showGameChart = State(initialValue: initialShowGameChart)
-    }
-    
-    private var currentScores: [Int] {
-        showGameChart ? gameScores : matchScores
-    }
-    
-    private var xAxisLabel: String {
-        showGameChart ? "小局" : "大局"
-    }
-    
-    private struct ScorePoint: Identifiable {
-        let id = UUID()
-        let index: Int
-        let score: Int
-    }
-    
-    private var dataPoints: [ScorePoint] {
-        currentScores.enumerated().map { ScorePoint(index: $0.offset, score: $0.element) }
-    }
-    
-    private func forceLandscape() {
-        let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene
-        windowScene?.requestGeometryUpdate(.iOS(interfaceOrientations: .landscape))
-        UIDevice.current.setValue(UIInterfaceOrientation.landscapeRight.rawValue, forKey: "orientation")
-    }
-    
-    private func restorePortrait() {
-        let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene
-        windowScene?.requestGeometryUpdate(.iOS(interfaceOrientations: .portrait))
-        UIDevice.current.setValue(UIInterfaceOrientation.portrait.rawValue, forKey: "orientation")
-    }
-    
-    var body: some View {
-        NavigationStack {
-            VStack(spacing: 16) {
-                // Toggle between game and match view
-                Picker("视图", selection: $showGameChart) {
-                    Text("小局走势").tag(true)
-                    Text("大局走势").tag(false)
-                }
-                .pickerStyle(.segmented)
-                .padding(.horizontal)
-                
-                // Chart takes full space in landscape
-                chartView
-                    .padding()
-                
-                // Stats summary (horizontal for landscape)
-                if let lastScore = currentScores.last {
-                    HStack(spacing: 24) {
-                        VStack {
-                            Text("当前累计")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                            Text("\(lastScore)")
-                                .font(.title2)
-                                .fontWeight(.bold)
-                                .foregroundColor(lastScore >= 0 ? .green : .red)
-                        }
-                        
-                        VStack {
-                            Text("最高")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                            Text("\(currentScores.max() ?? 0)")
-                                .font(.title2)
-                                .fontWeight(.bold)
-                                .foregroundColor(.green)
-                        }
-                        
-                        VStack {
-                            Text("最低")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                            Text("\(currentScores.min() ?? 0)")
-                                .font(.title2)
-                                .fontWeight(.bold)
-                                .foregroundColor(.red)
-                        }
-                        
-                        VStack {
-                            Text(showGameChart ? "总小局" : "总大局")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                            Text("\(currentScores.count - 1)")
-                                .font(.title2)
-                                .fontWeight(.bold)
-                        }
-                    }
-                    .padding()
-                    .background(Color(.systemGray6))
-                    .cornerRadius(12)
-                    .padding(.horizontal)
-                }
-            }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .navigationTitle("\(playerName) - 得分走势")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("关闭") {
-                        restorePortrait()
-                        dismiss()
-                    }
-                }
-            }
-        }
-        .onAppear {
-            forceLandscape()
-        }
-        .onDisappear {
-            restorePortrait()
-        }
-    }
-    
-    @ViewBuilder
-    private var chartView: some View {
-        if #available(iOS 16.0, *) {
-            Chart {
-                ForEach(dataPoints) { point in
-                    LineMark(
-                        x: .value(xAxisLabel, point.index),
-                        y: .value("分数", point.score)
-                    )
-                    .foregroundStyle(Color.accentColor)
-                    .lineStyle(StrokeStyle(lineWidth: 2.5))
-                    
-                    AreaMark(
-                        x: .value(xAxisLabel, point.index),
-                        y: .value("分数", point.score)
-                    )
-                    .foregroundStyle(
-                        LinearGradient(
-                            colors: [Color.accentColor.opacity(0.3), Color.accentColor.opacity(0.05)],
-                            startPoint: .top,
-                            endPoint: .bottom
-                        )
-                    )
-                    
-                    PointMark(
-                        x: .value(xAxisLabel, point.index),
-                        y: .value("分数", point.score)
-                    )
-                    .foregroundStyle(Color.accentColor)
-                    .symbolSize(30)
-                }
-                
-                // Zero line
-                RuleMark(y: .value("零分线", 0))
-                    .foregroundStyle(.secondary.opacity(0.5))
-                    .lineStyle(StrokeStyle(dash: [5, 3]))
-            }
-            .chartXAxisLabel(xAxisLabel)
-            .chartYAxisLabel("累计得分")
-        } else {
-            Text("需要 iOS 16.0 或更高版本")
-                .foregroundColor(.secondary)
         }
     }
 }
