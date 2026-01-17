@@ -15,25 +15,38 @@ struct MatchStatsView: View {
     @State private var match: MatchRecord?
     @State private var gameRecords: [GameRecord] = []
     @State private var isLoading = true
+    @ObservedObject private var dataSingleton = DataSingleton.instance
+    
+    private func scoreColor(_ score: Int) -> Color {
+        if score == 0 { return .primary }
+        let isPositive = score > 0
+        if dataSingleton.greenWin {
+            return isPositive ? .green : .red
+        } else {
+            return isPositive ? .red : .green
+        }
+    }
     
     var body: some View {
-        NavigationView {
-            VStack {
+        NavigationStack {
+            Group {
                 if isLoading {
-                    ProgressView()
+                    ProgressView("加载中...")
                 } else if let match = match {
-                    ScrollView {
-                        VStack(spacing: 20) {
-                            // Match summary
+                    List {
+                        // Match summary
+                        Section {
                             MatchSummarySection(match: match, games: gameRecords)
-                            
-                            // Per-player statistics for this match
-                            if !gameRecords.isEmpty {
-                                ForEach([
-                                    (match.playerAId, match.playerAName, 1),
-                                    (match.playerBId, match.playerBName, 2),
-                                    (match.playerCId, match.playerCName, 3)
-                                ], id: \.0) { (playerId, playerName, position) in
+                        }
+                        
+                        // Per-player statistics for this match
+                        if !gameRecords.isEmpty {
+                            ForEach([
+                                (match.playerAId, match.playerAName, 1),
+                                (match.playerBId, match.playerBName, 2),
+                                (match.playerCId, match.playerCName, 3)
+                            ], id: \.0) { (playerId, playerName, position) in
+                                Section {
                                     PlayerMatchStatsSection(
                                         playerName: playerName,
                                         position: position,
@@ -43,11 +56,11 @@ struct MatchStatsView: View {
                                 }
                             }
                         }
-                        .padding()
                     }
+                    .listStyle(.insetGrouped)
                 } else {
                     Text("无法加载对局数据")
-                        .foregroundColor(.gray50)
+                        .foregroundColor(.secondary)
                 }
             }
             .navigationTitle("对局统计")
@@ -65,12 +78,10 @@ struct MatchStatsView: View {
     }
     
     private func loadMatchData() {
-        // Load match record
         FirebaseService.shared.loadMatch(matchId: matchId) { result in
             switch result {
             case .success(let m):
                 self.match = m
-                // Load game records
                 FirebaseService.shared.loadGameRecords(forMatch: matchId) { result in
                     self.isLoading = false
                     switch result {
@@ -91,6 +102,7 @@ struct MatchStatsView: View {
 struct MatchSummarySection: View {
     let match: MatchRecord
     let games: [GameRecord]
+    @ObservedObject private var dataSingleton = DataSingleton.instance
     
     private var dateFormatter: DateFormatter {
         let formatter = DateFormatter()
@@ -98,50 +110,62 @@ struct MatchSummarySection: View {
         return formatter
     }
     
+    private func scoreColor(_ score: Int) -> Color {
+        if score == 0 { return .primary }
+        let isPositive = score > 0
+        if dataSingleton.greenWin {
+            return isPositive ? .green : .red
+        } else {
+            return isPositive ? .red : .green
+        }
+    }
+    
     var body: some View {
-        VStack(spacing: 12) {
+        VStack(spacing: 16) {
             Text("对局总结")
                 .font(.headline)
             
             Text(dateFormatter.string(from: match.startedAt))
                 .font(.subheadline)
-                .foregroundColor(.gray40)
+                .foregroundColor(.secondary)
             
-            HStack(spacing: 30) {
-                VStack {
+            HStack(spacing: 24) {
+                VStack(spacing: 4) {
                     Text(match.playerAName)
                         .font(.subheadline)
+                        .foregroundColor(.secondary)
                     Text("\(match.finalScoreA)")
                         .font(.title)
                         .fontWeight(.bold)
-                        .foregroundColor(match.finalScoreA > 0 ? .green : (match.finalScoreA < 0 ? .red : .white))
+                        .foregroundColor(scoreColor(match.finalScoreA))
                 }
-                VStack {
+                VStack(spacing: 4) {
                     Text(match.playerBName)
                         .font(.subheadline)
+                        .foregroundColor(.secondary)
                     Text("\(match.finalScoreB)")
                         .font(.title)
                         .fontWeight(.bold)
-                        .foregroundColor(match.finalScoreB > 0 ? .green : (match.finalScoreB < 0 ? .red : .white))
+                        .foregroundColor(scoreColor(match.finalScoreB))
                 }
-                VStack {
+                VStack(spacing: 4) {
                     Text(match.playerCName)
                         .font(.subheadline)
+                        .foregroundColor(.secondary)
                     Text("\(match.finalScoreC)")
                         .font(.title)
                         .fontWeight(.bold)
-                        .foregroundColor(match.finalScoreC > 0 ? .green : (match.finalScoreC < 0 ? .red : .white))
+                        .foregroundColor(scoreColor(match.finalScoreC))
                 }
             }
             
-            HStack {
+            HStack(spacing: 24) {
                 StatBadge(label: "总局数", value: "\(match.totalGames)")
                 StatBadge(label: "春天", value: "\(games.filter { $0.isSpring }.count)")
             }
         }
-        .padding()
-        .background(Color.gray80.opacity(0.3))
-        .cornerRadius(12)
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 8)
     }
 }
 
@@ -150,9 +174,9 @@ struct PlayerMatchStatsSection: View {
     let position: Int
     let games: [GameRecord]
     let match: MatchRecord
+    @ObservedObject private var dataSingleton = DataSingleton.instance
     
     private var playerGames: [(GameRecord, Bool, Int)] {
-        // Returns (record, isLandlord, score)
         games.map { record in
             let isLandlord = record.landlord == position
             let score: Int
@@ -190,12 +214,10 @@ struct PlayerMatchStatsSection: View {
     }
     
     private var springCount: Int {
-        // Spring as landlord (landlord wins with spring)
         playerGames.filter { $0.0.isSpring && $0.1 && $0.0.landlordResult }.count
     }
     
     private var springAgainstCount: Int {
-        // Spring against as farmer (landlord wins with spring, player is farmer)
         playerGames.filter { $0.0.isSpring && !$0.1 && $0.0.landlordResult }.count
     }
     
@@ -237,11 +259,26 @@ struct PlayerMatchStatsSection: View {
         playerGames.map { $0.2 }.min() ?? 0
     }
     
+    private func scoreColor(_ score: Int) -> Color {
+        if score == 0 { return .primary }
+        let isPositive = score > 0
+        if dataSingleton.greenWin {
+            return isPositive ? .green : .red
+        } else {
+            return isPositive ? .red : .green
+        }
+    }
+    
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text(playerName)
-                .font(.headline)
-                .foregroundColor(.primary500)
+            HStack {
+                Text(playerName)
+                    .font(.headline)
+                Spacer()
+                Text("\(totalScore)")
+                    .font(.headline)
+                    .foregroundColor(scoreColor(totalScore))
+            }
             
             LazyVGrid(columns: [
                 GridItem(.flexible()),
@@ -269,9 +306,7 @@ struct PlayerMatchStatsSection: View {
                 StatBadge(label: "最低分", value: "\(worstGame)")
             }
         }
-        .padding()
-        .background(Color.gray80.opacity(0.2))
-        .cornerRadius(12)
+        .padding(.vertical, 4)
     }
 }
 
@@ -286,12 +321,12 @@ struct StatBadge: View {
                 .fontWeight(.semibold)
             Text(label)
                 .font(.caption)
-                .foregroundColor(.gray50)
+                .foregroundColor(.secondary)
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 8)
-        .background(Color.gray70.opacity(0.3))
-        .cornerRadius(8)
+        .background(Color(.tertiarySystemFill))
+        .clipShape(RoundedRectangle(cornerRadius: 8))
     }
 }
 

@@ -15,6 +15,7 @@ class ListingViewModel: ObservableObject {
     @Published var deletingItem: Bool = false
     @Published var deleteIdx: Int = -1
     @Published var isSaving: Bool = false
+    @Published var showPlayerWarning: Bool = false  // Alert for missing players
     var instance: DataSingleton = DataSingleton.instance
     
     init() {
@@ -27,6 +28,12 @@ class ListingViewModel: ObservableObject {
         // If no games played, just clear without saving or incrementing
         if instance.games.isEmpty {
             instance.clearCurrentMatch()
+            return
+        }
+        
+        // Check if all players are selected before saving
+        if !instance.allPlayersSelected {
+            showPlayerWarning = true
             return
         }
         
