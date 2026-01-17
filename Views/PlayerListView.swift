@@ -635,10 +635,36 @@ struct StatisticsView: View {
 
 // MARK: - Skeleton Loading Views
 
+/// Synchronized shimmer animation manager
+/// All shimmer effects share the same phase so they animate together
+class ShimmerAnimationManager: ObservableObject {
+    static let shared = ShimmerAnimationManager()
+    @Published var phase: CGFloat = 0
+    
+    private init() {
+        startAnimation()
+    }
+    
+    private func startAnimation() {
+        // Use a timer to continuously update the phase
+        Timer.scheduledTimer(withTimeInterval: 0.016, repeats: true) { [weak self] _ in
+            DispatchQueue.main.async {
+                guard let self = self else { return }
+                // Complete one cycle every 1.5 seconds
+                self.phase += 0.016 / 1.5
+                if self.phase >= 1 {
+                    self.phase = 0
+                }
+            }
+        }
+    }
+}
+
 /// Professional skeleton shimmer animation like Zhihu app
 /// A subtle, smooth light sweep effect from left to right
+/// All shimmer effects are synchronized using a shared manager
 struct ShimmerEffect: ViewModifier {
-    @State private var phase: CGFloat = 0
+    @ObservedObject private var animationManager = ShimmerAnimationManager.shared
     
     func body(content: Content) -> some View {
         content
@@ -656,18 +682,10 @@ struct ShimmerEffect: ViewModifier {
                         endPoint: .trailing
                     )
                     .frame(width: geometry.size.width * 2)
-                    .offset(x: -geometry.size.width + phase * geometry.size.width * 2)
+                    .offset(x: -geometry.size.width + animationManager.phase * geometry.size.width * 2)
                 }
             )
             .mask(content)
-            .onAppear {
-                withAnimation(
-                    Animation.linear(duration: 1.5)
-                        .repeatForever(autoreverses: false)
-                ) {
-                    phase = 1
-                }
-            }
     }
 }
 
