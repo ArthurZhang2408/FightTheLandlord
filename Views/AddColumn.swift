@@ -10,9 +10,6 @@ import SwiftUI
 struct AddColumn: View {
     @Binding var showingNewItemView: Bool
     @StateObject var viewModel: AddColumnViewModel = AddColumnViewModel(idx: -1)
-    var height: CGFloat = 44
-    var width: CGFloat = .screenWidth / 3.5
-    var leadingPad: CGFloat = 8
     let turn: Int
     
     var body: some View {
