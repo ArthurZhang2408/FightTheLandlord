@@ -333,6 +333,8 @@ struct MatchDetailView: View {
                     NavigationLink(destination: FullMatchStatsView(matchId: matchId)) {
                         Image(systemName: "chart.bar")
                     }
+                    .disabled(isLoading)
+                    .opacity(isLoading ? 0.5 : 1.0)
                 }
             }
         }
@@ -433,7 +435,7 @@ struct MatchDetailView: View {
 struct SkeletonMatchDetailView: View {
     var body: some View {
         List {
-            // Summary section skeleton
+            // Summary section skeleton - use shimmer
             Section {
                 VStack(spacing: 12) {
                     RoundedRectangle(cornerRadius: 4)
@@ -456,8 +458,9 @@ struct SkeletonMatchDetailView: View {
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 8)
             }
+            .modifier(SkeletonShimmerModifier())
             
-            // Games section skeleton
+            // Games section skeleton - use shimmer
             Section {
                 ForEach(0..<4, id: \.self) { _ in
                     HStack(spacing: 12) {
@@ -484,18 +487,27 @@ struct SkeletonMatchDetailView: View {
             } header: {
                 Text("每局详情")
             }
+            .modifier(SkeletonShimmerModifier())
             
-            // Chart section skeleton
+            // Chart section skeleton - use pulse animation
             Section {
-                RoundedRectangle(cornerRadius: 8)
-                    .fill(Color(.systemGray5))
-                    .frame(height: 200)
+                SkeletonBox(height: 200)
+                    .modifier(SkeletonPulseModifier())
             } header: {
                 Text("得分走势")
             }
+            
+            // Player stats skeleton - use shimmer
+            Section {
+                ForEach(0..<3, id: \.self) { _ in
+                    SkeletonStatRow()
+                }
+            } header: {
+                Text("玩家统计")
+            }
+            .modifier(SkeletonShimmerModifier())
         }
         .listStyle(.insetGrouped)
-        .modifier(SkeletonShimmerModifier())
     }
 }
 
