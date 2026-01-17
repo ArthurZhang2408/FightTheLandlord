@@ -435,19 +435,22 @@ struct MatchDetailView: View {
 struct SkeletonMatchDetailView: View {
     var body: some View {
         List {
-            // Summary section skeleton - use shimmer
+            // Summary section skeleton
             Section {
                 VStack(spacing: 12) {
+                    // Date placeholder
                     RoundedRectangle(cornerRadius: 4)
                         .fill(Color(.systemGray5))
                         .frame(width: 120, height: 14)
                     
                     HStack(spacing: 20) {
                         ForEach(0..<3, id: \.self) { _ in
-                            VStack {
+                            VStack(spacing: 4) {
+                                // Player name placeholder
                                 RoundedRectangle(cornerRadius: 4)
                                     .fill(Color(.systemGray5))
                                     .frame(width: 60, height: 16)
+                                // Score placeholder
                                 RoundedRectangle(cornerRadius: 4)
                                     .fill(Color(.systemGray5))
                                     .frame(width: 40, height: 24)
@@ -457,13 +460,14 @@ struct SkeletonMatchDetailView: View {
                 }
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 8)
+                .shimmer()
             }
-            .modifier(SkeletonShimmerModifier())
             
-            // Games section skeleton - use shimmer
+            // Games section skeleton
             Section {
                 ForEach(0..<4, id: \.self) { _ in
                     HStack(spacing: 12) {
+                        // Game number placeholder
                         Circle()
                             .fill(Color(.systemGray5))
                             .frame(width: 24, height: 24)
@@ -471,9 +475,11 @@ struct SkeletonMatchDetailView: View {
                         HStack(spacing: 0) {
                             ForEach(0..<3, id: \.self) { _ in
                                 VStack(spacing: 4) {
+                                    // Name placeholder
                                     RoundedRectangle(cornerRadius: 4)
                                         .fill(Color(.systemGray5))
                                         .frame(width: 40, height: 10)
+                                    // Score placeholder
                                     RoundedRectangle(cornerRadius: 4)
                                         .fill(Color(.systemGray5))
                                         .frame(width: 30, height: 14)
@@ -483,29 +489,27 @@ struct SkeletonMatchDetailView: View {
                         }
                     }
                     .padding(.vertical, 4)
+                    .shimmer()
                 }
             } header: {
-                Text("每局详情")
+                SkeletonText(width: 60)
             }
-            .modifier(SkeletonShimmerModifier())
             
-            // Chart section skeleton - use pulse animation
+            // Chart section skeleton
             Section {
-                SkeletonBox(height: 200)
-                    .modifier(SkeletonPulseModifier())
+                SkeletonChartBox()
             } header: {
-                Text("得分走势")
+                SkeletonText(width: 60)
             }
             
-            // Player stats skeleton - use shimmer
+            // Player stats skeleton
             Section {
                 ForEach(0..<3, id: \.self) { _ in
                     SkeletonStatRow()
                 }
             } header: {
-                Text("玩家统计")
+                SkeletonText(width: 60)
             }
-            .modifier(SkeletonShimmerModifier())
         }
         .listStyle(.insetGrouped)
     }

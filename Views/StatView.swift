@@ -419,10 +419,10 @@ struct SkeletonPlayerListView: View {
                         .frame(width: 8, height: 12)
                 }
                 .padding(.vertical, 4)
+                .shimmer()
             }
         }
         .listStyle(.insetGrouped)
-        .modifier(SkeletonShimmerModifier())
     }
 }
 
