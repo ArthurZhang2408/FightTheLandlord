@@ -636,8 +636,6 @@ struct StatisticsView: View {
 // MARK: - Skeleton Loading Views
 
 struct SkeletonStatisticsView: View {
-    @State private var isAnimating = false
-    
     var body: some View {
         List {
             // Chart skeleton
@@ -672,7 +670,28 @@ struct SkeletonStatisticsView: View {
             }
         }
         .listStyle(.insetGrouped)
-        .redacted(reason: .placeholder)
+        .modifier(SkeletonShimmerModifier())
+    }
+}
+
+// MARK: - Unified Skeleton Shimmer Modifier
+// Following Apple HIG - subtle pulsing opacity animation for loading states
+
+struct SkeletonShimmerModifier: ViewModifier {
+    @State private var isAnimating = false
+    
+    func body(content: Content) -> some View {
+        content
+            .redacted(reason: .placeholder)
+            .opacity(isAnimating ? 0.5 : 1.0)
+            .animation(
+                Animation.easeInOut(duration: 1.0)
+                    .repeatForever(autoreverses: true),
+                value: isAnimating
+            )
+            .onAppear {
+                isAnimating = true
+            }
     }
 }
 
@@ -711,6 +730,7 @@ struct SkeletonMatchListView: View {
             }
         }
         .listStyle(.insetGrouped)
+        .modifier(SkeletonShimmerModifier())
     }
 }
 
@@ -741,7 +761,6 @@ struct SkeletonMatchRow: View {
             }
         }
         .padding(.vertical, 4)
-        .redacted(reason: .placeholder)
     }
 }
 

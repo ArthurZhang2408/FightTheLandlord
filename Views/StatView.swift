@@ -422,7 +422,7 @@ struct SkeletonPlayerListView: View {
             }
         }
         .listStyle(.insetGrouped)
-        .redacted(reason: .placeholder)
+        .modifier(SkeletonShimmerModifier())
     }
 }
 

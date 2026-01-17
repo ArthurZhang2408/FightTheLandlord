@@ -495,7 +495,7 @@ struct SkeletonMatchDetailView: View {
             }
         }
         .listStyle(.insetGrouped)
-        .redacted(reason: .placeholder)
+        .modifier(SkeletonShimmerModifier())
     }
 }
 
