@@ -63,27 +63,30 @@ Follow iOS semantic colors for adaptability to Light/Dark mode:
 
 ---
 
-## 3. Layout Architecture (Complete Redesign)
+## 3. Layout Architecture
 
 ### 3.1 Main Tab Structure
 ```
 ┌──────────────────────────────────────────┐
 │  Tab 1: 当前对局 (Current Match)          │
 │  - Score summary card at top             │
+│  - Player picker section                 │
 │  - Game history list below               │
 │  - FAB for adding new game               │
 ├──────────────────────────────────────────┤
 │  Tab 2: 历史记录 (Match History)          │
 │  - List of completed matches             │
 │  - Expandable for game details           │
+│  - Player statistics for each match      │
 ├──────────────────────────────────────────┤
 │  Tab 3: 玩家统计 (Player Stats)           │
-│  - Player cards with statistics          │
-│  - Drill-down for details                │
+│  - Player list with avatars              │
+│  - Drill-down for detailed statistics    │
+│  - Charts for visual data representation │
 └──────────────────────────────────────────┘
 ```
 
-### 3.2 Current Match View (NEW Layout)
+### 3.2 Current Match View
 ```
 ┌──────────────────────────────────────────┐
 │ 当前对局                    [设置] [结束]  │
@@ -96,113 +99,170 @@ Follow iOS semantic colors for adaptability to Light/Dark mode:
 │ │  └────────┴────────┴────────┘      │   │
 │ └────────────────────────────────────┘   │
 │                                          │
+│ 选择玩家                                  │
+│ ┌────────┬────────┬────────┐            │
+│ │ 选A... │ 选B... │ 选C... │            │
+│ └────────┴────────┴────────┘            │
+│                                          │
 │ 局数记录                                  │
 │ ┌────────────────────────────────────┐   │
-│ │ 第1局   👑+200    -100    -100     │   │
+│ │ 1 │ 👑+200    -100    -100      ⋮ │   │
 │ ├────────────────────────────────────┤   │
-│ │ 第2局    -100   👑+200    -100     │   │
-│ ├────────────────────────────────────┤   │
-│ │ 第3局    +400    -200   👑-200     │   │
+│ │ 2 │  -100   👑+200    -100      ⋮ │   │
 │ └────────────────────────────────────┘   │
 │                                          │
-│              [＋ 添加新局]                │
+│        [＋ 添加新局]                      │
 └──────────────────────────────────────────┘
 ```
 
-### 3.3 Add Game Flow (NEW Interaction)
-Instead of a complex form, use a step-by-step flow:
+### 3.3 Add Game Flow (Single-Page Form)
+Uses a native iOS Form with sections for clarity:
 
-**Step 1: Select Landlord**
 ```
 ┌──────────────────────────────────────────┐
-│ 谁是地主？                     [取消]    │
+│ 添加新局                [取消]   [完成]   │
 ├──────────────────────────────────────────┤
 │                                          │
-│   ┌─────────┐ ┌─────────┐ ┌─────────┐   │
-│   │  玩家A  │ │  玩家B  │ │  玩家C  │   │
-│   │   👑    │ │         │ │         │   │
-│   └─────────┘ └─────────┘ └─────────┘   │
+│ ⚠️ 本局由 玩家A 先叫分                    │
 │                                          │
-│         [下一步: 设置叫分]                │
+│ ─── 叫分 ───                             │
+│                                          │
+│ 玩家A [先叫]                              │
+│ [不叫] [1分] [2分] [3分]                 │
+│                                          │
+│ 玩家B                                    │
+│ [不叫] [1分] [2分] [3分]                 │
+│                                          │
+│ 玩家C                                    │
+│ [不叫] [1分] [2分] [3分]                 │
+│                                          │
+│ 👑 玩家A 成为地主                         │
+│                                          │
+│ ─── 倍数 ───                             │
+│                                          │
+│ 炸弹数量              [-] 0 [+]          │
+│ 春天                        [ ]          │
+│                                          │
+│ ─── 加倍 ───                             │
+│                                          │
+│ 玩家A加倍                   [ ]          │
+│ 玩家B加倍                   [ ]          │
+│ 玩家C加倍                   [ ]          │
+│                                          │
+│ ─── 结果 ───                             │
+│                                          │
+│ [  地主赢了  |  农民赢了  ]               │
+│                                          │
 └──────────────────────────────────────────┘
 ```
 
-**Step 2: Set Bid & Multipliers**
-```
-┌──────────────────────────────────────────┐
-│ 游戏参数                       [返回]    │
-├──────────────────────────────────────────┤
-│                                          │
-│  叫分 (底分)                             │
-│  ┌───────┬───────┬───────┬───────┐      │
-│  │  1分  │  2分  │  3分  │  不叫  │      │
-│  └───────┴───────┴───────┴───────┘      │
-│                                          │
-│  炸弹数量         [  0  ] [-] [+]        │
-│                                          │
-│  特殊情况                                │
-│  ┌──────────┐  ┌──────────┐             │
-│  │   春天   │  │  加倍    │             │
-│  └──────────┘  └──────────┘             │
-│                                          │
-│         [下一步: 输入结果]                │
-└──────────────────────────────────────────┘
-```
+**Special Feature: Auto-Advance First Bidder**
+When no one bids (all select "不叫"), clicking "完成" will:
+1. Close the form without adding a game
+2. Automatically advance the first bidder to the next player
+3. Show a hint at the footer: "⚠️ 没人叫分，点击完成将自动轮换到下一位玩家先叫"
 
-**Step 3: Enter Result**
-```
-┌──────────────────────────────────────────┐
-│ 比赛结果                       [返回]    │
-├──────────────────────────────────────────┤
-│                                          │
-│            谁赢了？                       │
-│                                          │
-│   ┌───────────────────────────────┐      │
-│   │         👑 地主赢了            │      │
-│   └───────────────────────────────┘      │
-│                                          │
-│   ┌───────────────────────────────┐      │
-│   │         🌾 农民赢了            │      │
-│   └───────────────────────────────┘      │
-│                                          │
-│               [完成]                      │
-└──────────────────────────────────────────┘
+---
+
+## 4. UX Logic
+
+### 4.1 Player Selection Validation
+**Before saving a match:**
+- All 3 players (A, B, C) must be selected
+- If not, show alert: "请为位置A、B、C都选择玩家后再保存牌局"
+- Match will NOT be saved if players are not selected
+
+### 4.2 First Bidder Rotation
+- First bidder rotates automatically: A → B → C → A
+- Calculated as: `(gameCount + initialStarter) % 3`
+- When no one bids, advance starter to next player
+
+### 4.3 Score Color Logic
+The color is determined by the score value AND the user's `greenWin` setting:
+```swift
+private func scoreColor(_ score: Int) -> Color {
+    if score == 0 { return .primary }
+    let isPositive = score > 0
+    if dataSingleton.greenWin {
+        return isPositive ? .green : .red
+    } else {
+        return isPositive ? .red : .green
+    }
+}
 ```
 
 ---
 
-## 4. Components (Apple HIG Style)
+## 5. Components (Apple HIG Style)
 
-### 4.1 Score Card
+### 5.1 Score Card
 - Use **Card** style with rounded corners (16pt)
 - System background with slight elevation
-- Large, prominent numbers using `.largeTitle` font
+- Large, prominent numbers using `.title2` font
 - Color coded based on user preference (green/red toggle)
 
-### 4.2 Game Row
+### 5.2 Game Row
 - Use **Inset Grouped List** style
 - Crown emoji (👑) for landlord indicator
 - Swipe actions for edit/delete
 - Subtle dividers between rows
+- Score colors based on win/lose + user preference
 
-### 4.3 Buttons
+### 5.3 Buttons
 - Use system button styles (`.borderedProminent`, `.bordered`)
 - Follow iOS sizing (44pt minimum touch target)
 - Appropriate tint colors
 
-### 4.4 Pickers & Toggles
-- Use native iOS Picker with `.segmented` style
-- Use native Toggle for boolean options
-- Stepper for numeric values (bomb count)
+### 5.4 Pickers & Toggles
+- Use native iOS Picker with `.segmented` style for bids
+- Use native Toggle for boolean options (spring, double)
+- Custom +/- buttons for bomb count
 
-### 4.5 Navigation
+### 5.5 Navigation
 - Use NavigationStack for modern navigation
 - Modal sheets for add/edit flows
 - Confirmation dialogs for destructive actions
 
+### 5.6 Charts (iOS 16+)
+- Pie chart for win rate overview
+- Bar chart for role comparison (landlord vs farmer)
+- Bar chart for bid distribution
+- Fallback views for older iOS versions
+
 ---
 
-## 5. Typography
+## 6. Statistics Display
+
+### 6.1 Player Statistics (Consistent Style)
+Both the Stats tab and History tab use consistent styling:
+
+**Structure:**
+1. Win Rate Pie Chart (visual overview)
+2. Overall Statistics section
+3. Role Comparison Bar Chart
+4. Role Statistics section
+5. Special Statistics section (spring, double)
+6. Streak Statistics section
+7. Bid Distribution Chart (if applicable)
+8. Match Statistics section
+9. Score Records section
+
+**Each stat row includes:**
+- Icon on the left (SF Symbol)
+- Label text
+- Value on the right
+- Optional color coding for values
+
+### 6.2 Color Coding in Statistics
+- Use `scoreColor()` function for all score-related values
+- Green/red based on user's `greenWin` preference
+- Positive values get the "win" color
+- Negative values get the "lose" color
+- Zero values use primary color
+
+---
+
+## 7. Typography
 
 Use SF Pro (system font) exclusively:
 ```swift
@@ -219,33 +279,36 @@ Use SF Pro (system font) exclusively:
 
 ---
 
-## 6. Interaction Patterns
+## 8. Interaction Patterns
 
-### 6.1 Adding a Game
-- Tap floating "+" button
-- Step-by-step wizard (3 steps)
-- Progress indicator at top
-- Can go back to previous step
+### 8.1 Adding a Game
+- Tap floating "添加新局" button
+- Single-page form (not multi-step wizard)
+- Immediate validation feedback
 - Clear completion confirmation
+- Auto-advance first bidder when no bids
 
-### 6.2 Editing a Game
-- Swipe left on row → Edit
-- Same wizard flow, pre-populated
-- Clear "Save" vs "Cancel" options
+### 8.2 Editing a Game
+- Tap game row or use menu → Edit
+- Same form layout, pre-populated
+- Clear "保存" vs "取消" options
 
-### 6.3 Ending a Match
-- Prominent "结束对局" button in toolbar
+### 8.3 Ending a Match
+- Prominent "结束" button in toolbar
+- Validation: all 3 players must be selected
 - Confirmation dialog with summary
 - Automatic save to history
+- Navigate to saved match in History tab
 
-### 6.4 Settings
+### 8.4 Settings
 - Use Form/List with grouped sections
 - Immediate feedback on changes
 - Clear labels and descriptions
+- Color legend explanation
 
 ---
 
-## 7. Iconography (SF Symbols)
+## 9. Iconography (SF Symbols)
 
 ```swift
 "house.fill"              // 当前对局 tab
@@ -259,33 +322,28 @@ Use SF Pro (system font) exclusively:
 "person.circle.fill"      // Player avatar
 "checkmark.circle.fill"   // Completion
 "xmark.circle.fill"       // Cancel/Error
+"hand.point.right.fill"   // First bidder indicator
+"bolt.fill"               // Bombs
+"sun.max.fill"            // Spring
+"trophy.fill"             // Wins
+"flame.fill"              // Win streak
 ```
 
 ---
 
-## 8. Animation
+## 10. Accessibility
 
-Follow iOS system animations:
-- Sheet presentation: System spring
-- List updates: Automatic animations
-- Button feedback: System haptics
-- Score changes: Number transition
-
----
-
-## 9. Accessibility
-
-### 9.1 VoiceOver
+### 10.1 VoiceOver
 - All controls properly labeled
 - Score announcements are clear
 - Navigation hints provided
 
-### 9.2 Dynamic Type
+### 10.2 Dynamic Type
 - Support all text sizes
 - Layouts adapt to larger text
 - Minimum font size: 11pt
 
-### 9.3 Color
+### 10.3 Color
 - Don't rely solely on color for meaning
 - Use icons alongside colors
 - Support reduced transparency
@@ -294,9 +352,17 @@ Follow iOS system animations:
 
 ## Changelog
 
+### Version 2.1 (Current)
+- Single-page form instead of multi-step wizard for adding games
+- Auto-advance first bidder when no one bids
+- Player selection validation before saving match
+- Fixed color settings applied consistently throughout app (including history)
+- Added charts to statistics (pie chart, bar charts)
+- Improved statistics UI with icons and consistent styling
+- Color legend explanation in settings
+
 ### Version 2.0 (Apple HIG Redesign)
 - Complete redesign following Apple HIG
-- New step-by-step game entry flow
 - Score card summary at top of match view
 - Retained user-configurable green/red color preference
 - Native iOS components throughout

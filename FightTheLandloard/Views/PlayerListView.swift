@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import Charts
 
 struct PlayerListView: View {
     @StateObject private var firebaseService = FirebaseService.shared
@@ -194,7 +195,7 @@ struct PlayerDetailView: View {
                         .foregroundColor(.secondary)
                 }
             } else if let stats = statistics {
-                StatisticsView(stats: stats)
+                StatisticsView(stats: stats, playerName: player.name)
             }
         }
         .navigationTitle(player.name)
@@ -225,12 +226,13 @@ struct PlayerDetailView: View {
 
 struct StatisticsView: View {
     let stats: PlayerStatistics
-    @EnvironmentObject var instance: DataSingleton
+    let playerName: String
+    @ObservedObject private var dataSingleton = DataSingleton.instance
     
     private func scoreColor(_ score: Int) -> Color {
         if score == 0 { return .primary }
         let isPositive = score > 0
-        if DataSingleton.instance.greenWin {
+        if dataSingleton.greenWin {
             return isPositive ? .green : .red
         } else {
             return isPositive ? .red : .green
@@ -239,93 +241,369 @@ struct StatisticsView: View {
     
     var body: some View {
         List {
-            // Overall Statistics
-            Section("总体统计") {
-                StatRow(label: "总游戏数", value: "\(stats.totalGames)")
-                StatRow(label: "胜利", value: "\(stats.gamesWon)", valueColor: .green)
-                StatRow(label: "失败", value: "\(stats.gamesLost)", valueColor: .red)
-                StatRow(label: "胜率", value: String(format: "%.1f%%", stats.winRate))
-                StatRow(label: "总得分", value: "\(stats.totalScore)", valueColor: scoreColor(stats.totalScore))
-                StatRow(label: "场均得分", value: String(format: "%.1f", stats.averageScorePerGame))
-            }
-            
-            // Role Statistics
-            Section("角色统计") {
-                StatRow(label: "当地主次数", value: "\(stats.gamesAsLandlord)", icon: "crown.fill", iconColor: .orange)
-                StatRow(label: "地主胜率", value: String(format: "%.1f%%", stats.landlordWinRate))
-                StatRow(label: "当农民次数", value: "\(stats.gamesAsFarmer)", icon: "leaf.fill", iconColor: .green)
-                StatRow(label: "农民胜率", value: String(format: "%.1f%%", stats.farmerWinRate))
-            }
-            
-            // Special Statistics
-            Section("特殊情况") {
-                StatRow(label: "春天次数", value: "\(stats.springCount)", icon: "sun.max.fill", iconColor: .yellow)
-                StatRow(label: "被春次数", value: "\(stats.springAgainstCount)")
-                StatRow(label: "加倍次数", value: "\(stats.doubledGames)")
-                if stats.doubledGames > 0 {
-                    StatRow(label: "加倍胜率", value: String(format: "%.1f%%", stats.doubledWinRate))
+            // Win Rate Chart
+            if stats.totalGames > 0 {
+                Section {
+                    WinRatePieChart(wins: stats.gamesWon, losses: stats.gamesLost)
+                        .frame(height: 200)
+                } header: {
+                    Text("胜率概览")
                 }
             }
             
+            // Overall Statistics
+            Section {
+                StatRow(label: "总游戏数", value: "\(stats.totalGames)", icon: "gamecontroller.fill", iconColor: .accentColor)
+                StatRow(label: "胜利", value: "\(stats.gamesWon)", icon: "trophy.fill", iconColor: .green)
+                StatRow(label: "失败", value: "\(stats.gamesLost)", icon: "xmark.circle.fill", iconColor: .red)
+                StatRow(label: "胜率", value: String(format: "%.1f%%", stats.winRate), icon: "percent", iconColor: .orange)
+                StatRow(label: "总得分", value: "\(stats.totalScore)", valueColor: scoreColor(stats.totalScore), icon: "number.circle.fill", iconColor: .purple)
+                StatRow(label: "场均得分", value: String(format: "%.1f", stats.averageScorePerGame), icon: "chart.line.uptrend.xyaxis", iconColor: .blue)
+            } header: {
+                Text("总体统计")
+            }
+            
+            // Role Statistics with Chart
+            Section {
+                RoleComparisonChart(
+                    landlordGames: stats.gamesAsLandlord,
+                    landlordWins: stats.landlordWins,
+                    farmerGames: stats.gamesAsFarmer,
+                    farmerWins: stats.farmerWins
+                )
+                .frame(height: 200)
+            } header: {
+                Text("角色对比")
+            }
+            
+            Section {
+                StatRow(label: "当地主次数", value: "\(stats.gamesAsLandlord)", icon: "crown.fill", iconColor: .orange)
+                StatRow(label: "地主胜率", value: String(format: "%.1f%%", stats.landlordWinRate), icon: "percent", iconColor: .orange)
+                StatRow(label: "当农民次数", value: "\(stats.gamesAsFarmer)", icon: "leaf.fill", iconColor: .green)
+                StatRow(label: "农民胜率", value: String(format: "%.1f%%", stats.farmerWinRate), icon: "percent", iconColor: .green)
+            } header: {
+                Text("角色统计")
+            }
+            
+            // Special Statistics
+            Section {
+                StatRow(label: "春天次数", value: "\(stats.springCount)", icon: "sun.max.fill", iconColor: .yellow)
+                StatRow(label: "被春次数", value: "\(stats.springAgainstCount)", icon: "cloud.rain.fill", iconColor: .gray)
+                StatRow(label: "加倍次数", value: "\(stats.doubledGames)", icon: "2.circle.fill", iconColor: .blue)
+                if stats.doubledGames > 0 {
+                    StatRow(label: "加倍胜率", value: String(format: "%.1f%%", stats.doubledWinRate), icon: "percent", iconColor: .blue)
+                }
+            } header: {
+                Text("特殊情况")
+            }
+            
             // Streak Statistics
-            Section("连胜连败") {
-                StatRow(label: "当前连胜", value: "\(stats.currentWinStreak)", valueColor: stats.currentWinStreak > 0 ? .green : .primary)
-                StatRow(label: "当前连败", value: "\(stats.currentLossStreak)", valueColor: stats.currentLossStreak > 0 ? .red : .primary)
-                StatRow(label: "最长连胜", value: "\(stats.maxWinStreak)")
-                StatRow(label: "最长连败", value: "\(stats.maxLossStreak)")
+            Section {
+                StatRow(label: "当前连胜", value: "\(stats.currentWinStreak)", valueColor: stats.currentWinStreak > 0 ? .green : .primary, icon: "flame.fill", iconColor: .orange)
+                StatRow(label: "当前连败", value: "\(stats.currentLossStreak)", valueColor: stats.currentLossStreak > 0 ? .red : .primary, icon: "snowflake", iconColor: .blue)
+                StatRow(label: "最长连胜", value: "\(stats.maxWinStreak)", icon: "star.fill", iconColor: .yellow)
+                StatRow(label: "最长连败", value: "\(stats.maxLossStreak)", icon: "xmark.circle", iconColor: .gray)
+            } header: {
+                Text("连胜连败")
             }
             
             // Bid Statistics
             if stats.firstBidderGames > 0 {
-                Section("先叫时叫分分布") {
+                Section {
+                    BidDistributionChart(
+                        bidZero: stats.bidZeroCount,
+                        bidOne: stats.bidOneCount,
+                        bidTwo: stats.bidTwoCount,
+                        bidThree: stats.bidThreeCount
+                    )
+                    .frame(height: 200)
+                } header: {
+                    Text("先叫时叫分分布")
+                }
+                
+                Section {
                     StatRow(label: "先叫次数", value: "\(stats.firstBidderGames)")
                     StatRow(label: "不叫", value: "\(stats.bidZeroCount)")
                     StatRow(label: "1分", value: "\(stats.bidOneCount)")
                     StatRow(label: "2分", value: "\(stats.bidTwoCount)")
                     StatRow(label: "3分", value: "\(stats.bidThreeCount)")
+                } header: {
+                    Text("叫分详情")
                 }
             }
             
             // Match Statistics
-            Section("对局统计") {
-                StatRow(label: "总对局数", value: "\(stats.totalMatches)")
-                StatRow(label: "对局胜利", value: "\(stats.matchesWon)", valueColor: .green)
-                StatRow(label: "对局失败", value: "\(stats.matchesLost)", valueColor: .red)
-                StatRow(label: "对局平局", value: "\(stats.matchesTied)")
-                StatRow(label: "对局胜率", value: String(format: "%.1f%%", stats.matchWinRate))
+            Section {
+                StatRow(label: "总对局数", value: "\(stats.totalMatches)", icon: "rectangle.stack.fill", iconColor: .indigo)
+                StatRow(label: "对局胜利", value: "\(stats.matchesWon)", valueColor: .green, icon: "checkmark.circle.fill", iconColor: .green)
+                StatRow(label: "对局失败", value: "\(stats.matchesLost)", valueColor: .red, icon: "xmark.circle.fill", iconColor: .red)
+                StatRow(label: "对局平局", value: "\(stats.matchesTied)", icon: "equal.circle.fill", iconColor: .gray)
+                StatRow(label: "对局胜率", value: String(format: "%.1f%%", stats.matchWinRate), icon: "percent", iconColor: .purple)
+            } header: {
+                Text("对局统计")
             }
             
             // Score Records
-            Section("得分记录") {
-                StatRow(label: "单局最高得分", value: "\(stats.bestGameScore)", valueColor: .green)
-                StatRow(label: "单局最低得分", value: "\(stats.worstGameScore)", valueColor: .red)
-                StatRow(label: "对局最高得分", value: "\(stats.bestMatchScore)", valueColor: .green)
-                StatRow(label: "对局最低得分", value: "\(stats.worstMatchScore)", valueColor: .red)
+            Section {
+                StatRow(label: "单局最高得分", value: "\(stats.bestGameScore)", valueColor: .green, icon: "arrow.up.circle.fill", iconColor: .green)
+                StatRow(label: "单局最低得分", value: "\(stats.worstGameScore)", valueColor: .red, icon: "arrow.down.circle.fill", iconColor: .red)
+                StatRow(label: "对局最高得分", value: "\(stats.bestMatchScore)", valueColor: .green, icon: "arrow.up.forward.circle.fill", iconColor: .green)
+                StatRow(label: "对局最低得分", value: "\(stats.worstMatchScore)", valueColor: .red, icon: "arrow.down.backward.circle.fill", iconColor: .red)
+            } header: {
+                Text("得分记录")
             }
         }
         .listStyle(.insetGrouped)
     }
 }
 
-struct StatSection<Content: View>: View {
-    let title: String
-    @ViewBuilder let content: Content
+// MARK: - Charts
+
+struct WinRatePieChart: View {
+    let wins: Int
+    let losses: Int
     
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text(title)
-                .font(.headline)
-                .foregroundColor(.primary)
-            
-            VStack(spacing: 4) {
-                content
+        if #available(iOS 16.0, *) {
+            Chart {
+                SectorMark(
+                    angle: .value("胜利", wins),
+                    innerRadius: .ratio(0.6),
+                    angularInset: 2
+                )
+                .foregroundStyle(.green)
+                .annotation(position: .overlay) {
+                    if wins > 0 {
+                        Text("\(wins)")
+                            .font(.caption)
+                            .fontWeight(.bold)
+                            .foregroundColor(.white)
+                    }
+                }
+                
+                SectorMark(
+                    angle: .value("失败", losses),
+                    innerRadius: .ratio(0.6),
+                    angularInset: 2
+                )
+                .foregroundStyle(.red)
+                .annotation(position: .overlay) {
+                    if losses > 0 {
+                        Text("\(losses)")
+                            .font(.caption)
+                            .fontWeight(.bold)
+                            .foregroundColor(.white)
+                    }
+                }
             }
-            .padding()
-            .background(Color.gray80)
-            .cornerRadius(12)
+            .chartBackground { proxy in
+                GeometryReader { geometry in
+                    let frame = geometry[proxy.plotFrame!]
+                    VStack {
+                        Text("胜率")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                        Text(String(format: "%.0f%%", (wins + losses) > 0 ? Double(wins) / Double(wins + losses) * 100 : 0))
+                            .font(.title2)
+                            .fontWeight(.bold)
+                    }
+                    .position(x: frame.midX, y: frame.midY)
+                }
+            }
+        } else {
+            // Fallback for older iOS versions
+            HStack(spacing: 24) {
+                VStack {
+                    Text("\(wins)")
+                        .font(.title)
+                        .fontWeight(.bold)
+                        .foregroundColor(.green)
+                    Text("胜利")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+                VStack {
+                    Text(String(format: "%.0f%%", (wins + losses) > 0 ? Double(wins) / Double(wins + losses) * 100 : 0))
+                        .font(.title)
+                        .fontWeight(.bold)
+                    Text("胜率")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+                VStack {
+                    Text("\(losses)")
+                        .font(.title)
+                        .fontWeight(.bold)
+                        .foregroundColor(.red)
+                    Text("失败")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+            }
+            .frame(maxWidth: .infinity)
         }
     }
 }
+
+struct RoleComparisonChart: View {
+    let landlordGames: Int
+    let landlordWins: Int
+    let farmerGames: Int
+    let farmerWins: Int
+    
+    var body: some View {
+        if #available(iOS 16.0, *) {
+            Chart {
+                BarMark(
+                    x: .value("角色", "地主"),
+                    y: .value("局数", landlordGames)
+                )
+                .foregroundStyle(.orange.opacity(0.6))
+                .annotation(position: .top) {
+                    Text("\(landlordGames)")
+                        .font(.caption2)
+                        .foregroundColor(.secondary)
+                }
+                
+                BarMark(
+                    x: .value("角色", "地主胜"),
+                    y: .value("局数", landlordWins)
+                )
+                .foregroundStyle(.orange)
+                .annotation(position: .top) {
+                    Text("\(landlordWins)")
+                        .font(.caption2)
+                        .foregroundColor(.secondary)
+                }
+                
+                BarMark(
+                    x: .value("角色", "农民"),
+                    y: .value("局数", farmerGames)
+                )
+                .foregroundStyle(.green.opacity(0.6))
+                .annotation(position: .top) {
+                    Text("\(farmerGames)")
+                        .font(.caption2)
+                        .foregroundColor(.secondary)
+                }
+                
+                BarMark(
+                    x: .value("角色", "农民胜"),
+                    y: .value("局数", farmerWins)
+                )
+                .foregroundStyle(.green)
+                .annotation(position: .top) {
+                    Text("\(farmerWins)")
+                        .font(.caption2)
+                        .foregroundColor(.secondary)
+                }
+            }
+            .chartYAxis {
+                AxisMarks(position: .leading)
+            }
+        } else {
+            // Fallback
+            HStack(spacing: 24) {
+                VStack {
+                    Text("地主")
+                        .font(.caption)
+                        .foregroundColor(.orange)
+                    Text("\(landlordWins)/\(landlordGames)")
+                        .font(.headline)
+                    Text(landlordGames > 0 ? String(format: "%.0f%%", Double(landlordWins)/Double(landlordGames)*100) : "0%")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+                VStack {
+                    Text("农民")
+                        .font(.caption)
+                        .foregroundColor(.green)
+                    Text("\(farmerWins)/\(farmerGames)")
+                        .font(.headline)
+                    Text(farmerGames > 0 ? String(format: "%.0f%%", Double(farmerWins)/Double(farmerGames)*100) : "0%")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+            }
+            .frame(maxWidth: .infinity)
+        }
+    }
+}
+
+struct BidDistributionChart: View {
+    let bidZero: Int
+    let bidOne: Int
+    let bidTwo: Int
+    let bidThree: Int
+    
+    var body: some View {
+        if #available(iOS 16.0, *) {
+            Chart {
+                BarMark(
+                    x: .value("叫分", "不叫"),
+                    y: .value("次数", bidZero)
+                )
+                .foregroundStyle(.gray)
+                
+                BarMark(
+                    x: .value("叫分", "1分"),
+                    y: .value("次数", bidOne)
+                )
+                .foregroundStyle(.blue)
+                
+                BarMark(
+                    x: .value("叫分", "2分"),
+                    y: .value("次数", bidTwo)
+                )
+                .foregroundStyle(.orange)
+                
+                BarMark(
+                    x: .value("叫分", "3分"),
+                    y: .value("次数", bidThree)
+                )
+                .foregroundStyle(.red)
+            }
+            .chartYAxis {
+                AxisMarks(position: .leading)
+            }
+        } else {
+            // Fallback
+            HStack(spacing: 16) {
+                VStack {
+                    Text("\(bidZero)")
+                        .font(.headline)
+                    Text("不叫")
+                        .font(.caption)
+                        .foregroundColor(.gray)
+                }
+                VStack {
+                    Text("\(bidOne)")
+                        .font(.headline)
+                    Text("1分")
+                        .font(.caption)
+                        .foregroundColor(.blue)
+                }
+                VStack {
+                    Text("\(bidTwo)")
+                        .font(.headline)
+                    Text("2分")
+                        .font(.caption)
+                        .foregroundColor(.orange)
+                }
+                VStack {
+                    Text("\(bidThree)")
+                        .font(.headline)
+                    Text("3分")
+                        .font(.caption)
+                        .foregroundColor(.red)
+                }
+            }
+            .frame(maxWidth: .infinity)
+        }
+    }
+}
+
+// MARK: - Stat Row
 
 struct StatRow: View {
     let label: String
@@ -342,7 +620,7 @@ struct StatRow: View {
                     .frame(width: 24)
             }
             Text(label)
-                .foregroundColor(.secondary)
+                .foregroundColor(.primary)
             Spacer()
             Text(value)
                 .foregroundColor(valueColor)

@@ -185,6 +185,11 @@ struct ListingView: View {
                 }
                 Button("取消", role: .cancel) {}
             }
+            .alert("请选择玩家", isPresented: $viewModel.showPlayerWarning) {
+                Button("确定", role: .cancel) {}
+            } message: {
+                Text("请为位置A、B、C都选择玩家后再保存牌局")
+            }
             .alert(isPresented: $viewModel.instance.listingShowAlert) {
                 Alert(
                     title: Text("提示"),
