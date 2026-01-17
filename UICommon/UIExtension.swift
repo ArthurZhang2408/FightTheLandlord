@@ -23,10 +23,22 @@ extension Font {
 }
 
 extension String {
+    /// Legacy color mapping - kept for backward compatibility
+    /// New code should use scoreColor instead
     var color: Color {
         switch self {
-        case "green": return DataSingleton.instance.greenWin ? .green : .red
-        case "red": return DataSingleton.instance.greenWin ? .red : .green
+        case "green": return .winColor
+        case "red": return .loseColor
+        default: return .white
+        }
+    }
+    
+    /// Semantic color for game outcomes
+    /// "win" = Gold (positive), "lose" = Coral (negative), default = white
+    var scoreColor: Color {
+        switch self {
+        case "win": return .winColor
+        case "lose": return .loseColor
         default: return .white
         }
     }
@@ -116,6 +128,45 @@ extension Color {
     static var secondaryG50: Color {
         return Color(hex: "7DFFEE ")
     }
+    
+    // MARK: - Semantic Colors for Game Outcomes
+    
+    /// Gold color for positive scores/wins
+    static var winColor: Color {
+        return Color(hex: "FFD700")
+    }
+    
+    /// Coral red color for negative scores/losses
+    static var loseColor: Color {
+        return Color(hex: "FF6B6B")
+    }
+    
+    /// Amber color for landlord indicator
+    static var landlordColor: Color {
+        return Color(hex: "FFB800")
+    }
+    
+    /// Green color for farmer indicator
+    static var farmerColor: Color {
+        return Color(hex: "4CAF50")
+    }
+    
+    /// Success state color
+    static var successColor: Color {
+        return Color(hex: "4CAF50")
+    }
+    
+    /// Warning state color
+    static var warningColor: Color {
+        return Color(hex: "FF9800")
+    }
+    
+    /// Error state color
+    static var errorColor: Color {
+        return Color(hex: "F44336")
+    }
+    
+    // MARK: - Gray Scale
     
     static var grayC: Color {
         return Color(hex: "0E0E12")

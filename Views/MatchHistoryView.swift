@@ -137,6 +137,12 @@ struct PlayerScoreLabel: View {
     let name: String
     let score: Int
     
+    private var scoreColor: Color {
+        if score > 0 { return .winColor }
+        if score < 0 { return .loseColor }
+        return .white
+    }
+    
     var body: some View {
         VStack(alignment: .leading, spacing: 2) {
             Text(name)
@@ -146,7 +152,7 @@ struct PlayerScoreLabel: View {
             Text("\(score)")
                 .font(.subheadline)
                 .fontWeight(.medium)
-                .foregroundColor(score > 0 ? .green : (score < 0 ? .red : .white))
+                .foregroundColor(scoreColor)
         }
     }
 }
@@ -184,6 +190,12 @@ struct MatchDetailView: View {
         return formatter
     }
     
+    private func scoreColor(_ score: Int) -> Color {
+        if score > 0 { return .winColor }
+        if score < 0 { return .loseColor }
+        return .white
+    }
+    
     var width: CGFloat = 90
     
     var body: some View {
@@ -207,7 +219,7 @@ struct MatchDetailView: View {
                                     Text("\(displayScoreA)")
                                         .font(.title2)
                                         .fontWeight(.bold)
-                                        .foregroundColor(displayScoreA > 0 ? .green : (displayScoreA < 0 ? .red : .white))
+                                        .foregroundColor(scoreColor(displayScoreA))
                                 }
                                 VStack {
                                     Text(match.playerBName)
@@ -215,7 +227,7 @@ struct MatchDetailView: View {
                                     Text("\(displayScoreB)")
                                         .font(.title2)
                                         .fontWeight(.bold)
-                                        .foregroundColor(displayScoreB > 0 ? .green : (displayScoreB < 0 ? .red : .white))
+                                        .foregroundColor(scoreColor(displayScoreB))
                                 }
                                 VStack {
                                     Text(match.playerCName)
@@ -223,7 +235,7 @@ struct MatchDetailView: View {
                                     Text("\(displayScoreC)")
                                         .font(.title2)
                                         .fontWeight(.bold)
-                                        .foregroundColor(displayScoreC > 0 ? .green : (displayScoreC < 0 ? .red : .white))
+                                        .foregroundColor(scoreColor(displayScoreC))
                                 }
                             }
                         }
@@ -405,129 +417,146 @@ struct HistoryEditView: View {
         self._viewModel = StateObject(wrappedValue: HistoryEditViewModel(game: games.wrappedValue[editingIndex]))
     }
     
-    var height: CGFloat = 40
-    var width: CGFloat = .screenWidth/3.5
-    var leadingPad: CGFloat = 13
-    
     var body: some View {
         NavigationView {
-            VStack {
-                VStack(alignment: .center) {
-                    HStack {
-                        VStack(alignment: .leading, spacing: 20) {
-                            VStack {
-                                Text(playerAName)
-                                    .foregroundStyle(.white)
-                            }
-                            .frame(height: height)
-                            .padding(.leading, leadingPad)
-                            VStack {
-                                Picker(selection: $viewModel.apoint) {
-                                    ForEach(viewModel.points, id: \.self) { curr in
-                                        Text(curr)
-                                    }
-                                } label: {}
-                            }
-                            .frame(height: height)
-                            VStack {
-                                Toggle(isOn: $viewModel.setting.adouble) {
-                                    Text("加倍")
-                                }
-                                .toggleStyle(.button)
-                            }
-                            .frame(height: height)
+            ScrollView {
+                VStack(spacing: 24) {
+                    // MARK: - Player Bid Section
+                    VStack(spacing: 16) {
+                        Text("叫分")
+                            .font(.customfont(.semibold, fontSize: 16))
+                            .foregroundColor(.gray30)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                        
+                        HStack(alignment: .top, spacing: 8) {
+                            // Player A Column
+                            HistoryPlayerBidColumn(
+                                playerName: playerAName.isEmpty ? "玩家A" : playerAName,
+                                selectedBid: $viewModel.apoint,
+                                isDoubled: $viewModel.setting.adouble,
+                                points: viewModel.points
+                            )
+                            
+                            // Player B Column
+                            HistoryPlayerBidColumn(
+                                playerName: playerBName.isEmpty ? "玩家B" : playerBName,
+                                selectedBid: $viewModel.bpoint,
+                                isDoubled: $viewModel.setting.bdouble,
+                                points: viewModel.points
+                            )
+                            
+                            // Player C Column
+                            HistoryPlayerBidColumn(
+                                playerName: playerCName.isEmpty ? "玩家C" : playerCName,
+                                selectedBid: $viewModel.cpoint,
+                                isDoubled: $viewModel.setting.cdouble,
+                                points: viewModel.points
+                            )
                         }
-                        .frame(width: width)
-                        VStack(alignment: .leading, spacing: 20) {
-                            VStack {
-                                Text(playerBName)
-                                    .foregroundStyle(.white)
-                            }
-                            .frame(height: height)
-                            .padding(.leading, leadingPad)
-                            VStack {
-                                Picker(selection: $viewModel.bpoint) {
-                                    ForEach(viewModel.points, id: \.self) { curr in
-                                        Text(curr)
-                                    }
-                                } label: {}
-                            }
-                            .frame(height: height)
-                            VStack {
-                                Toggle(isOn: $viewModel.setting.bdouble) {
-                                    Text("加倍")
-                                }
-                                .toggleStyle(.button)
-                            }
-                            .frame(height: height)
-                        }
-                        .frame(width: width)
-                        VStack(alignment: .leading, spacing: 20) {
-                            VStack {
-                                Text(playerCName)
-                                    .foregroundStyle(.white)
-                            }
-                            .frame(height: height)
-                            .padding(.leading, leadingPad)
-                            VStack {
-                                Picker(selection: $viewModel.cpoint) {
-                                    ForEach(viewModel.points, id: \.self) { curr in
-                                        Text(curr)
-                                    }
-                                } label: {}
-                            }
-                            .frame(height: height)
-                            VStack {
-                                Toggle(isOn: $viewModel.setting.cdouble) {
-                                    Text("加倍")
-                                }
-                                .toggleStyle(.button)
-                            }
-                            .frame(height: height)
-                        }
-                        .frame(width: width)
                     }
-                    .padding(.bottom, 30)
-                    HStack {
-                        VStack(spacing: 40) {
-                            VStack {
-                                RoundTextField(title: "炸弹", text: $viewModel.bombs, keyboardType: .decimal, height: 35)
-                            }
-                            .frame(height: height)
-                            VStack {
-                                Toggle(isOn: $viewModel.setting.spring) {
-                                    Text("春天")
-                                }
-                                .toggleStyle(.button)
-                            }
-                            .frame(height: height)
-                            VStack {
-                                Picker("landlord", selection: $viewModel.setting.landlordResult) {
-                                    ForEach(viewModel.results, id: \.self) { result in
-                                        Text(result).tag(result == "地主赢了")
-                                    }
-                                }
-                                .pickerStyle(.segmented)
-                            }
-                            .frame(height: height)
+                    .padding(16)
+                    .background(Color.gray80)
+                    .cornerRadius(12)
+                    
+                    // MARK: - Game Modifiers Section
+                    VStack(spacing: 16) {
+                        Text("游戏参数")
+                            .font(.customfont(.semibold, fontSize: 16))
+                            .foregroundColor(.gray30)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                        
+                        // Bombs Input
+                        HStack {
+                            Image(systemName: "bolt.fill")
+                                .foregroundColor(.warningColor)
+                            Text("炸弹数量")
+                                .font(.customfont(.medium, fontSize: 14))
+                                .foregroundColor(.gray40)
+                            Spacer()
+                            TextField("0", text: $viewModel.bombs)
+                                .keyboardType(.numberPad)
+                                .multilineTextAlignment(.center)
+                                .font(.customfont(.semibold, fontSize: 16))
+                                .foregroundColor(.white)
+                                .frame(width: 60, height: 36)
+                                .background(Color.gray70)
+                                .cornerRadius(8)
                         }
-                        .padding(.horizontal, 50)
+                        
+                        Divider()
+                            .background(Color.gray70)
+                        
+                        // Spring Toggle
+                        HStack {
+                            Image(systemName: "sun.max.fill")
+                                .foregroundColor(.winColor)
+                            Text("春天")
+                                .font(.customfont(.medium, fontSize: 14))
+                                .foregroundColor(.gray40)
+                            Spacer()
+                            Toggle("", isOn: $viewModel.setting.spring)
+                                .toggleStyle(CustomToggleStyle())
+                        }
                     }
+                    .padding(16)
+                    .background(Color.gray80)
+                    .cornerRadius(12)
+                    
+                    // MARK: - Result Section
+                    VStack(spacing: 16) {
+                        Text("结果")
+                            .font(.customfont(.semibold, fontSize: 16))
+                            .foregroundColor(.gray30)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                        
+                        Picker("result", selection: $viewModel.setting.landlordResult) {
+                            HStack {
+                                Image(systemName: "crown.fill")
+                                Text("地主赢")
+                            }
+                            .tag(true)
+                            
+                            HStack {
+                                Image(systemName: "person.2.fill")
+                                Text("农民赢")
+                            }
+                            .tag(false)
+                        }
+                        .pickerStyle(.segmented)
+                    }
+                    .padding(16)
+                    .background(Color.gray80)
+                    .cornerRadius(12)
+                    
+                    Spacer(minLength: 20)
+                    
+                    // MARK: - Submit Button
+                    PrimaryButton(title: "保存修改") {
+                        if viewModel.save() {
+                            // Update local state
+                            games[editingIndex] = viewModel.setting
+                            updateLocalScores()
+                            // Save to Firebase
+                            saveToFirebase()
+                            showingEditSheet = false
+                        }
+                    }
+                    .padding(.bottom, 20)
                 }
-                .padding(.top, .topInsets + 20)
-                Spacer()
-                PrimaryButton(title: "保存修改") {
-                    if viewModel.save() {
-                        // Update local state
-                        games[editingIndex] = viewModel.setting
-                        updateLocalScores()
-                        // Save to Firebase
-                        saveToFirebase()
+                .padding(.horizontal, 16)
+                .padding(.top, 16)
+            }
+            .background(Color.grayC)
+            .navigationTitle("修改第\(editingIndex + 1)局")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("取消") {
                         showingEditSheet = false
                     }
+                    .foregroundColor(.gray40)
                 }
             }
-            .navigationTitle("修改第\(editingIndex + 1)局")
             .alert(isPresented: $viewModel.showAlert) {
                 Alert(
                     title: Text("错误"),
@@ -589,6 +618,56 @@ struct HistoryEditView: View {
                 print("Error updating game records: \(error.localizedDescription)")
             }
         }
+    }
+}
+
+// MARK: - History Player Bid Column
+struct HistoryPlayerBidColumn: View {
+    let playerName: String
+    @Binding var selectedBid: String
+    @Binding var isDoubled: Bool
+    let points: [String]
+    
+    var body: some View {
+        VStack(spacing: 12) {
+            // Player Name
+            Text(playerName)
+                .font(.customfont(.semibold, fontSize: 14))
+                .foregroundColor(.white)
+                .lineLimit(1)
+                .frame(height: 24)
+            
+            // Bid Selection
+            Menu {
+                ForEach(points, id: \.self) { point in
+                    Button(point) {
+                        selectedBid = point
+                    }
+                }
+            } label: {
+                Text(selectedBid)
+                    .font(.customfont(.medium, fontSize: 14))
+                    .foregroundColor(selectedBid == "不叫" ? .gray50 : .white)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 36)
+                    .background(selectedBid == "不叫" ? Color.gray70 : Color.primary.opacity(0.3))
+                    .cornerRadius(8)
+            }
+            
+            // Double Toggle
+            Button {
+                isDoubled.toggle()
+            } label: {
+                Text("加倍")
+                    .font(.customfont(.medium, fontSize: 12))
+                    .foregroundColor(isDoubled ? .white : .gray50)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 32)
+                    .background(isDoubled ? Color.primary500 : Color.gray70)
+                    .cornerRadius(8)
+            }
+        }
+        .frame(maxWidth: .infinity)
     }
 }
 
@@ -805,6 +884,12 @@ struct MatchPlayerStatRow: View {
         }.count
     }
     
+    private var scoreColor: Color {
+        if finalScore > 0 { return .winColor }
+        if finalScore < 0 { return .loseColor }
+        return .white
+    }
+    
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
@@ -814,7 +899,7 @@ struct MatchPlayerStatRow: View {
                 Spacer()
                 Text("\(finalScore)")
                     .font(.headline)
-                    .foregroundColor(finalScore > 0 ? .green : (finalScore < 0 ? .red : .white))
+                    .foregroundColor(scoreColor)
             }
             
             HStack(spacing: 16) {
