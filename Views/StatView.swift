@@ -16,54 +16,13 @@ struct StatView: View {
     
     var body: some View {
         NavigationStack(path: $navigationPath) {
-            VStack {
+            Group {
                 if firebaseService.isLoading {
-                    ProgressView()
+                    ProgressView("加载中...")
                 } else if firebaseService.players.isEmpty {
-                    VStack(spacing: 20) {
-                        Image(systemName: "person.3.fill")
-                            .font(.system(size: 50))
-                            .foregroundColor(.gray50)
-                        Text("暂无玩家")
-                            .font(.customfont(.semibold, fontSize: 18))
-                            .foregroundColor(.gray40)
-                        Text("点击右上角添加新玩家")
-                            .font(.customfont(.regular, fontSize: 14))
-                            .foregroundColor(.gray50)
-                    }
-                    .padding(.top, 100)
+                    emptyStateView
                 } else {
-                    List {
-                        ForEach(firebaseService.players) { player in
-                            Button {
-                                navigationPath.append(player)
-                            } label: {
-                                HStack(spacing: 12) {
-                                    Image(systemName: "person.circle.fill")
-                                        .font(.title2)
-                                        .foregroundColor(.primary500)
-                                    Text(player.name)
-                                        .font(.customfont(.medium, fontSize: 16))
-                                        .foregroundColor(.white)
-                                    Spacer()
-                                    Image(systemName: "chevron.right")
-                                        .foregroundColor(.gray50)
-                                        .font(.caption)
-                                }
-                                .padding(.vertical, 8)
-                            }
-                            .swipeActions(edge: .trailing, allowsFullSwipe: false) {
-                                Button {
-                                    playerToDelete = player
-                                    showingDeleteConfirm = true
-                                } label: {
-                                    Label("删除", systemImage: "trash")
-                                }
-                                .tint(.loseColor)
-                            }
-                        }
-                    }
-                    .listStyle(.plain)
+                    playerListView
                 }
             }
             .navigationTitle("玩家统计")
@@ -71,11 +30,13 @@ struct StatView: View {
                 PlayerDetailView(player: player)
             }
             .toolbar {
-                Button {
-                    showingAddPlayer = true
-                } label: {
-                    Image(systemName: "plus.circle.fill")
-                        .foregroundColor(.primary500)
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button {
+                        showingAddPlayer = true
+                    } label: {
+                        Image(systemName: "plus.circle.fill")
+                            .font(.title3)
+                    }
                 }
             }
             .sheet(isPresented: $showingAddPlayer) {
@@ -91,8 +52,85 @@ struct StatView: View {
                     }
                     playerToDelete = nil
                 }
+            } message: {
+                Text("删除后无法恢复该玩家的所有数据")
             }
         }
+    }
+    
+    private var emptyStateView: some View {
+        VStack(spacing: 20) {
+            Image(systemName: "person.3.fill")
+                .font(.system(size: 60))
+                .foregroundColor(.secondary.opacity(0.5))
+            
+            Text("暂无玩家")
+                .font(.title2)
+                .fontWeight(.medium)
+            
+            Text("添加玩家来记录比赛统计")
+                .font(.subheadline)
+                .foregroundColor(.secondary)
+            
+            Button {
+                showingAddPlayer = true
+            } label: {
+                HStack {
+                    Image(systemName: "plus.circle.fill")
+                    Text("添加玩家")
+                }
+                .padding(.horizontal, 24)
+                .padding(.vertical, 12)
+            }
+            .buttonStyle(.borderedProminent)
+            .padding(.top, 8)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(Color(.systemGroupedBackground))
+    }
+    
+    private var playerListView: some View {
+        List {
+            ForEach(firebaseService.players) { player in
+                Button {
+                    navigationPath.append(player)
+                } label: {
+                    HStack(spacing: 12) {
+                        // Avatar
+                        ZStack {
+                            Circle()
+                                .fill(Color.accentColor.opacity(0.15))
+                                .frame(width: 44, height: 44)
+                            Text(String(player.name.prefix(1)))
+                                .font(.headline)
+                                .foregroundColor(.accentColor)
+                        }
+                        
+                        // Name
+                        Text(player.name)
+                            .font(.body)
+                            .foregroundColor(.primary)
+                        
+                        Spacer()
+                        
+                        Image(systemName: "chevron.right")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                    .padding(.vertical, 4)
+                }
+                .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+                    Button {
+                        playerToDelete = player
+                        showingDeleteConfirm = true
+                    } label: {
+                        Label("删除", systemImage: "trash")
+                    }
+                    .tint(.red)
+                }
+            }
+        }
+        .listStyle(.insetGrouped)
     }
 }
 

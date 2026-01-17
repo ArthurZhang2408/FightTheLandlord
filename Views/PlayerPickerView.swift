@@ -22,65 +22,55 @@ struct PlayerPickerView: View {
     }
     
     var body: some View {
-        VStack(spacing: 4) {
-            // Position label
-            Text("玩家\(position)")
-                .font(.customfont(.medium, fontSize: 11))
-                .foregroundColor(.gray50)
-            
-            Menu {
-                ForEach(availablePlayers) { player in
-                    Button {
-                        selectedPlayer = player
-                    } label: {
-                        HStack {
-                            Text(player.name)
-                            if selectedPlayer?.id == player.id {
-                                Image(systemName: "checkmark")
-                            }
+        Menu {
+            ForEach(availablePlayers) { player in
+                Button {
+                    selectedPlayer = player
+                } label: {
+                    HStack {
+                        Text(player.name)
+                        if selectedPlayer?.id == player.id {
+                            Image(systemName: "checkmark")
                         }
                     }
                 }
-                
-                Divider()
-                
-                Button {
-                    showingAddPlayer = true
-                } label: {
-                    Label("添加新玩家", systemImage: "plus.circle")
-                }
-            } label: {
-                HStack(spacing: 6) {
-                    if let player = selectedPlayer {
-                        Image(systemName: "person.circle.fill")
-                            .font(.system(size: 14))
-                            .foregroundColor(.primary500)
-                        Text(player.name)
-                            .font(.customfont(.medium, fontSize: 14))
-                            .foregroundColor(.white)
-                            .lineLimit(1)
-                    } else {
-                        Image(systemName: "person.circle")
-                            .font(.system(size: 14))
-                            .foregroundColor(.gray50)
-                        Text("选择")
-                            .font(.customfont(.regular, fontSize: 14))
-                            .foregroundColor(.gray50)
-                    }
-                    Spacer()
-                    Image(systemName: "chevron.down")
-                        .font(.system(size: 10))
-                        .foregroundColor(.gray50)
-                }
-                .padding(.horizontal, 12)
-                .padding(.vertical, 10)
-                .background(Color.gray80)
-                .cornerRadius(10)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 10)
-                        .stroke(selectedPlayer != nil ? Color.primary500.opacity(0.5) : Color.gray70, lineWidth: 1)
-                )
             }
+            
+            Divider()
+            
+            Button {
+                showingAddPlayer = true
+            } label: {
+                Label("添加新玩家", systemImage: "plus.circle")
+            }
+        } label: {
+            VStack(spacing: 4) {
+                ZStack {
+                    Circle()
+                        .fill(selectedPlayer != nil ? Color.accentColor.opacity(0.15) : Color(.tertiarySystemFill))
+                        .frame(width: 50, height: 50)
+                    
+                    if let player = selectedPlayer {
+                        Text(String(player.name.prefix(1)))
+                            .font(.title2)
+                            .fontWeight(.medium)
+                            .foregroundColor(.accentColor)
+                    } else {
+                        Image(systemName: "person.badge.plus")
+                            .font(.title3)
+                            .foregroundColor(.secondary)
+                    }
+                }
+                
+                Text(selectedPlayer?.name ?? "玩家\(position)")
+                    .font(.caption)
+                    .foregroundColor(selectedPlayer != nil ? .primary : .secondary)
+                    .lineLimit(1)
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 8)
+            .background(Color(.secondarySystemGroupedBackground))
+            .clipShape(RoundedRectangle(cornerRadius: 12))
         }
         .sheet(isPresented: $showingAddPlayer) {
             AddPlayerView(isPresented: $showingAddPlayer)
@@ -92,7 +82,7 @@ struct PlayerPickerView: View {
     HStack {
         PlayerPickerView(selectedPlayer: .constant(nil), excludePlayers: [], position: "A")
         PlayerPickerView(selectedPlayer: .constant(Player(name: "张三")), excludePlayers: [], position: "B")
+        PlayerPickerView(selectedPlayer: .constant(nil), excludePlayers: [], position: "C")
     }
     .padding()
-    .background(Color.grayC)
 }

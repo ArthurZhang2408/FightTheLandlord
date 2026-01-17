@@ -10,142 +10,155 @@ import SwiftUI
 struct ListingView: View {
     @StateObject var viewModel: ListingViewModel = ListingViewModel()
     @EnvironmentObject var instance: DataSingleton
-    var height: CGFloat = 10
+    
     var body: some View {
-        NavigationView {
-            VStack(spacing: 0) {
-                // Player Selection Header
-                HStack(spacing: 12) {
-                    PlayerPickerView(
-                        selectedPlayer: Binding(
-                            get: { viewModel.instance.playerA },
-                            set: { player in
-                                viewModel.instance.playerA = player
-                                viewModel.instance.syncPlayerNames()
-                            }
-                        ),
-                        excludePlayers: [viewModel.instance.playerB, viewModel.instance.playerC].compactMap { $0 },
-                        position: "A"
+        NavigationStack {
+            ScrollView {
+                VStack(spacing: 20) {
+                    // MARK: - Score Summary Card
+                    ScoreSummaryCard(
+                        playerA: viewModel.instance.room.aName.isEmpty ? "玩家A" : viewModel.instance.room.aName,
+                        playerB: viewModel.instance.room.bName.isEmpty ? "玩家B" : viewModel.instance.room.bName,
+                        playerC: viewModel.instance.room.cName.isEmpty ? "玩家C" : viewModel.instance.room.cName,
+                        scoreA: viewModel.instance.aRe,
+                        scoreB: viewModel.instance.bRe,
+                        scoreC: viewModel.instance.cRe,
+                        gamesPlayed: viewModel.instance.games.count
                     )
-                    PlayerPickerView(
-                        selectedPlayer: Binding(
-                            get: { viewModel.instance.playerB },
-                            set: { player in
-                                viewModel.instance.playerB = player
-                                viewModel.instance.syncPlayerNames()
-                            }
-                        ),
-                        excludePlayers: [viewModel.instance.playerA, viewModel.instance.playerC].compactMap { $0 },
-                        position: "B"
-                    )
-                    PlayerPickerView(
-                        selectedPlayer: Binding(
-                            get: { viewModel.instance.playerC },
-                            set: { player in
-                                viewModel.instance.playerC = player
-                                viewModel.instance.syncPlayerNames()
-                            }
-                        ),
-                        excludePlayers: [viewModel.instance.playerA, viewModel.instance.playerB].compactMap { $0 },
-                        position: "C"
-                    )
-                }
-                .padding(.horizontal, 16)
-                .padding(.vertical, 12)
-                
-                // Score Header
-                if !viewModel.instance.games.isEmpty {
-                    HStack {
-                        Text("局")
-                            .frame(width: 40)
-                            .foregroundColor(.gray50)
-                        Spacer()
-                        Text(viewModel.instance.room.aName.isEmpty ? "A" : viewModel.instance.room.aName)
-                            .frame(width: 80)
-                            .foregroundColor(.gray40)
-                        Text(viewModel.instance.room.bName.isEmpty ? "B" : viewModel.instance.room.bName)
-                            .frame(width: 80)
-                            .foregroundColor(.gray40)
-                        Text(viewModel.instance.room.cName.isEmpty ? "C" : viewModel.instance.room.cName)
-                            .frame(width: 80)
-                            .foregroundColor(.gray40)
-                    }
-                    .font(.customfont(.medium, fontSize: 12))
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 8)
-                    .background(Color.gray80.opacity(0.5))
-                }
-                
-                // Games List
-                List {
-                    ForEach(viewModel.instance.games.indices, id: \.self) { idx in
-                        GameRowView(
-                            index: idx,
-                            game: viewModel.instance.games[idx],
-                            cumulativeScore: viewModel.instance.scorePerGame ? nil : viewModel.instance.scores[idx],
-                            playerNames: [
-                                viewModel.instance.room.aName,
-                                viewModel.instance.room.bName,
-                                viewModel.instance.room.cName
-                            ]
-                        )
-                        .swipeActions(allowsFullSwipe: false) {
-                            Button {
-                                viewModel.gameIdx = idx
-                                viewModel.showingNewItemView = true
-                            } label: {
-                                Label("编辑", systemImage: "pencil")
-                            }
-                            .tint(.primary500)
-                            Button {
-                                viewModel.deleteIdx = idx
-                                viewModel.deletingItem = true
-                            } label: {
-                                Label("删除", systemImage: "trash.fill")
-                            }
-                            .tint(.loseColor)
+                    .padding(.horizontal)
+                    
+                    // MARK: - Player Selection Section
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text("选择玩家")
+                            .font(.headline)
+                            .foregroundColor(.secondary)
+                            .padding(.horizontal)
+                        
+                        HStack(spacing: 12) {
+                            PlayerPickerView(
+                                selectedPlayer: Binding(
+                                    get: { viewModel.instance.playerA },
+                                    set: { player in
+                                        viewModel.instance.playerA = player
+                                        viewModel.instance.syncPlayerNames()
+                                    }
+                                ),
+                                excludePlayers: [viewModel.instance.playerB, viewModel.instance.playerC].compactMap { $0 },
+                                position: "A"
+                            )
+                            PlayerPickerView(
+                                selectedPlayer: Binding(
+                                    get: { viewModel.instance.playerB },
+                                    set: { player in
+                                        viewModel.instance.playerB = player
+                                        viewModel.instance.syncPlayerNames()
+                                    }
+                                ),
+                                excludePlayers: [viewModel.instance.playerA, viewModel.instance.playerC].compactMap { $0 },
+                                position: "B"
+                            )
+                            PlayerPickerView(
+                                selectedPlayer: Binding(
+                                    get: { viewModel.instance.playerC },
+                                    set: { player in
+                                        viewModel.instance.playerC = player
+                                        viewModel.instance.syncPlayerNames()
+                                    }
+                                ),
+                                excludePlayers: [viewModel.instance.playerA, viewModel.instance.playerB].compactMap { $0 },
+                                position: "C"
+                            )
                         }
-                    }.onMove { from, to in
-                        viewModel.instance.games.move(fromOffsets: from, toOffset: to)
-                        viewModel.instance.updateScore(from: min(from.first ?? 0, to))
+                        .padding(.horizontal)
                     }
                     
-                    // Total Score Row
-                    if viewModel.instance.scorePerGame && !viewModel.instance.games.isEmpty {
-                        TotalScoreRow(
-                            aRe: viewModel.instance.aRe,
-                            bRe: viewModel.instance.bRe,
-                            cRe: viewModel.instance.cRe
-                        )
+                    // MARK: - Games List Section
+                    VStack(alignment: .leading, spacing: 12) {
+                        HStack {
+                            Text("局数记录")
+                                .font(.headline)
+                                .foregroundColor(.secondary)
+                            Spacer()
+                            Text("\(viewModel.instance.games.count) 局")
+                                .font(.subheadline)
+                                .foregroundColor(.secondary)
+                        }
+                        .padding(.horizontal)
+                        
+                        if viewModel.instance.games.isEmpty {
+                            EmptyGamesView()
+                                .padding(.horizontal)
+                        } else {
+                            LazyVStack(spacing: 8) {
+                                ForEach(viewModel.instance.games.indices, id: \.self) { idx in
+                                    GameRowCard(
+                                        gameNumber: idx + 1,
+                                        game: viewModel.instance.games[idx],
+                                        cumulativeScore: viewModel.instance.scorePerGame ? nil : viewModel.instance.scores[idx],
+                                        playerNames: (
+                                            viewModel.instance.room.aName.isEmpty ? "A" : viewModel.instance.room.aName,
+                                            viewModel.instance.room.bName.isEmpty ? "B" : viewModel.instance.room.bName,
+                                            viewModel.instance.room.cName.isEmpty ? "C" : viewModel.instance.room.cName
+                                        ),
+                                        onEdit: {
+                                            viewModel.gameIdx = idx
+                                            viewModel.showingNewItemView = true
+                                        },
+                                        onDelete: {
+                                            viewModel.deleteIdx = idx
+                                            viewModel.deletingItem = true
+                                        }
+                                    )
+                                }
+                            }
+                            .padding(.horizontal)
+                        }
                     }
+                    
+                    Spacer(minLength: 80)
                 }
-                .listStyle(.plain)
+                .padding(.top)
             }
+            .background(Color(.systemGroupedBackground))
             .navigationTitle("当前对局")
             .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    HStack(spacing: 16) {
-                        Button {
-                            viewModel.showingSettingView = true
-                        } label: {
-                            Image(systemName: "gear")
-                                .foregroundColor(.gray40)
-                        }
-                        Button {
-                            viewModel.gameIdx = -1
-                            viewModel.showingNewItemView = true
-                        } label: {
-                            Image(systemName: "plus.circle.fill")
-                                .foregroundColor(.primary500)
-                        }
-                        Button {
-                            viewModel.showConfirm.toggle()
-                        } label: {
-                            Image(systemName: "checkmark.circle")
-                                .foregroundColor(.successColor)
-                        }
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button {
+                        viewModel.showingSettingView = true
+                    } label: {
+                        Image(systemName: "gearshape")
                     }
                 }
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button {
+                        viewModel.showConfirm.toggle()
+                    } label: {
+                        Text("结束")
+                            .fontWeight(.medium)
+                    }
+                    .tint(.red)
+                }
+            }
+            .overlay(alignment: .bottom) {
+                // Floating Add Button
+                Button {
+                    viewModel.gameIdx = -1
+                    viewModel.showingNewItemView = true
+                } label: {
+                    HStack {
+                        Image(systemName: "plus.circle.fill")
+                            .font(.title2)
+                        Text("添加新局")
+                            .fontWeight(.semibold)
+                    }
+                    .padding(.horizontal, 24)
+                    .padding(.vertical, 14)
+                    .background(Color.accentColor)
+                    .foregroundColor(.white)
+                    .clipShape(Capsule())
+                    .shadow(color: .accentColor.opacity(0.3), radius: 10, y: 5)
+                }
+                .padding(.bottom, 16)
             }
             .sheet(isPresented: $viewModel.showingNewItemView) {
                 AddColumn(
@@ -155,13 +168,16 @@ struct ListingView: View {
                 )
             }
             .sheet(isPresented: $viewModel.showingSettingView) {
-                SettingView(players: [viewModel.instance.room.aName, viewModel.instance.room.bName, viewModel.instance.room.cName]).environmentObject(DataSingleton.instance)
+                SettingView(players: [viewModel.instance.room.aName, viewModel.instance.room.bName, viewModel.instance.room.cName])
+                    .environmentObject(DataSingleton.instance)
             }
             .confirmationDialog("确定结束牌局吗？", isPresented: $viewModel.showConfirm, titleVisibility: .visible) {
-                Button("结束并保存") {
+                Button("结束并保存", role: .destructive) {
                     viewModel.endMatch()
                 }
                 Button("取消", role: .cancel) {}
+            } message: {
+                Text("当前对局将被保存到历史记录中")
             }
             .confirmationDialog("确定删除第\(viewModel.deleteIdx+1)局吗？", isPresented: $viewModel.deletingItem, titleVisibility: .visible) {
                 Button("删除", role: .destructive) {
@@ -179,125 +195,200 @@ struct ListingView: View {
     }
 }
 
-// MARK: - Game Row View
+// MARK: - Score Summary Card
 
-struct GameRowView: View {
-    let index: Int
-    let game: GameSetting
-    let cumulativeScore: ScoreTriple?
-    let playerNames: [String]
+struct ScoreSummaryCard: View {
+    let playerA: String
+    let playerB: String
+    let playerC: String
+    let scoreA: Int
+    let scoreB: Int
+    let scoreC: Int
+    let gamesPlayed: Int
     
-    private var scoreA: Int { cumulativeScore?.A ?? game.A }
-    private var scoreB: Int { cumulativeScore?.B ?? game.B }
-    private var scoreC: Int { cumulativeScore?.C ?? game.C }
-    
-    var body: some View {
-        HStack {
-            // Game number
-            Text("\(index + 1)")
-                .font(.customfont(.medium, fontSize: 14))
-                .foregroundColor(.gray50)
-                .frame(width: 40)
-            
-            Spacer()
-            
-            // Player A Score
-            ScoreCell(
-                score: scoreA,
-                isLandlord: game.landlord == 1,
-                gameScore: game.A
-            )
-            .frame(width: 80)
-            
-            // Player B Score
-            ScoreCell(
-                score: scoreB,
-                isLandlord: game.landlord == 2,
-                gameScore: game.B
-            )
-            .frame(width: 80)
-            
-            // Player C Score
-            ScoreCell(
-                score: scoreC,
-                isLandlord: game.landlord == 3,
-                gameScore: game.C
-            )
-            .frame(width: 80)
-        }
-        .padding(.vertical, 8)
-        .background(Color.gray80.opacity(0.3))
-        .cornerRadius(8)
-    }
-}
-
-// MARK: - Score Cell
-
-struct ScoreCell: View {
-    let score: Int
-    let isLandlord: Bool
-    let gameScore: Int
-    
-    private var scoreColor: Color {
-        if gameScore > 0 { return .winColor }
-        if gameScore < 0 { return .loseColor }
-        return .white
-    }
-    
-    var body: some View {
-        HStack(spacing: 4) {
-            if isLandlord {
-                Image(systemName: "crown.fill")
-                    .font(.system(size: 10))
-                    .foregroundColor(.landlordColor)
-            }
-            Text("\(score)")
-                .font(.customfont(.semibold, fontSize: 15))
-                .foregroundColor(scoreColor)
-        }
-    }
-}
-
-// MARK: - Total Score Row
-
-struct TotalScoreRow: View {
-    let aRe: Int
-    let bRe: Int
-    let cRe: Int
+    @EnvironmentObject var instance: DataSingleton
     
     private func scoreColor(_ score: Int) -> Color {
-        if score > 0 { return .winColor }
-        if score < 0 { return .loseColor }
-        return .white
+        if score == 0 { return .primary }
+        let isPositive = score > 0
+        if instance.greenWin {
+            return isPositive ? .green : .red
+        } else {
+            return isPositive ? .red : .green
+        }
     }
     
     var body: some View {
-        HStack {
-            Text("总分")
-                .font(.customfont(.semibold, fontSize: 14))
-                .foregroundColor(.gray30)
-                .frame(width: 40)
+        VStack(spacing: 16) {
+            HStack {
+                Text("总分")
+                    .font(.headline)
+                    .foregroundColor(.secondary)
+                Spacer()
+                if gamesPlayed > 0 {
+                    Text("已进行 \(gamesPlayed) 局")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+            }
             
-            Spacer()
-            
-            Text("\(aRe)")
-                .font(.customfont(.bold, fontSize: 16))
-                .foregroundColor(scoreColor(aRe))
-                .frame(width: 80)
-            
-            Text("\(bRe)")
-                .font(.customfont(.bold, fontSize: 16))
-                .foregroundColor(scoreColor(bRe))
-                .frame(width: 80)
-            
-            Text("\(cRe)")
-                .font(.customfont(.bold, fontSize: 16))
-                .foregroundColor(scoreColor(cRe))
-                .frame(width: 80)
+            HStack(spacing: 0) {
+                ScoreColumn(name: playerA, score: scoreA, color: scoreColor(scoreA))
+                Divider()
+                    .frame(height: 60)
+                ScoreColumn(name: playerB, score: scoreB, color: scoreColor(scoreB))
+                Divider()
+                    .frame(height: 60)
+                ScoreColumn(name: playerC, score: scoreC, color: scoreColor(scoreC))
+            }
         }
-        .padding(.vertical, 12)
-        .background(Color.gray70.opacity(0.5))
-        .cornerRadius(8)
+        .padding()
+        .background(Color(.secondarySystemGroupedBackground))
+        .clipShape(RoundedRectangle(cornerRadius: 16))
+    }
+}
+
+struct ScoreColumn: View {
+    let name: String
+    let score: Int
+    let color: Color
+    
+    var body: some View {
+        VStack(spacing: 4) {
+            Text(name)
+                .font(.subheadline)
+                .foregroundColor(.secondary)
+                .lineLimit(1)
+            Text(score >= 0 ? "+\(score)" : "\(score)")
+                .font(.system(size: 28, weight: .bold, design: .rounded))
+                .foregroundColor(color)
+        }
+        .frame(maxWidth: .infinity)
+    }
+}
+
+// MARK: - Game Row Card
+
+struct GameRowCard: View {
+    let gameNumber: Int
+    let game: GameSetting
+    let cumulativeScore: ScoreTriple?
+    let playerNames: (String, String, String)
+    let onEdit: () -> Void
+    let onDelete: () -> Void
+    
+    @EnvironmentObject var instance: DataSingleton
+    
+    private var displayScoreA: Int { cumulativeScore?.A ?? game.A }
+    private var displayScoreB: Int { cumulativeScore?.B ?? game.B }
+    private var displayScoreC: Int { cumulativeScore?.C ?? game.C }
+    
+    private func scoreColor(for colorString: String) -> Color {
+        return colorString.color
+    }
+    
+    var body: some View {
+        HStack(spacing: 12) {
+            // Game number badge
+            Text("\(gameNumber)")
+                .font(.caption)
+                .fontWeight(.medium)
+                .foregroundColor(.white)
+                .frame(width: 28, height: 28)
+                .background(Circle().fill(Color.accentColor.opacity(0.8)))
+            
+            // Scores
+            HStack(spacing: 0) {
+                GameScoreCell(
+                    name: playerNames.0,
+                    score: displayScoreA,
+                    isLandlord: game.landlord == 1,
+                    color: scoreColor(for: game.aC)
+                )
+                GameScoreCell(
+                    name: playerNames.1,
+                    score: displayScoreB,
+                    isLandlord: game.landlord == 2,
+                    color: scoreColor(for: game.bC)
+                )
+                GameScoreCell(
+                    name: playerNames.2,
+                    score: displayScoreC,
+                    isLandlord: game.landlord == 3,
+                    color: scoreColor(for: game.cC)
+                )
+            }
+            
+            // Action buttons
+            Menu {
+                Button {
+                    onEdit()
+                } label: {
+                    Label("编辑", systemImage: "pencil")
+                }
+                Button(role: .destructive) {
+                    onDelete()
+                } label: {
+                    Label("删除", systemImage: "trash")
+                }
+            } label: {
+                Image(systemName: "ellipsis.circle")
+                    .font(.title3)
+                    .foregroundColor(.secondary)
+            }
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
+        .background(Color(.secondarySystemGroupedBackground))
+        .clipShape(RoundedRectangle(cornerRadius: 12))
+    }
+}
+
+struct GameScoreCell: View {
+    let name: String
+    let score: Int
+    let isLandlord: Bool
+    let color: Color
+    
+    var body: some View {
+        VStack(spacing: 2) {
+            HStack(spacing: 2) {
+                if isLandlord {
+                    Text("👑")
+                        .font(.caption2)
+                }
+                Text(name)
+                    .font(.caption2)
+                    .foregroundColor(.secondary)
+                    .lineLimit(1)
+            }
+            Text(score >= 0 ? "+\(score)" : "\(score)")
+                .font(.system(size: 16, weight: .semibold, design: .rounded))
+                .foregroundColor(color)
+        }
+        .frame(maxWidth: .infinity)
+    }
+}
+
+// MARK: - Empty State
+
+struct EmptyGamesView: View {
+    var body: some View {
+        VStack(spacing: 12) {
+            Image(systemName: "rectangle.stack.badge.plus")
+                .font(.system(size: 48))
+                .foregroundColor(.secondary.opacity(0.5))
+            Text("还没有记录")
+                .font(.headline)
+                .foregroundColor(.secondary)
+            Text("点击下方按钮添加第一局")
+                .font(.subheadline)
+                .foregroundColor(.secondary.opacity(0.7))
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 40)
+        .background(Color(.secondarySystemGroupedBackground))
+        .clipShape(RoundedRectangle(cornerRadius: 16))
     }
 }
 
