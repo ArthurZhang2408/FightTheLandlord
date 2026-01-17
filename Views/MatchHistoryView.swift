@@ -471,7 +471,10 @@ struct HistoryEditView: View {
         self.playerAName = playerAName
         self.playerBName = playerBName
         self.playerCName = playerCName
-        self._viewModel = StateObject(wrappedValue: HistoryEditViewModel(game: games.wrappedValue[editingIndex]))
+        // Safe bounds check to prevent "Index out of range" crash
+        let gamesArray = games.wrappedValue
+        let safeGame = (editingIndex >= 0 && editingIndex < gamesArray.count) ? gamesArray[editingIndex] : GameSetting()
+        self._viewModel = StateObject(wrappedValue: HistoryEditViewModel(game: safeGame))
     }
     
     var body: some View {
