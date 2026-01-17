@@ -119,6 +119,13 @@ struct AddColumn: View {
                             }
                             .frame(height: height)
                             VStack{
+                                Toggle(isOn: $viewModel.setting.spring) {
+                                    Text("春天")
+                                }
+                                .toggleStyle(.button)
+                            }
+                            .frame(height: height)
+                            VStack{
                                 
                                 Picker("landlord", selection: $viewModel.setting.landlordResult) {
                                     ForEach(viewModel.results, id: \.self) { result in

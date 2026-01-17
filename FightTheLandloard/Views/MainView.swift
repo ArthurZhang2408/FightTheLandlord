@@ -18,11 +18,16 @@ struct MainView: View {
     
     @ViewBuilder
     var accountView: some View {
-        TabView {
+        TabView(selection: $instance.selectedTab) {
             ListingView()
-                .tabItem { Label("Home", systemImage: "house") }
+                .tabItem { Label("对局", systemImage: "house") }
+                .tag(0)
+            MatchHistoryView()
+                .tabItem { Label("历史", systemImage: "clock.arrow.circlepath") }
+                .tag(1)
             StatView()
-                .tabItem { Label("Stat", systemImage: "chart.bar") }
+                .tabItem { Label("统计", systemImage: "chart.bar") }
+                .tag(2)
         }
     }
 }
