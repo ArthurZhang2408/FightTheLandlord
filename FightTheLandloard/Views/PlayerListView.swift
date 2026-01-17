@@ -635,41 +635,79 @@ struct StatisticsView: View {
 
 // MARK: - Skeleton Loading Views
 
+/// Professional skeleton shimmer animation like Zhihu app
+/// A subtle, smooth light sweep effect from left to right
+struct ShimmerEffect: ViewModifier {
+    @State private var phase: CGFloat = 0
+    
+    func body(content: Content) -> some View {
+        content
+            .overlay(
+                GeometryReader { geometry in
+                    LinearGradient(
+                        gradient: Gradient(stops: [
+                            .init(color: Color(.systemGray5), location: 0),
+                            .init(color: Color(.systemGray4), location: 0.4),
+                            .init(color: Color(.systemGray3), location: 0.5),
+                            .init(color: Color(.systemGray4), location: 0.6),
+                            .init(color: Color(.systemGray5), location: 1)
+                        ]),
+                        startPoint: .leading,
+                        endPoint: .trailing
+                    )
+                    .frame(width: geometry.size.width * 2)
+                    .offset(x: -geometry.size.width + phase * geometry.size.width * 2)
+                }
+            )
+            .mask(content)
+            .onAppear {
+                withAnimation(
+                    Animation.linear(duration: 1.5)
+                        .repeatForever(autoreverses: false)
+                ) {
+                    phase = 1
+                }
+            }
+    }
+}
+
+extension View {
+    func shimmer() -> some View {
+        self.modifier(ShimmerEffect())
+    }
+}
+
 struct SkeletonStatisticsView: View {
     var body: some View {
         List {
-            // Chart skeleton - use pulse animation
+            // Chart skeleton
             Section {
-                SkeletonBox(height: 200)
-                    .modifier(SkeletonPulseModifier())
+                SkeletonChartBox()
             } header: {
-                Text("得分走势")
+                SkeletonText(width: 60)
             }
             
-            // Win rate chart skeleton - use pulse animation
+            // Win rate chart skeleton
             Section {
-                SkeletonBox(height: 200)
-                    .modifier(SkeletonPulseModifier())
+                SkeletonChartBox()
             } header: {
-                Text("胜率概览")
+                SkeletonText(width: 60)
             }
             
-            // Stats skeleton - use shimmer animation
+            // Stats skeleton
             Section {
                 ForEach(0..<6, id: \.self) { _ in
                     SkeletonStatRow()
                 }
             } header: {
-                Text("总体统计")
+                SkeletonText(width: 60)
             }
-            .modifier(SkeletonShimmerModifier())
             
             // Role chart skeleton
             Section {
-                SkeletonBox(height: 200)
-                    .modifier(SkeletonPulseModifier())
+                SkeletonChartBox()
             } header: {
-                Text("角色对比")
+                SkeletonText(width: 60)
             }
             
             // Role stats skeleton
@@ -678,9 +716,8 @@ struct SkeletonStatisticsView: View {
                     SkeletonStatRow()
                 }
             } header: {
-                Text("角色统计")
+                SkeletonText(width: 60)
             }
-            .modifier(SkeletonShimmerModifier())
             
             // Special stats skeleton
             Section {
@@ -688,9 +725,8 @@ struct SkeletonStatisticsView: View {
                     SkeletonStatRow()
                 }
             } header: {
-                Text("特殊情况")
+                SkeletonText(width: 60)
             }
-            .modifier(SkeletonShimmerModifier())
             
             // Streak stats skeleton
             Section {
@@ -698,9 +734,8 @@ struct SkeletonStatisticsView: View {
                     SkeletonStatRow()
                 }
             } header: {
-                Text("连胜连败")
+                SkeletonText(width: 60)
             }
-            .modifier(SkeletonShimmerModifier())
             
             // Match stats skeleton
             Section {
@@ -708,9 +743,8 @@ struct SkeletonStatisticsView: View {
                     SkeletonStatRow()
                 }
             } header: {
-                Text("对局统计")
+                SkeletonText(width: 60)
             }
-            .modifier(SkeletonShimmerModifier())
             
             // Score records skeleton
             Section {
@@ -718,96 +752,58 @@ struct SkeletonStatisticsView: View {
                     SkeletonStatRow()
                 }
             } header: {
-                Text("得分记录")
+                SkeletonText(width: 60)
             }
-            .modifier(SkeletonShimmerModifier())
         }
         .listStyle(.insetGrouped)
     }
 }
 
-// MARK: - Skeleton Animation Modifiers
-
-/// Pulse animation for chart placeholders - subtle opacity fade
-struct SkeletonPulseModifier: ViewModifier {
-    @State private var isAnimating = false
-    
-    func body(content: Content) -> some View {
-        content
-            .redacted(reason: .placeholder)
-            .opacity(isAnimating ? 0.5 : 1.0)
-            .animation(
-                Animation.easeInOut(duration: 1.0)
-                    .repeatForever(autoreverses: true),
-                value: isAnimating
-            )
-            .onAppear {
-                isAnimating = true
-            }
-    }
-}
-
-/// Shimmer animation for non-chart items - sliding highlight effect
-struct SkeletonShimmerModifier: ViewModifier {
-    @State private var isAnimating = false
-    
-    func body(content: Content) -> some View {
-        content
-            .redacted(reason: .placeholder)
-            .overlay(
-                GeometryReader { geometry in
-                    let gradientWidth = geometry.size.width * 0.5
-                    LinearGradient(
-                        gradient: Gradient(stops: [
-                            .init(color: .clear, location: 0),
-                            .init(color: Color.white.opacity(0.4), location: 0.3),
-                            .init(color: Color.white.opacity(0.6), location: 0.5),
-                            .init(color: Color.white.opacity(0.4), location: 0.7),
-                            .init(color: .clear, location: 1)
-                        ]),
-                        startPoint: .leading,
-                        endPoint: .trailing
-                    )
-                    .frame(width: gradientWidth)
-                    .offset(x: isAnimating ? geometry.size.width + gradientWidth : -gradientWidth)
-                }
-                .mask(content)
-            )
-            .onAppear {
-                withAnimation(
-                    Animation.linear(duration: 1.5)
-                        .repeatForever(autoreverses: false)
-                ) {
-                    isAnimating = true
-                }
-            }
-    }
-}
-
-struct SkeletonBox: View {
-    let height: CGFloat
-    
+/// Skeleton placeholder for chart areas - simple gray box with shimmer
+struct SkeletonChartBox: View {
     var body: some View {
         RoundedRectangle(cornerRadius: 8)
             .fill(Color(.systemGray5))
-            .frame(height: height)
+            .frame(height: 200)
+            .shimmer()
     }
 }
 
+/// Skeleton placeholder for text - simple gray rounded rectangle
+struct SkeletonText: View {
+    let width: CGFloat
+    var height: CGFloat = 14
+    
+    var body: some View {
+        RoundedRectangle(cornerRadius: 4)
+            .fill(Color(.systemGray5))
+            .frame(width: width, height: height)
+            .shimmer()
+    }
+}
+
+/// Skeleton placeholder for stat rows (icon + label + value)
 struct SkeletonStatRow: View {
     var body: some View {
         HStack {
+            // Icon placeholder
             Circle()
                 .fill(Color(.systemGray5))
                 .frame(width: 24, height: 24)
+            
+            // Label placeholder
             RoundedRectangle(cornerRadius: 4)
                 .fill(Color(.systemGray5))
-                .frame(width: 80, height: 16)
+                .frame(width: 80, height: 14)
+            
             Spacer()
+            
+            // Value placeholder
             RoundedRectangle(cornerRadius: 4)
                 .fill(Color(.systemGray5))
-                .frame(width: 50, height: 16)
+                .frame(width: 50, height: 14)
         }
+        .shimmer()
     }
 }
 
@@ -819,7 +815,6 @@ struct SkeletonMatchListView: View {
             }
         }
         .listStyle(.insetGrouped)
-        .modifier(SkeletonShimmerModifier())
     }
 }
 
@@ -827,10 +822,12 @@ struct SkeletonMatchRow: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
+                // Date placeholder
                 RoundedRectangle(cornerRadius: 4)
                     .fill(Color(.systemGray5))
                     .frame(width: 120, height: 14)
                 Spacer()
+                // Game count placeholder
                 RoundedRectangle(cornerRadius: 4)
                     .fill(Color(.systemGray5))
                     .frame(width: 40, height: 12)
@@ -839,9 +836,11 @@ struct SkeletonMatchRow: View {
             HStack(spacing: 16) {
                 ForEach(0..<3, id: \.self) { _ in
                     VStack(spacing: 4) {
+                        // Player name placeholder
                         RoundedRectangle(cornerRadius: 4)
                             .fill(Color(.systemGray5))
                             .frame(width: 50, height: 12)
+                        // Score placeholder
                         RoundedRectangle(cornerRadius: 4)
                             .fill(Color(.systemGray5))
                             .frame(width: 30, height: 16)
@@ -850,6 +849,31 @@ struct SkeletonMatchRow: View {
             }
         }
         .padding(.vertical, 4)
+        .shimmer()
+    }
+}
+
+// Legacy modifiers kept for compatibility but using new shimmer
+struct SkeletonPulseModifier: ViewModifier {
+    func body(content: Content) -> some View {
+        content.shimmer()
+    }
+}
+
+struct SkeletonShimmerModifier: ViewModifier {
+    func body(content: Content) -> some View {
+        content.shimmer()
+    }
+}
+
+struct SkeletonBox: View {
+    let height: CGFloat
+    
+    var body: some View {
+        RoundedRectangle(cornerRadius: 8)
+            .fill(Color(.systemGray5))
+            .frame(height: height)
+            .shimmer()
     }
 }
 
