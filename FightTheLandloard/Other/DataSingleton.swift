@@ -20,6 +20,8 @@ class DataSingleton: ObservableObject {
     @Published var cRe: Int = 0
     @Published var room: RoomSetting
     @Published var listingShowAlert: Bool = false
+    /// Deprecated: No longer used. Score colors now use semantic winColor/loseColor.
+    /// Kept for potential migration or backward compatibility.
     @Published var greenWin: Bool = true
     @Published var scorePerGame: Bool = true
     @Published var scores: [ScoreTriple] = []

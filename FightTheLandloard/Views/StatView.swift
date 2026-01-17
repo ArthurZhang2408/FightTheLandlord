@@ -21,14 +21,14 @@ struct StatView: View {
                     ProgressView()
                 } else if firebaseService.players.isEmpty {
                     VStack(spacing: 20) {
-                        Image(systemName: "person.3")
+                        Image(systemName: "person.3.fill")
                             .font(.system(size: 50))
                             .foregroundColor(.gray50)
                         Text("暂无玩家")
-                            .font(.headline)
-                            .foregroundColor(.gray)
+                            .font(.customfont(.semibold, fontSize: 18))
+                            .foregroundColor(.gray40)
                         Text("点击右上角添加新玩家")
-                            .font(.subheadline)
+                            .font(.customfont(.regular, fontSize: 14))
                             .foregroundColor(.gray50)
                     }
                     .padding(.top, 100)
@@ -38,32 +38,32 @@ struct StatView: View {
                             Button {
                                 navigationPath.append(player)
                             } label: {
-                                HStack {
+                                HStack(spacing: 12) {
                                     Image(systemName: "person.circle.fill")
                                         .font(.title2)
                                         .foregroundColor(.primary500)
                                     Text(player.name)
-                                        .font(.headline)
-                                        .foregroundColor(.primary)
+                                        .font(.customfont(.medium, fontSize: 16))
+                                        .foregroundColor(.white)
                                     Spacer()
                                     Image(systemName: "chevron.right")
-                                        .foregroundColor(.gray)
+                                        .foregroundColor(.gray50)
                                         .font(.caption)
                                 }
                                 .padding(.vertical, 8)
                             }
                             .swipeActions(edge: .trailing, allowsFullSwipe: false) {
-                                // Use non-destructive role to prevent immediate visual deletion
                                 Button {
                                     playerToDelete = player
                                     showingDeleteConfirm = true
                                 } label: {
                                     Label("删除", systemImage: "trash")
                                 }
-                                .tint(.red)
+                                .tint(.loseColor)
                             }
                         }
                     }
+                    .listStyle(.plain)
                 }
             }
             .navigationTitle("玩家统计")
@@ -74,7 +74,8 @@ struct StatView: View {
                 Button {
                     showingAddPlayer = true
                 } label: {
-                    Image(systemName: "plus")
+                    Image(systemName: "plus.circle.fill")
+                        .foregroundColor(.primary500)
                 }
             }
             .sheet(isPresented: $showingAddPlayer) {

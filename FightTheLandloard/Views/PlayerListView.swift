@@ -20,20 +20,27 @@ struct PlayerListView: View {
                     ProgressView()
                 } else if firebaseService.players.isEmpty {
                     VStack(spacing: 20) {
+                        Image(systemName: "person.3.fill")
+                            .font(.system(size: 50))
+                            .foregroundColor(.gray50)
                         Text("暂无玩家")
-                            .font(.headline)
-                            .foregroundColor(.gray)
+                            .font(.customfont(.semibold, fontSize: 18))
+                            .foregroundColor(.gray40)
                         Text("点击右上角添加新玩家")
-                            .font(.subheadline)
+                            .font(.customfont(.regular, fontSize: 14))
                             .foregroundColor(.gray50)
                     }
                 } else {
                     List {
                         ForEach(firebaseService.players) { player in
                             NavigationLink(destination: PlayerDetailView(player: player)) {
-                                HStack {
+                                HStack(spacing: 12) {
+                                    Image(systemName: "person.circle.fill")
+                                        .font(.title2)
+                                        .foregroundColor(.primary500)
                                     Text(player.name)
-                                        .font(.headline)
+                                        .font(.customfont(.medium, fontSize: 16))
+                                        .foregroundColor(.white)
                                     Spacer()
                                 }
                                 .padding(.vertical, 8)
@@ -45,9 +52,11 @@ struct PlayerListView: View {
                                 } label: {
                                     Label("删除", systemImage: "trash")
                                 }
+                                .tint(.loseColor)
                             }
                         }
                     }
+                    .listStyle(.plain)
                 }
             }
             .navigationTitle("玩家管理")
@@ -55,7 +64,8 @@ struct PlayerListView: View {
                 Button {
                     showingAddPlayer = true
                 } label: {
-                    Image(systemName: "plus")
+                    Image(systemName: "plus.circle.fill")
+                        .foregroundColor(.primary500)
                 }
             }
             .sheet(isPresented: $showingAddPlayer) {
@@ -83,14 +93,30 @@ struct AddPlayerView: View {
     
     var body: some View {
         NavigationView {
-            VStack(spacing: 20) {
-                TextField("玩家名称", text: $playerName)
-                    .textFieldStyle(RoundedBorderTextFieldStyle())
-                    .padding(.horizontal)
-                    .padding(.top, 20)
+            VStack(spacing: 24) {
+                // Player name input
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("玩家名称")
+                        .font(.customfont(.medium, fontSize: 14))
+                        .foregroundColor(.gray40)
+                    
+                    TextField("", text: $playerName)
+                        .font(.customfont(.regular, fontSize: 16))
+                        .foregroundColor(.white)
+                        .padding(16)
+                        .background(Color.gray80)
+                        .cornerRadius(12)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 12)
+                                .stroke(Color.gray70, lineWidth: 1)
+                        )
+                }
+                .padding(.horizontal, 20)
+                .padding(.top, 20)
                 
                 if isLoading {
                     ProgressView()
+                        .progressViewStyle(CircularProgressViewStyle(tint: .primary500))
                 }
                 
                 Spacer()
@@ -99,7 +125,10 @@ struct AddPlayerView: View {
                     addPlayer()
                 }
                 .disabled(playerName.trimmingCharacters(in: .whitespaces).isEmpty || isLoading)
+                .opacity(playerName.trimmingCharacters(in: .whitespaces).isEmpty || isLoading ? 0.5 : 1)
+                .padding(.bottom, 20)
             }
+            .background(Color.grayC)
             .navigationTitle("添加玩家")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -107,6 +136,7 @@ struct AddPlayerView: View {
                     Button("取消") {
                         isPresented = false
                     }
+                    .foregroundColor(.gray40)
                 }
             }
             .alert("错误", isPresented: $showError) {
@@ -148,12 +178,13 @@ struct PlayerDetailView: View {
                     HStack {
                         Spacer()
                         ProgressView()
+                            .progressViewStyle(CircularProgressViewStyle(tint: .primary500))
                         Spacer()
                     }
                     .padding(.top, 50)
                 } else if let error = errorMessage {
                     Text(error)
-                        .foregroundColor(.red)
+                        .foregroundColor(.loseColor)
                         .padding()
                 } else if let stats = statistics {
                     StatisticsView(stats: stats)
@@ -161,6 +192,7 @@ struct PlayerDetailView: View {
             }
             .padding()
         }
+        .background(Color.grayC)
         .navigationTitle(player.name)
         .onAppear {
             loadStatistics()
@@ -194,25 +226,25 @@ struct StatisticsView: View {
             // Overall Statistics
             StatSection(title: "总体统计") {
                 StatRow(label: "总游戏数", value: "\(stats.totalGames)")
-                StatRow(label: "胜利", value: "\(stats.gamesWon)")
-                StatRow(label: "失败", value: "\(stats.gamesLost)")
+                StatRow(label: "胜利", value: "\(stats.gamesWon)", valueColor: .winColor)
+                StatRow(label: "失败", value: "\(stats.gamesLost)", valueColor: .loseColor)
                 StatRow(label: "胜率", value: String(format: "%.1f%%", stats.winRate))
-                StatRow(label: "总得分", value: "\(stats.totalScore)")
+                StatRow(label: "总得分", value: "\(stats.totalScore)", valueColor: stats.totalScore > 0 ? .winColor : (stats.totalScore < 0 ? .loseColor : .white))
                 StatRow(label: "场均得分", value: String(format: "%.1f", stats.averageScorePerGame))
             }
             
             // Role Statistics
             StatSection(title: "角色统计") {
-                StatRow(label: "当地主次数", value: "\(stats.gamesAsLandlord)")
+                StatRow(label: "当地主次数", value: "\(stats.gamesAsLandlord)", iconName: "crown.fill", iconColor: .landlordColor)
                 StatRow(label: "地主胜率", value: String(format: "%.1f%%", stats.landlordWinRate))
-                StatRow(label: "当农民次数", value: "\(stats.gamesAsFarmer)")
+                StatRow(label: "当农民次数", value: "\(stats.gamesAsFarmer)", iconName: "person.2.fill", iconColor: .farmerColor)
                 StatRow(label: "农民胜率", value: String(format: "%.1f%%", stats.farmerWinRate))
             }
             
             // Spring and Doubled Statistics
             StatSection(title: "特殊情况") {
-                StatRow(label: "春天次数", value: "\(stats.springCount)")
-                StatRow(label: "被春次数", value: "\(stats.springAgainstCount)")
+                StatRow(label: "春天次数", value: "\(stats.springCount)", iconName: "sun.max.fill", iconColor: .winColor)
+                StatRow(label: "被春次数", value: "\(stats.springAgainstCount)", valueColor: .loseColor)
                 StatRow(label: "加倍次数", value: "\(stats.doubledGames)")
                 if stats.doubledGames > 0 {
                     StatRow(label: "加倍胜率", value: String(format: "%.1f%%", stats.doubledWinRate))
@@ -221,8 +253,8 @@ struct StatisticsView: View {
             
             // Streak Statistics
             StatSection(title: "连胜连败") {
-                StatRow(label: "当前连胜", value: "\(stats.currentWinStreak)")
-                StatRow(label: "当前连败", value: "\(stats.currentLossStreak)")
+                StatRow(label: "当前连胜", value: "\(stats.currentWinStreak)", valueColor: stats.currentWinStreak > 0 ? .winColor : .white)
+                StatRow(label: "当前连败", value: "\(stats.currentLossStreak)", valueColor: stats.currentLossStreak > 0 ? .loseColor : .white)
                 StatRow(label: "最长连胜", value: "\(stats.maxWinStreak)")
                 StatRow(label: "最长连败", value: "\(stats.maxLossStreak)")
             }
@@ -241,8 +273,8 @@ struct StatisticsView: View {
             // Match Statistics
             StatSection(title: "对局统计") {
                 StatRow(label: "总对局数", value: "\(stats.totalMatches)")
-                StatRow(label: "对局胜利", value: "\(stats.matchesWon)")
-                StatRow(label: "对局失败", value: "\(stats.matchesLost)")
+                StatRow(label: "对局胜利", value: "\(stats.matchesWon)", valueColor: .winColor)
+                StatRow(label: "对局失败", value: "\(stats.matchesLost)", valueColor: .loseColor)
                 StatRow(label: "对局平局", value: "\(stats.matchesTied)")
                 StatRow(label: "对局胜率", value: String(format: "%.1f%%", stats.matchWinRate))
                 StatRow(label: "对局当前连胜", value: "\(stats.currentMatchWinStreak)")
@@ -253,12 +285,12 @@ struct StatisticsView: View {
             
             // Score Records
             StatSection(title: "得分记录") {
-                StatRow(label: "单局最高得分", value: "\(stats.bestGameScore)")
-                StatRow(label: "单局最低得分", value: "\(stats.worstGameScore)")
-                StatRow(label: "对局最高得分", value: "\(stats.bestMatchScore)")
-                StatRow(label: "对局最低得分", value: "\(stats.worstMatchScore)")
-                StatRow(label: "最高累计分数", value: "\(stats.bestSnapshot)")
-                StatRow(label: "最低累计分数", value: "\(stats.worstSnapshot)")
+                StatRow(label: "单局最高得分", value: "\(stats.bestGameScore)", valueColor: .winColor)
+                StatRow(label: "单局最低得分", value: "\(stats.worstGameScore)", valueColor: .loseColor)
+                StatRow(label: "对局最高得分", value: "\(stats.bestMatchScore)", valueColor: .winColor)
+                StatRow(label: "对局最低得分", value: "\(stats.worstMatchScore)", valueColor: .loseColor)
+                StatRow(label: "最高累计分数", value: "\(stats.bestSnapshot)", valueColor: .winColor)
+                StatRow(label: "最低累计分数", value: "\(stats.worstSnapshot)", valueColor: .loseColor)
             }
         }
     }
@@ -271,8 +303,8 @@ struct StatSection<Content: View>: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text(title)
-                .font(.headline)
-                .foregroundColor(.primary)
+                .font(.customfont(.semibold, fontSize: 16))
+                .foregroundColor(.white)
             
             VStack(spacing: 4) {
                 content
@@ -287,15 +319,24 @@ struct StatSection<Content: View>: View {
 struct StatRow: View {
     let label: String
     let value: String
+    var valueColor: Color = .white
+    var iconName: String? = nil
+    var iconColor: Color = .gray50
     
     var body: some View {
         HStack {
+            if let iconName = iconName {
+                Image(systemName: iconName)
+                    .foregroundColor(iconColor)
+                    .font(.system(size: 12))
+            }
             Text(label)
+                .font(.customfont(.regular, fontSize: 14))
                 .foregroundColor(.gray40)
             Spacer()
             Text(value)
-                .foregroundColor(.white)
-                .fontWeight(.medium)
+                .font(.customfont(.medium, fontSize: 14))
+                .foregroundColor(valueColor)
         }
     }
 }
