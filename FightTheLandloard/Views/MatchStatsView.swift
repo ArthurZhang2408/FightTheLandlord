@@ -98,12 +98,6 @@ struct MatchSummarySection: View {
         return formatter
     }
     
-    private func scoreColor(_ score: Int) -> Color {
-        if score > 0 { return .winColor }
-        if score < 0 { return .loseColor }
-        return .white
-    }
-    
     var body: some View {
         VStack(spacing: 12) {
             Text("对局总结")
@@ -120,7 +114,7 @@ struct MatchSummarySection: View {
                     Text("\(match.finalScoreA)")
                         .font(.title)
                         .fontWeight(.bold)
-                        .foregroundColor(scoreColor(match.finalScoreA))
+                        .foregroundColor(match.finalScoreA > 0 ? .green : (match.finalScoreA < 0 ? .red : .white))
                 }
                 VStack {
                     Text(match.playerBName)
@@ -128,7 +122,7 @@ struct MatchSummarySection: View {
                     Text("\(match.finalScoreB)")
                         .font(.title)
                         .fontWeight(.bold)
-                        .foregroundColor(scoreColor(match.finalScoreB))
+                        .foregroundColor(match.finalScoreB > 0 ? .green : (match.finalScoreB < 0 ? .red : .white))
                 }
                 VStack {
                     Text(match.playerCName)
@@ -136,7 +130,7 @@ struct MatchSummarySection: View {
                     Text("\(match.finalScoreC)")
                         .font(.title)
                         .fontWeight(.bold)
-                        .foregroundColor(scoreColor(match.finalScoreC))
+                        .foregroundColor(match.finalScoreC > 0 ? .green : (match.finalScoreC < 0 ? .red : .white))
                 }
             }
             
