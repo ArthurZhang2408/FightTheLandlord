@@ -117,21 +117,21 @@ class AddColumnViewModel: ObservableObject {
         }
         else if apoint == "1分" {
             guard bpoint != "1分" && cpoint != "1分" else {
-                errorMessage = "多人叫2分"
+                errorMessage = "多人叫1分"
                 return false
             }
             setting.landlord = 1
         }
         else if bpoint == "1分" {
             guard apoint != "1分" && cpoint != "1分" else {
-                errorMessage = "多人叫2分"
+                errorMessage = "多人叫1分"
                 return false
             }
             setting.landlord = 2
         }
         else if cpoint == "1分" {
             guard apoint != "1分" && bpoint != "1分" else {
-                errorMessage = "多人叫2分"
+                errorMessage = "多人叫1分"
                 return false
             }
             setting.landlord = 3
