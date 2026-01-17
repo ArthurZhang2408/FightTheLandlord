@@ -20,7 +20,7 @@ struct StatView: View {
             ZStack(alignment: .bottomTrailing) {
                 Group {
                     if firebaseService.isLoading {
-                        ProgressView("加载中...")
+                        SkeletonPlayerListView()
                     } else if firebaseService.players.isEmpty {
                         emptyStateView
                     } else {
@@ -386,6 +386,43 @@ struct PlayerChip: View {
             )
         }
         .buttonStyle(.plain)
+    }
+}
+
+// MARK: - Skeleton Player List View
+
+struct SkeletonPlayerListView: View {
+    var body: some View {
+        List {
+            ForEach(0..<5, id: \.self) { _ in
+                HStack(spacing: 12) {
+                    // Avatar skeleton
+                    Circle()
+                        .fill(Color(.systemGray5))
+                        .frame(width: 44, height: 44)
+                    
+                    // Name skeleton
+                    RoundedRectangle(cornerRadius: 4)
+                        .fill(Color(.systemGray5))
+                        .frame(width: 80, height: 16)
+                    
+                    Spacer()
+                    
+                    // Color dot skeleton
+                    Circle()
+                        .fill(Color(.systemGray5))
+                        .frame(width: 10, height: 10)
+                    
+                    // Chevron skeleton
+                    RoundedRectangle(cornerRadius: 2)
+                        .fill(Color(.systemGray5))
+                        .frame(width: 8, height: 12)
+                }
+                .padding(.vertical, 4)
+            }
+        }
+        .listStyle(.insetGrouped)
+        .redacted(reason: .placeholder)
     }
 }
 

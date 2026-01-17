@@ -236,7 +236,7 @@ extension View {
     }
 }
 
-// MARK: - Fullscreen Single Player Chart View
+// MARK: - Fullscreen Single Player Chart View with Zoom/Pan
 
 @available(iOS 16.0, *)
 struct FullscreenSinglePlayerChartView: View {
@@ -269,15 +269,14 @@ struct FullscreenSinglePlayerChartView: View {
     var body: some View {
         NavigationStack {
             GeometryReader { geometry in
-                SinglePlayerLineChart(
+                ZoomableChartContainer(
                     scores: currentScores,
                     playerName: playerName,
                     playerColor: playerColor,
                     xAxisLabel: xAxisLabel,
-                    config: .fullscreen
+                    chartWidth: geometry.size.width,
+                    chartHeight: geometry.size.height
                 )
-                .padding()
-                .frame(width: geometry.size.width, height: geometry.size.height)
             }
             .navigationTitle("\(playerName) - 得分走势")
             .navigationBarTitleDisplayMode(.inline)
@@ -314,7 +313,124 @@ struct FullscreenSinglePlayerChartView: View {
     }
 }
 
-// MARK: - Fullscreen Multi-Player Chart View
+// MARK: - Zoomable Chart Container (Single Player)
+
+@available(iOS 16.0, *)
+struct ZoomableChartContainer: View {
+    let scores: [Int]
+    let playerName: String
+    let playerColor: Color
+    let xAxisLabel: String
+    let chartWidth: CGFloat
+    let chartHeight: CGFloat
+    
+    @State private var scale: CGFloat = 1.0
+    @State private var lastScale: CGFloat = 1.0
+    @State private var offset: CGFloat = 0
+    @State private var lastOffset: CGFloat = 0
+    
+    private var dataPoints: [PlayerScorePoint] {
+        scores.enumerated().map { PlayerScorePoint(index: $0.offset, playerName: playerName, score: $0.element, color: playerColor) }
+    }
+    
+    private var visiblePointCount: Int {
+        max(1, Int(Double(scores.count) / Double(scale)))
+    }
+    
+    private var shouldShowPoints: Bool {
+        visiblePointCount <= ChartConfig.pointVisibilityThreshold
+    }
+    
+    private var chartContentWidth: CGFloat {
+        chartWidth * scale
+    }
+    
+    private var maxOffset: CGFloat {
+        max(0, chartContentWidth - chartWidth)
+    }
+    
+    var body: some View {
+        VStack(spacing: 0) {
+            // Zoom info
+            HStack {
+                Text("缩放: \(String(format: "%.1fx", scale))")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                Spacer()
+                if scale > 1 {
+                    Button("重置") {
+                        withAnimation(.spring()) {
+                            scale = 1.0
+                            lastScale = 1.0
+                            offset = 0
+                            lastOffset = 0
+                        }
+                    }
+                    .font(.caption)
+                }
+            }
+            .padding(.horizontal)
+            .padding(.top, 8)
+            
+            GeometryReader { proxy in
+                ScrollView(.horizontal, showsIndicators: false) {
+                    Chart {
+                        ForEach(dataPoints) { point in
+                            LineMark(
+                                x: .value(xAxisLabel, point.index),
+                                y: .value("分数", point.score)
+                            )
+                            .foregroundStyle(point.color)
+                            .lineStyle(StrokeStyle(lineWidth: 2.5))
+                            
+                            AreaMark(
+                                x: .value(xAxisLabel, point.index),
+                                y: .value("分数", point.score)
+                            )
+                            .foregroundStyle(
+                                LinearGradient(
+                                    colors: [point.color.opacity(0.3), point.color.opacity(0.05)],
+                                    startPoint: .top,
+                                    endPoint: .bottom
+                                )
+                            )
+                            
+                            if shouldShowPoints {
+                                PointMark(
+                                    x: .value(xAxisLabel, point.index),
+                                    y: .value("分数", point.score)
+                                )
+                                .foregroundStyle(point.color)
+                                .symbolSize(50)
+                            }
+                        }
+                        
+                        // Zero line reference
+                        RuleMark(y: .value("零分线", 0))
+                            .foregroundStyle(.secondary.opacity(0.5))
+                            .lineStyle(StrokeStyle(dash: [5, 3]))
+                    }
+                    .chartXAxisLabel(xAxisLabel)
+                    .chartYAxisLabel("累计得分")
+                    .frame(width: chartContentWidth, height: proxy.size.height)
+                    .padding(.horizontal)
+                }
+                .gesture(
+                    MagnificationGesture()
+                        .onChanged { value in
+                            let newScale = lastScale * value
+                            scale = min(max(newScale, 1.0), 10.0)
+                        }
+                        .onEnded { _ in
+                            lastScale = scale
+                        }
+                )
+            }
+        }
+    }
+}
+
+// MARK: - Fullscreen Multi-Player Chart View with Zoom/Pan
 
 @available(iOS 16.0, *)
 struct FullscreenMultiPlayerChartView: View {
@@ -327,13 +443,12 @@ struct FullscreenMultiPlayerChartView: View {
     var body: some View {
         NavigationStack {
             GeometryReader { geometry in
-                MultiPlayerLineChart(
+                ZoomableMultiPlayerChartContainer(
                     playerData: playerData,
                     xAxisLabel: xAxisLabel,
-                    config: .fullscreen
+                    chartWidth: geometry.size.width,
+                    chartHeight: geometry.size.height
                 )
-                .padding()
-                .frame(width: geometry.size.width, height: geometry.size.height)
             }
             .navigationTitle(title)
             .navigationBarTitleDisplayMode(.inline)
@@ -354,6 +469,124 @@ struct FullscreenMultiPlayerChartView: View {
             windowScene.requestGeometryUpdate(.iOS(interfaceOrientations: .portrait))
         }
         UIDevice.current.setValue(UIInterfaceOrientation.portrait.rawValue, forKey: "orientation")
+    }
+}
+
+// MARK: - Zoomable Multi-Player Chart Container
+
+@available(iOS 16.0, *)
+struct ZoomableMultiPlayerChartContainer: View {
+    let playerData: [(name: String, scores: [Int], color: Color)]
+    let xAxisLabel: String
+    let chartWidth: CGFloat
+    let chartHeight: CGFloat
+    
+    @State private var scale: CGFloat = 1.0
+    @State private var lastScale: CGFloat = 1.0
+    
+    private var maxDataCount: Int {
+        playerData.map { $0.scores.count }.max() ?? 0
+    }
+    
+    private var visiblePointCount: Int {
+        max(1, Int(Double(maxDataCount) / Double(scale)))
+    }
+    
+    private var shouldShowPoints: Bool {
+        visiblePointCount <= ChartConfig.pointVisibilityThreshold
+    }
+    
+    private var chartContentWidth: CGFloat {
+        chartWidth * scale
+    }
+    
+    var body: some View {
+        VStack(spacing: 0) {
+            // Zoom info and legend
+            HStack {
+                Text("缩放: \(String(format: "%.1fx", scale))")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                Spacer()
+                if scale > 1 {
+                    Button("重置") {
+                        withAnimation(.spring()) {
+                            scale = 1.0
+                            lastScale = 1.0
+                        }
+                    }
+                    .font(.caption)
+                }
+            }
+            .padding(.horizontal)
+            .padding(.top, 8)
+            
+            // Legend
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 16) {
+                    ForEach(playerData, id: \.name) { player in
+                        HStack(spacing: 4) {
+                            Circle()
+                                .fill(player.color)
+                                .frame(width: 10, height: 10)
+                            Text(player.name)
+                                .font(.caption)
+                        }
+                    }
+                }
+                .padding(.horizontal)
+            }
+            .padding(.vertical, 4)
+            
+            GeometryReader { proxy in
+                ScrollView(.horizontal, showsIndicators: false) {
+                    Chart {
+                        ForEach(playerData, id: \.name) { player in
+                            let playerPoints = player.scores.enumerated().map { PlayerScorePoint(index: $0.offset, playerName: player.name, score: $0.element, color: player.color) }
+                            
+                            ForEach(playerPoints) { point in
+                                LineMark(
+                                    x: .value(xAxisLabel, point.index),
+                                    y: .value("分数", point.score)
+                                )
+                                .foregroundStyle(by: .value("玩家", point.playerName))
+                                .lineStyle(StrokeStyle(lineWidth: 2.5))
+                                
+                                if shouldShowPoints {
+                                    PointMark(
+                                        x: .value(xAxisLabel, point.index),
+                                        y: .value("分数", point.score)
+                                    )
+                                    .foregroundStyle(by: .value("玩家", point.playerName))
+                                    .symbolSize(50)
+                                }
+                            }
+                        }
+                        
+                        // Zero line reference
+                        RuleMark(y: .value("零分线", 0))
+                            .foregroundStyle(.secondary.opacity(0.5))
+                            .lineStyle(StrokeStyle(dash: [5, 3]))
+                    }
+                    .chartXAxisLabel(xAxisLabel)
+                    .chartYAxisLabel("累计得分")
+                    .chartLegend(.hidden) // We have custom legend above
+                    .chartForegroundStyleScale(domain: playerData.map { $0.name }, range: playerData.map { $0.color })
+                    .frame(width: chartContentWidth, height: proxy.size.height)
+                    .padding(.horizontal)
+                }
+                .gesture(
+                    MagnificationGesture()
+                        .onChanged { value in
+                            let newScale = lastScale * value
+                            scale = min(max(newScale, 1.0), 10.0)
+                        }
+                        .onEnded { _ in
+                            lastScale = scale
+                        }
+                )
+            }
+        }
     }
 }
 

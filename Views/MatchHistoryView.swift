@@ -19,7 +19,7 @@ struct MatchHistoryView: View {
         NavigationStack(path: $navigationPath) {
             Group {
                 if firebaseService.isLoadingMatches {
-                    ProgressView("加载中...")
+                    SkeletonMatchListView()
                 } else if firebaseService.matches.isEmpty {
                     emptyStateView
                 } else {
@@ -182,12 +182,18 @@ struct MatchDetailView: View {
     @State private var showingDeleteConfirm = false
     @State private var deleteIdx: Int = -1
     @ObservedObject private var dataSingleton = DataSingleton.instance
+    @ObservedObject private var firebaseService = FirebaseService.shared
     
     @State private var games: [GameSetting] = []
     @State private var scores: [ScoreTriple] = []
     @State private var aRe: Int = 0
     @State private var bRe: Int = 0
     @State private var cRe: Int = 0
+    
+    // Player colors
+    @State private var playerAColor: Color = .blue
+    @State private var playerBColor: Color = .green
+    @State private var playerCColor: Color = .orange
     
     private var displayScoreA: Int {
         games.isEmpty ? match.finalScoreA : aRe
@@ -218,7 +224,7 @@ struct MatchDetailView: View {
     var body: some View {
         Group {
             if isLoading {
-                ProgressView("加载中...")
+                SkeletonMatchDetailView()
             } else {
                 List {
                     Section {
@@ -284,12 +290,13 @@ struct MatchDetailView: View {
                         Text("每局详情 (\(games.count)局)")
                     }
                     
-                    // Score Line Chart
+                    // Score Line Chart with player colors
                     if games.count >= 2 {
                         Section {
                             ScoreLineChart(
                                 scores: scores,
-                                playerNames: (match.playerAName, match.playerBName, match.playerCName)
+                                playerNames: (match.playerAName, match.playerBName, match.playerCName),
+                                playerColors: (playerAColor, playerBColor, playerCColor)
                             )
                             .frame(height: 200)
                         } header: {
@@ -355,6 +362,9 @@ struct MatchDetailView: View {
             return
         }
         
+        // Load player colors
+        loadPlayerColors()
+        
         FirebaseService.shared.loadGameRecords(forMatch: matchId) { result in
             isLoading = false
             switch result {
@@ -391,6 +401,19 @@ struct MatchDetailView: View {
         }
     }
     
+    private func loadPlayerColors() {
+        // Look up player colors from Firebase players
+        if let playerA = firebaseService.players.first(where: { $0.id == match.playerAId }) {
+            playerAColor = playerA.displayColor
+        }
+        if let playerB = firebaseService.players.first(where: { $0.id == match.playerBId }) {
+            playerBColor = playerB.displayColor
+        }
+        if let playerC = firebaseService.players.first(where: { $0.id == match.playerCId }) {
+            playerCColor = playerC.displayColor
+        }
+    }
+    
     private func updateScores() {
         aRe = 0
         bRe = 0
@@ -402,6 +425,115 @@ struct MatchDetailView: View {
             cRe += game.C
             scores.append(ScoreTriple(A: aRe, B: bRe, C: cRe))
         }
+    }
+}
+
+// MARK: - Skeleton Match Detail View
+
+struct SkeletonMatchDetailView: View {
+    var body: some View {
+        List {
+            // Summary section skeleton
+            Section {
+                VStack(spacing: 12) {
+                    RoundedRectangle(cornerRadius: 4)
+                        .fill(Color(.systemGray5))
+                        .frame(width: 120, height: 14)
+                    
+                    HStack(spacing: 20) {
+                        ForEach(0..<3, id: \.self) { _ in
+                            VStack {
+                                RoundedRectangle(cornerRadius: 4)
+                                    .fill(Color(.systemGray5))
+                                    .frame(width: 60, height: 16)
+                                RoundedRectangle(cornerRadius: 4)
+                                    .fill(Color(.systemGray5))
+                                    .frame(width: 40, height: 24)
+                            }
+                        }
+                    }
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 8)
+            }
+            
+            // Games section skeleton
+            Section {
+                ForEach(0..<4, id: \.self) { _ in
+                    HStack(spacing: 12) {
+                        Circle()
+                            .fill(Color(.systemGray5))
+                            .frame(width: 24, height: 24)
+                        
+                        HStack(spacing: 0) {
+                            ForEach(0..<3, id: \.self) { _ in
+                                VStack(spacing: 4) {
+                                    RoundedRectangle(cornerRadius: 4)
+                                        .fill(Color(.systemGray5))
+                                        .frame(width: 40, height: 10)
+                                    RoundedRectangle(cornerRadius: 4)
+                                        .fill(Color(.systemGray5))
+                                        .frame(width: 30, height: 14)
+                                }
+                                .frame(maxWidth: .infinity)
+                            }
+                        }
+                    }
+                    .padding(.vertical, 4)
+                }
+            } header: {
+                Text("每局详情")
+            }
+            
+            // Chart section skeleton
+            Section {
+                RoundedRectangle(cornerRadius: 8)
+                    .fill(Color(.systemGray5))
+                    .frame(height: 200)
+            } header: {
+                Text("得分走势")
+            }
+        }
+        .listStyle(.insetGrouped)
+        .redacted(reason: .placeholder)
+    }
+}
+
+// MARK: - Skeleton Match List View
+
+struct SkeletonMatchListView: View {
+    var body: some View {
+        List {
+            ForEach(0..<6, id: \.self) { _ in
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack {
+                        RoundedRectangle(cornerRadius: 4)
+                            .fill(Color(.systemGray5))
+                            .frame(width: 120, height: 14)
+                        Spacer()
+                        RoundedRectangle(cornerRadius: 4)
+                            .fill(Color(.systemGray5))
+                            .frame(width: 40, height: 12)
+                    }
+                    
+                    HStack(spacing: 16) {
+                        ForEach(0..<3, id: \.self) { _ in
+                            VStack(alignment: .leading, spacing: 2) {
+                                RoundedRectangle(cornerRadius: 4)
+                                    .fill(Color(.systemGray5))
+                                    .frame(width: 50, height: 10)
+                                RoundedRectangle(cornerRadius: 4)
+                                    .fill(Color(.systemGray5))
+                                    .frame(width: 30, height: 14)
+                            }
+                        }
+                    }
+                }
+                .padding(.vertical, 4)
+            }
+        }
+        .listStyle(.insetGrouped)
+        .redacted(reason: .placeholder)
     }
 }
 

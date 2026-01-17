@@ -200,16 +200,18 @@ struct PlayerDetailView: View {
     @State private var errorMessage: String?
     @State private var showingColorPicker = false
     @State private var selectedColor: PlayerColor
+    @State private var currentPlayerColor: Color
     
     init(player: Player) {
         self.player = player
         self._selectedColor = State(initialValue: player.playerColor ?? .blue)
+        self._currentPlayerColor = State(initialValue: player.displayColor)
     }
     
     var body: some View {
         Group {
             if isLoading {
-                ProgressView("加载统计数据...")
+                SkeletonStatisticsView()
             } else if let error = errorMessage {
                 VStack(spacing: 12) {
                     Image(systemName: "exclamationmark.triangle")
@@ -223,7 +225,7 @@ struct PlayerDetailView: View {
                     stats: stats, 
                     playerName: player.name,
                     playerId: player.id ?? "",
-                    playerColor: player.displayColor,
+                    playerColor: currentPlayerColor,
                     gameRecords: gameRecords,
                     matchRecords: matchRecords
                 )
@@ -237,7 +239,7 @@ struct PlayerDetailView: View {
                     showingColorPicker = true
                 } label: {
                     Circle()
-                        .fill(player.displayColor)
+                        .fill(currentPlayerColor)
                         .frame(width: 24, height: 24)
                         .overlay(
                             Circle()
@@ -250,7 +252,10 @@ struct PlayerDetailView: View {
             PlayerColorPickerSheet(
                 player: player,
                 selectedColor: $selectedColor,
-                isPresented: $showingColorPicker
+                isPresented: $showingColorPicker,
+                onColorChanged: { newColor in
+                    currentPlayerColor = newColor.color
+                }
             )
         }
         .onAppear {
@@ -313,6 +318,7 @@ struct PlayerColorPickerSheet: View {
     let player: Player
     @Binding var selectedColor: PlayerColor
     @Binding var isPresented: Bool
+    var onColorChanged: ((PlayerColor) -> Void)?
     @State private var isSaving = false
     
     var body: some View {
@@ -373,6 +379,7 @@ struct PlayerColorPickerSheet: View {
         
         FirebaseService.shared.updatePlayer(updatedPlayer) { result in
             isSaving = false
+            onColorChanged?(selectedColor)
             isPresented = false
         }
     }
@@ -623,6 +630,136 @@ struct StatisticsView: View {
                 )
             }
         }
+    }
+}
+
+// MARK: - Skeleton Loading Views
+
+struct SkeletonStatisticsView: View {
+    @State private var isAnimating = false
+    
+    var body: some View {
+        List {
+            // Chart skeleton
+            Section {
+                SkeletonBox(height: 200)
+            } header: {
+                Text("得分走势")
+            }
+            
+            // Stats skeleton
+            Section {
+                ForEach(0..<5, id: \.self) { _ in
+                    SkeletonStatRow()
+                }
+            } header: {
+                Text("总体统计")
+            }
+            
+            // Role stats skeleton
+            Section {
+                SkeletonBox(height: 200)
+            } header: {
+                Text("角色对比")
+            }
+            
+            Section {
+                ForEach(0..<4, id: \.self) { _ in
+                    SkeletonStatRow()
+                }
+            } header: {
+                Text("角色统计")
+            }
+        }
+        .listStyle(.insetGrouped)
+        .redacted(reason: .placeholder)
+    }
+}
+
+struct SkeletonBox: View {
+    let height: CGFloat
+    @State private var isAnimating = false
+    
+    var body: some View {
+        RoundedRectangle(cornerRadius: 8)
+            .fill(Color(.systemGray5))
+            .frame(height: height)
+            .overlay(
+                RoundedRectangle(cornerRadius: 8)
+                    .fill(
+                        LinearGradient(
+                            gradient: Gradient(colors: [.clear, Color.white.opacity(0.3), .clear]),
+                            startPoint: .leading,
+                            endPoint: .trailing
+                        )
+                    )
+                    .offset(x: isAnimating ? 200 : -200)
+            )
+            .clipped()
+            .onAppear {
+                withAnimation(Animation.linear(duration: 1.5).repeatForever(autoreverses: false)) {
+                    isAnimating = true
+                }
+            }
+    }
+}
+
+struct SkeletonStatRow: View {
+    var body: some View {
+        HStack {
+            Circle()
+                .fill(Color(.systemGray5))
+                .frame(width: 24, height: 24)
+            RoundedRectangle(cornerRadius: 4)
+                .fill(Color(.systemGray5))
+                .frame(width: 80, height: 16)
+            Spacer()
+            RoundedRectangle(cornerRadius: 4)
+                .fill(Color(.systemGray5))
+                .frame(width: 50, height: 16)
+        }
+    }
+}
+
+struct SkeletonMatchListView: View {
+    var body: some View {
+        List {
+            ForEach(0..<5, id: \.self) { _ in
+                SkeletonMatchRow()
+            }
+        }
+        .listStyle(.insetGrouped)
+    }
+}
+
+struct SkeletonMatchRow: View {
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                RoundedRectangle(cornerRadius: 4)
+                    .fill(Color(.systemGray5))
+                    .frame(width: 120, height: 14)
+                Spacer()
+                RoundedRectangle(cornerRadius: 4)
+                    .fill(Color(.systemGray5))
+                    .frame(width: 40, height: 12)
+            }
+            
+            HStack(spacing: 16) {
+                ForEach(0..<3, id: \.self) { _ in
+                    VStack(spacing: 4) {
+                        RoundedRectangle(cornerRadius: 4)
+                            .fill(Color(.systemGray5))
+                            .frame(width: 50, height: 12)
+                        RoundedRectangle(cornerRadius: 4)
+                            .fill(Color(.systemGray5))
+                            .frame(width: 30, height: 16)
+                    }
+                }
+            }
+        }
+        .padding(.vertical, 4)
+        .redacted(reason: .placeholder)
     }
 }
 
