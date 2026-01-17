@@ -171,13 +171,13 @@ class AddColumnViewModel: ObservableObject {
             if setting.landlordResult {
                 b *= -1
                 c *= -1
-                aC = .green
-                setting.aC = "green"
+                aC = .winColor
+                setting.aC = "win"
             }
             else {
                 a *= -1
-                aC = .red
-                setting.aC = "red"
+                aC = .loseColor
+                setting.aC = "lose"
             }
         case 2:
             if setting.bdouble {
@@ -189,13 +189,13 @@ class AddColumnViewModel: ObservableObject {
             if setting.landlordResult {
                 a *= -1
                 c *= -1
-                bC = .green
-                setting.bC = "green"
+                bC = .winColor
+                setting.bC = "win"
             }
             else {
                 b *= -1
-                bC = .red
-                setting.bC = "red"
+                bC = .loseColor
+                setting.bC = "lose"
             }
         default:
             if setting.cdouble {
@@ -207,13 +207,13 @@ class AddColumnViewModel: ObservableObject {
             if setting.landlordResult {
                 b *= -1
                 a *= -1
-                cC = .green
-                setting.cC = "green"
+                cC = .winColor
+                setting.cC = "win"
             }
             else {
                 c *= -1
-                cC = .red
-                setting.cC = "red"
+                cC = .loseColor
+                setting.cC = "lose"
             }
         }
         setting.bombs = Int(bombs) ?? 0

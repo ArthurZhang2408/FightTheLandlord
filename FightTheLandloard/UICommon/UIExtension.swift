@@ -23,12 +23,13 @@ extension Font {
 }
 
 extension String {
-    /// Legacy color mapping - kept for backward compatibility
-    /// New code should use scoreColor instead
+    /// Color mapping for game outcomes - handles both legacy and new values
+    /// Legacy: "green" = win, "red" = lose
+    /// New: "win" = win, "lose" = lose
     var color: Color {
         switch self {
-        case "green": return .winColor
-        case "red": return .loseColor
+        case "green", "win": return .winColor
+        case "red", "lose": return .loseColor
         default: return .white
         }
     }

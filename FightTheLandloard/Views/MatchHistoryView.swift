@@ -250,20 +250,10 @@ struct MatchDetailView: View {
                                 .foregroundColor(.gray50)
                         } else {
                             ForEach(games.indices, id: \.self) { idx in
-                                HStack {
-                                    Text("\(idx+1): ")
-                                        .frame(width: width)
-                                    Text(games[idx].A.description)
-                                        .frame(width: width)
-                                        .foregroundColor(games[idx].aC.color)
-                                    Text(games[idx].B.description)
-                                        .frame(width: width)
-                                        .foregroundColor(games[idx].bC.color)
-                                    Text(games[idx].C.description)
-                                        .frame(width: width)
-                                        .foregroundColor(games[idx].cC.color)
-                                }
-                                .frame(width: width * 4)
+                                HistoryGameRow(
+                                    index: idx,
+                                    game: games[idx]
+                                )
                                 .swipeActions(allowsFullSwipe: false) {
                                     Button {
                                         editingGameIndex = idx
@@ -271,7 +261,7 @@ struct MatchDetailView: View {
                                     } label: {
                                         Label("修改", systemImage: "pencil")
                                     }
-                                    .tint(.indigo)
+                                    .tint(.primary500)
                                 }
                             }
                         }
@@ -354,13 +344,15 @@ struct MatchDetailView: View {
                     setting.A = record.scoreA
                     setting.B = record.scoreB
                     setting.C = record.scoreC
-                    // Set colors based on landlord and result
+                    // Note: aC, bC, cC are no longer used for display colors.
+                    // The HistoryGameRow component computes colors from scores directly.
+                    // We keep the values for potential backward compatibility.
                     if record.landlord == 1 {
-                        setting.aC = record.landlordResult ? "green" : "red"
+                        setting.aC = record.landlordResult ? "win" : "lose"
                     } else if record.landlord == 2 {
-                        setting.bC = record.landlordResult ? "green" : "red"
+                        setting.bC = record.landlordResult ? "win" : "lose"
                     } else {
-                        setting.cC = record.landlordResult ? "green" : "red"
+                        setting.cC = record.landlordResult ? "win" : "lose"
                     }
                     return setting
                 }
@@ -382,6 +374,72 @@ struct MatchDetailView: View {
             cRe += game.C
             scores.append(ScoreTriple(A: aRe, B: bRe, C: cRe))
         }
+    }
+}
+
+// MARK: - History Game Row
+struct HistoryGameRow: View {
+    let index: Int
+    let game: GameSetting
+    
+    private func scoreColor(_ score: Int) -> Color {
+        if score > 0 { return .winColor }
+        if score < 0 { return .loseColor }
+        return .white
+    }
+    
+    var body: some View {
+        HStack {
+            // Game number
+            Text("\(index + 1)")
+                .font(.customfont(.medium, fontSize: 14))
+                .foregroundColor(.gray50)
+                .frame(width: 40)
+            
+            Spacer()
+            
+            // Player A Score
+            HStack(spacing: 4) {
+                if game.landlord == 1 {
+                    Image(systemName: "crown.fill")
+                        .font(.system(size: 10))
+                        .foregroundColor(.landlordColor)
+                }
+                Text("\(game.A)")
+                    .font(.customfont(.semibold, fontSize: 15))
+                    .foregroundColor(scoreColor(game.A))
+            }
+            .frame(width: 80)
+            
+            // Player B Score
+            HStack(spacing: 4) {
+                if game.landlord == 2 {
+                    Image(systemName: "crown.fill")
+                        .font(.system(size: 10))
+                        .foregroundColor(.landlordColor)
+                }
+                Text("\(game.B)")
+                    .font(.customfont(.semibold, fontSize: 15))
+                    .foregroundColor(scoreColor(game.B))
+            }
+            .frame(width: 80)
+            
+            // Player C Score
+            HStack(spacing: 4) {
+                if game.landlord == 3 {
+                    Image(systemName: "crown.fill")
+                        .font(.system(size: 10))
+                        .foregroundColor(.landlordColor)
+                }
+                Text("\(game.C)")
+                    .font(.customfont(.semibold, fontSize: 15))
+                    .foregroundColor(scoreColor(game.C))
+            }
+            .frame(width: 80)
+        }
+        .padding(.vertical, 8)
+        .background(Color.gray80.opacity(0.3))
+        .cornerRadius(8)
     }
 }
 
@@ -788,10 +846,10 @@ class HistoryEditViewModel: ObservableObject {
             if setting.landlordResult {
                 b *= -1
                 c *= -1
-                setting.aC = "green"
+                setting.aC = "win"
             } else {
                 a *= -1
-                setting.aC = "red"
+                setting.aC = "lose"
             }
         case 2:
             if setting.bdouble {
@@ -803,10 +861,10 @@ class HistoryEditViewModel: ObservableObject {
             if setting.landlordResult {
                 a *= -1
                 c *= -1
-                setting.bC = "green"
+                setting.bC = "win"
             } else {
                 b *= -1
-                setting.bC = "red"
+                setting.bC = "lose"
             }
         default:
             if setting.cdouble {
@@ -818,10 +876,10 @@ class HistoryEditViewModel: ObservableObject {
             if setting.landlordResult {
                 b *= -1
                 a *= -1
-                setting.cC = "green"
+                setting.cC = "win"
             } else {
                 c *= -1
-                setting.cC = "red"
+                setting.cC = "lose"
             }
         }
         setting.bombs = Int(bombs) ?? 0
