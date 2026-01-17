@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import Charts
 
 struct MatchHistoryView: View {
     @ObservedObject private var firebaseService = FirebaseService.shared
@@ -167,12 +168,17 @@ struct PlayerScoreLabel: View {
     }
 }
 
+// Wrapper to make Int identifiable for sheet(item:)
+struct EditingGameItem: Identifiable {
+    let id = UUID()
+    let index: Int
+}
+
 struct MatchDetailView: View {
     let match: MatchRecord
     @State private var gameRecords: [GameRecord] = []
     @State private var isLoading = true
-    @State private var showingEditSheet = false
-    @State private var editingGameIndex: Int = -1
+    @State private var editingGame: EditingGameItem? = nil
     @State private var showingDeleteConfirm = false
     @State private var deleteIdx: Int = -1
     @ObservedObject private var dataSingleton = DataSingleton.instance
@@ -265,8 +271,8 @@ struct MatchDetailView: View {
                                 )
                                 .swipeActions(allowsFullSwipe: false) {
                                     Button {
-                                        editingGameIndex = idx
-                                        showingEditSheet = true
+                                        // Use item-based sheet to ensure proper index binding
+                                        editingGame = EditingGameItem(index: idx)
                                     } label: {
                                         Label("修改", systemImage: "pencil")
                                     }
@@ -276,6 +282,19 @@ struct MatchDetailView: View {
                         }
                     } header: {
                         Text("每局详情 (\(games.count)局)")
+                    }
+                    
+                    // Score Line Chart
+                    if games.count >= 2 {
+                        Section {
+                            ScoreLineChart(
+                                scores: scores,
+                                playerNames: (match.playerAName, match.playerBName, match.playerCName)
+                            )
+                            .frame(height: 200)
+                        } header: {
+                            Text("得分走势")
+                        }
                     }
                     
                     if !gameRecords.isEmpty {
@@ -313,15 +332,15 @@ struct MatchDetailView: View {
         .onAppear {
             loadGameRecords()
         }
-        .sheet(isPresented: $showingEditSheet) {
+        .sheet(item: $editingGame) { editItem in
             HistoryEditView(
-                showingEditSheet: $showingEditSheet,
+                editingGame: $editingGame,
                 games: $games,
                 scores: $scores,
                 aRe: $aRe,
                 bRe: $bRe,
                 cRe: $cRe,
-                editingIndex: editingGameIndex,
+                editingIndex: editItem.index,
                 match: match,
                 playerAName: match.playerAName,
                 playerBName: match.playerBName,
@@ -443,7 +462,7 @@ struct GameScoreItem: View {
 }
 
 struct HistoryEditView: View {
-    @Binding var showingEditSheet: Bool
+    @Binding var editingGame: EditingGameItem?
     @Binding var games: [GameSetting]
     @Binding var scores: [ScoreTriple]
     @Binding var aRe: Int
@@ -457,10 +476,10 @@ struct HistoryEditView: View {
     
     @StateObject private var viewModel: HistoryEditViewModel
     
-    init(showingEditSheet: Binding<Bool>, games: Binding<[GameSetting]>, scores: Binding<[ScoreTriple]>, 
+    init(editingGame: Binding<EditingGameItem?>, games: Binding<[GameSetting]>, scores: Binding<[ScoreTriple]>, 
          aRe: Binding<Int>, bRe: Binding<Int>, cRe: Binding<Int>,
          editingIndex: Int, match: MatchRecord, playerAName: String, playerBName: String, playerCName: String) {
-        self._showingEditSheet = showingEditSheet
+        self._editingGame = editingGame
         self._games = games
         self._scores = scores
         self._aRe = aRe
@@ -471,7 +490,7 @@ struct HistoryEditView: View {
         self.playerAName = playerAName
         self.playerBName = playerBName
         self.playerCName = playerCName
-        // Safe bounds check to prevent "Index out of range" crash
+        // Since we use sheet(item:), editingIndex is always valid when this is called
         let gamesArray = games.wrappedValue
         let safeGame = (editingIndex >= 0 && editingIndex < gamesArray.count) ? gamesArray[editingIndex] : GameSetting()
         self._viewModel = StateObject(wrappedValue: HistoryEditViewModel(game: safeGame))
@@ -562,7 +581,7 @@ struct HistoryEditView: View {
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("取消") {
-                        showingEditSheet = false
+                        editingGame = nil
                     }
                 }
                 ToolbarItem(placement: .confirmationAction) {
@@ -571,7 +590,7 @@ struct HistoryEditView: View {
                             games[editingIndex] = viewModel.setting
                             updateLocalScores()
                             saveToFirebase()
-                            showingEditSheet = false
+                            editingGame = nil
                         }
                     }
                     .fontWeight(.semibold)
@@ -1013,6 +1032,103 @@ struct FullMatchStatsView: View {
             case .failure:
                 self.isLoading = false
             }
+        }
+    }
+}
+
+// MARK: - Score Line Chart
+
+struct ScoreLineChart: View {
+    let scores: [ScoreTriple]
+    let playerNames: (String, String, String)
+    
+    private struct ScorePoint: Identifiable {
+        let id = UUID()
+        let gameIndex: Int
+        let player: String
+        let score: Int
+    }
+    
+    private var dataPoints: [ScorePoint] {
+        var points: [ScorePoint] = []
+        // Add starting point (0, 0, 0)
+        points.append(ScorePoint(gameIndex: 0, player: playerNames.0, score: 0))
+        points.append(ScorePoint(gameIndex: 0, player: playerNames.1, score: 0))
+        points.append(ScorePoint(gameIndex: 0, player: playerNames.2, score: 0))
+        
+        for (idx, score) in scores.enumerated() {
+            points.append(ScorePoint(gameIndex: idx + 1, player: playerNames.0, score: score.A))
+            points.append(ScorePoint(gameIndex: idx + 1, player: playerNames.1, score: score.B))
+            points.append(ScorePoint(gameIndex: idx + 1, player: playerNames.2, score: score.C))
+        }
+        return points
+    }
+    
+    var body: some View {
+        if #available(iOS 16.0, *) {
+            Chart {
+                ForEach(dataPoints) { point in
+                    LineMark(
+                        x: .value("局数", point.gameIndex),
+                        y: .value("分数", point.score)
+                    )
+                    .foregroundStyle(by: .value("玩家", point.player))
+                    
+                    PointMark(
+                        x: .value("局数", point.gameIndex),
+                        y: .value("分数", point.score)
+                    )
+                    .foregroundStyle(by: .value("玩家", point.player))
+                }
+            }
+            .chartXAxisLabel("局数")
+            .chartYAxisLabel("累计得分")
+            .chartLegend(position: .bottom)
+        } else {
+            // Fallback for older iOS versions
+            VStack(spacing: 8) {
+                HStack(spacing: 16) {
+                    ForEach([(playerNames.0, Color.blue), (playerNames.1, Color.green), (playerNames.2, Color.orange)], id: \.0) { name, color in
+                        HStack(spacing: 4) {
+                            Circle()
+                                .fill(color)
+                                .frame(width: 8, height: 8)
+                            Text(name)
+                                .font(.caption)
+                        }
+                    }
+                }
+                
+                if let lastScore = scores.last {
+                    HStack(spacing: 20) {
+                        VStack {
+                            Text("\(lastScore.A)")
+                                .font(.headline)
+                                .foregroundColor(.blue)
+                            Text(playerNames.0)
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                        VStack {
+                            Text("\(lastScore.B)")
+                                .font(.headline)
+                                .foregroundColor(.green)
+                            Text(playerNames.1)
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                        VStack {
+                            Text("\(lastScore.C)")
+                                .font(.headline)
+                                .foregroundColor(.orange)
+                            Text(playerNames.2)
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                    }
+                }
+            }
+            .frame(maxWidth: .infinity)
         }
     }
 }
