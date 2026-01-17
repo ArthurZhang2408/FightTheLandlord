@@ -481,26 +481,29 @@ struct HistoryEditView: View {
         NavigationStack {
             Form {
                 Section {
-                    PlayerBidRow(
+                    PlayerBidCardHistory(
                         name: playerAName,
                         isFirstBidder: false,
                         selectedBid: $viewModel.apoint,
+                        isDoubled: $viewModel.setting.adouble,
                         options: viewModel.points
                     )
-                    PlayerBidRow(
+                    PlayerBidCardHistory(
                         name: playerBName,
                         isFirstBidder: false,
                         selectedBid: $viewModel.bpoint,
+                        isDoubled: $viewModel.setting.bdouble,
                         options: viewModel.points
                     )
-                    PlayerBidRow(
+                    PlayerBidCardHistory(
                         name: playerCName,
                         isFirstBidder: false,
                         selectedBid: $viewModel.cpoint,
+                        isDoubled: $viewModel.setting.cdouble,
                         options: viewModel.points
                     )
                 } header: {
-                    Text("叫分")
+                    Text("玩家叫分")
                 }
                 
                 Section {
@@ -545,23 +548,9 @@ struct HistoryEditView: View {
                 }
                 
                 Section {
-                    Toggle(isOn: $viewModel.setting.adouble) {
-                        Text("\(playerAName)加倍")
-                    }
-                    Toggle(isOn: $viewModel.setting.bdouble) {
-                        Text("\(playerBName)加倍")
-                    }
-                    Toggle(isOn: $viewModel.setting.cdouble) {
-                        Text("\(playerCName)加倍")
-                    }
-                } header: {
-                    Text("加倍")
-                }
-                
-                Section {
                     Picker("比赛结果", selection: $viewModel.setting.landlordResult) {
-                        Text("地主赢了").tag(true)
-                        Text("农民赢了").tag(false)
+                        Text("地主赢").tag(true)
+                        Text("农民赢").tag(false)
                     }
                     .pickerStyle(.segmented)
                 } header: {
@@ -810,36 +799,48 @@ class HistoryEditViewModel: ObservableObject {
     }
 }
 
-// MARK: - Player Bid Row (for History Edit)
+// MARK: - Player Bid Card (for History Edit)
 
-struct PlayerBidRow: View {
+struct PlayerBidCardHistory: View {
     let name: String
     let isFirstBidder: Bool
     @Binding var selectedBid: String
+    @Binding var isDoubled: Bool
     let options: [String]
     
     var body: some View {
-        HStack {
-            HStack(spacing: 4) {
+        VStack(alignment: .leading, spacing: 12) {
+            // Player name row
+            HStack {
                 if isFirstBidder {
                     Image(systemName: "hand.point.right.fill")
-                        .font(.caption)
                         .foregroundColor(.orange)
                 }
                 Text(name)
-                    .fontWeight(.medium)
+                    .font(.headline)
+                
+                Spacer()
+                
+                // Double toggle with label
+                HStack(spacing: 6) {
+                    Text("加倍")
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                    Toggle("", isOn: $isDoubled)
+                        .labelsHidden()
+                }
             }
             
-            Spacer()
-            
-            Picker("", selection: $selectedBid) {
+            // Bid picker (full width)
+            Picker("叫分", selection: $selectedBid) {
                 ForEach(options, id: \.self) { option in
-                    Text(option).tag(option)
+                    Text(option)
+                        .tag(option)
                 }
             }
             .pickerStyle(.segmented)
-            .frame(width: 180)
         }
+        .padding(.vertical, 4)
     }
 }
 
