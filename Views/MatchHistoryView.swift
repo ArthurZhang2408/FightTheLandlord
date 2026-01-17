@@ -499,43 +499,7 @@ struct SkeletonMatchDetailView: View {
     }
 }
 
-// MARK: - Skeleton Match List View
-
-struct SkeletonMatchListView: View {
-    var body: some View {
-        List {
-            ForEach(0..<6, id: \.self) { _ in
-                VStack(alignment: .leading, spacing: 8) {
-                    HStack {
-                        RoundedRectangle(cornerRadius: 4)
-                            .fill(Color(.systemGray5))
-                            .frame(width: 120, height: 14)
-                        Spacer()
-                        RoundedRectangle(cornerRadius: 4)
-                            .fill(Color(.systemGray5))
-                            .frame(width: 40, height: 12)
-                    }
-                    
-                    HStack(spacing: 16) {
-                        ForEach(0..<3, id: \.self) { _ in
-                            VStack(alignment: .leading, spacing: 2) {
-                                RoundedRectangle(cornerRadius: 4)
-                                    .fill(Color(.systemGray5))
-                                    .frame(width: 50, height: 10)
-                                RoundedRectangle(cornerRadius: 4)
-                                    .fill(Color(.systemGray5))
-                                    .frame(width: 30, height: 14)
-                            }
-                        }
-                    }
-                }
-                .padding(.vertical, 4)
-            }
-        }
-        .listStyle(.insetGrouped)
-        .redacted(reason: .placeholder)
-    }
-}
+// SkeletonMatchListView is defined in PlayerListView.swift
 
 struct GameRecordRow: View {
     let gameNumber: Int
