@@ -443,8 +443,10 @@ struct ZoomableChartContainer: View {
             .chartXAxisLabel(xAxisLabel)
             .chartYAxisLabel("累计得分")
             .chartXScale(domain: xDomainStart...xDomainEnd)
+            .chartPlotStyle { plotArea in
+                plotArea.clipped() // Clip the plot area precisely
+            }
             .padding(.horizontal)
-            .clipped() // Prevent chart from drawing outside its bounds
             .contentShape(Rectangle())
             .gesture(
                 zoomEnabled ?
@@ -654,8 +656,10 @@ struct ZoomableMultiPlayerChartContainer: View {
             .chartXScale(domain: xDomainStart...xDomainEnd)
             .chartLegend(.hidden) // We have custom legend above
             .chartForegroundStyleScale(domain: playerData.map { $0.name }, range: playerData.map { $0.color })
+            .chartPlotStyle { plotArea in
+                plotArea.clipped() // Clip the plot area precisely
+            }
             .padding(.horizontal)
-            .clipped() // Prevent chart from drawing outside its bounds
             .contentShape(Rectangle())
             .gesture(
                 zoomEnabled ?
