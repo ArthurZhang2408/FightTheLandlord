@@ -15,42 +15,38 @@ struct AddColumn: View {
     var body: some View {
         NavigationStack {
             Form {
-                // MARK: - First Bidder Indicator
-                if turn >= 0 {
-                    Section {
-                        HStack {
-                            Image(systemName: "hand.point.right.fill")
-                                .foregroundColor(.orange)
-                            Text("本局由 \(playerName(turn)) 先叫分")
-                                .foregroundColor(.secondary)
-                        }
-                    }
-                }
-                
-                // MARK: - Bids Section
+                // MARK: - Players Section (Bid + Double combined)
                 Section {
-                    PlayerBidRow(
+                    CompactPlayerRow(
                         name: viewModel.instance.room.aName.isEmpty ? "玩家A" : viewModel.instance.room.aName,
                         isFirstBidder: turn == 0,
                         selectedBid: $viewModel.apoint,
+                        isDoubled: $viewModel.setting.adouble,
                         options: viewModel.points
                     )
                     
-                    PlayerBidRow(
+                    CompactPlayerRow(
                         name: viewModel.instance.room.bName.isEmpty ? "玩家B" : viewModel.instance.room.bName,
                         isFirstBidder: turn == 1,
                         selectedBid: $viewModel.bpoint,
+                        isDoubled: $viewModel.setting.bdouble,
                         options: viewModel.points
                     )
                     
-                    PlayerBidRow(
+                    CompactPlayerRow(
                         name: viewModel.instance.room.cName.isEmpty ? "玩家C" : viewModel.instance.room.cName,
                         isFirstBidder: turn == 2,
                         selectedBid: $viewModel.cpoint,
+                        isDoubled: $viewModel.setting.cdouble,
                         options: viewModel.points
                     )
                 } header: {
-                    Text("叫分")
+                    HStack {
+                        Text("叫分")
+                        Spacer()
+                        Text("加倍")
+                            .foregroundColor(.secondary)
+                    }
                 } footer: {
                     if let landlord = determineLandlord() {
                         Text("👑 \(landlord) 成为地主")
@@ -59,13 +55,12 @@ struct AddColumn: View {
                     }
                 }
                 
-                // MARK: - Multipliers Section
+                // MARK: - Multipliers Section (Bombs + Spring)
                 Section {
-                    // Bombs
                     HStack {
-                        Label("炸弹数量", systemImage: "bolt.fill")
+                        Label("炸弹", systemImage: "bolt.fill")
                         Spacer()
-                        HStack(spacing: 16) {
+                        HStack(spacing: 12) {
                             Button {
                                 let current = Int(viewModel.bombs) ?? 0
                                 if current > 0 {
@@ -73,7 +68,7 @@ struct AddColumn: View {
                                 }
                             } label: {
                                 Image(systemName: "minus.circle.fill")
-                                    .font(.title3)
+                                    .font(.title2)
                                     .foregroundColor(.secondary)
                             }
                             .buttonStyle(.plain)
@@ -81,21 +76,20 @@ struct AddColumn: View {
                             Text(viewModel.bombs.isEmpty ? "0" : viewModel.bombs)
                                 .font(.title3)
                                 .fontWeight(.semibold)
-                                .frame(minWidth: 30)
+                                .frame(minWidth: 24)
                             
                             Button {
                                 let current = Int(viewModel.bombs) ?? 0
                                 viewModel.bombs = "\(current + 1)"
                             } label: {
                                 Image(systemName: "plus.circle.fill")
-                                    .font(.title3)
+                                    .font(.title2)
                                     .foregroundColor(.accentColor)
                             }
                             .buttonStyle(.plain)
                         }
                     }
                     
-                    // Spring
                     Toggle(isOn: $viewModel.setting.spring) {
                         Label("春天", systemImage: "sun.max.fill")
                     }
@@ -103,26 +97,11 @@ struct AddColumn: View {
                     Text("倍数")
                 }
                 
-                // MARK: - Double Section
-                Section {
-                    Toggle(isOn: $viewModel.setting.adouble) {
-                        Text(viewModel.instance.room.aName.isEmpty ? "玩家A加倍" : "\(viewModel.instance.room.aName)加倍")
-                    }
-                    Toggle(isOn: $viewModel.setting.bdouble) {
-                        Text(viewModel.instance.room.bName.isEmpty ? "玩家B加倍" : "\(viewModel.instance.room.bName)加倍")
-                    }
-                    Toggle(isOn: $viewModel.setting.cdouble) {
-                        Text(viewModel.instance.room.cName.isEmpty ? "玩家C加倍" : "\(viewModel.instance.room.cName)加倍")
-                    }
-                } header: {
-                    Text("加倍")
-                }
-                
                 // MARK: - Result Section
                 Section {
                     Picker("比赛结果", selection: $viewModel.setting.landlordResult) {
-                        Text("地主赢了").tag(true)
-                        Text("农民赢了").tag(false)
+                        Text("地主赢").tag(true)
+                        Text("农民赢").tag(false)
                     }
                     .pickerStyle(.segmented)
                 } header: {
@@ -198,39 +177,46 @@ struct AddColumn: View {
     }
 }
 
-// MARK: - Player Bid Row
+// MARK: - Compact Player Row (Bid + Double in one row)
 
-struct PlayerBidRow: View {
+struct CompactPlayerRow: View {
     let name: String
     let isFirstBidder: Bool
     @Binding var selectedBid: String
+    @Binding var isDoubled: Bool
     let options: [String]
     
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack {
+        HStack(spacing: 8) {
+            // Player name with first bidder indicator
+            HStack(spacing: 4) {
+                if isFirstBidder {
+                    Image(systemName: "hand.point.right.fill")
+                        .font(.caption)
+                        .foregroundColor(.orange)
+                }
                 Text(name)
                     .font(.subheadline)
                     .fontWeight(.medium)
-                if isFirstBidder {
-                    Text("先叫")
-                        .font(.caption2)
-                        .foregroundColor(.white)
-                        .padding(.horizontal, 6)
-                        .padding(.vertical, 2)
-                        .background(Color.orange)
-                        .clipShape(Capsule())
-                }
+                    .lineLimit(1)
             }
+            .frame(width: 70, alignment: .leading)
             
-            Picker("叫分", selection: $selectedBid) {
+            // Bid picker (compact)
+            Picker("", selection: $selectedBid) {
                 ForEach(options, id: \.self) { option in
-                    Text(option).tag(option)
+                    Text(option == "不叫" ? "不叫" : option.replacingOccurrences(of: "分", with: ""))
+                        .tag(option)
                 }
             }
             .pickerStyle(.segmented)
+            .frame(maxWidth: .infinity)
+            
+            // Double toggle
+            Toggle("", isOn: $isDoubled)
+                .labelsHidden()
+                .frame(width: 50)
         }
-        .padding(.vertical, 4)
     }
 }
 
