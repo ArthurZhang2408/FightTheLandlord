@@ -810,6 +810,39 @@ class HistoryEditViewModel: ObservableObject {
     }
 }
 
+// MARK: - Player Bid Row (for History Edit)
+
+struct PlayerBidRow: View {
+    let name: String
+    let isFirstBidder: Bool
+    @Binding var selectedBid: String
+    let options: [String]
+    
+    var body: some View {
+        HStack {
+            HStack(spacing: 4) {
+                if isFirstBidder {
+                    Image(systemName: "hand.point.right.fill")
+                        .font(.caption)
+                        .foregroundColor(.orange)
+                }
+                Text(name)
+                    .fontWeight(.medium)
+            }
+            
+            Spacer()
+            
+            Picker("", selection: $selectedBid) {
+                ForEach(options, id: \.self) { option in
+                    Text(option).tag(option)
+                }
+            }
+            .pickerStyle(.segmented)
+            .frame(width: 180)
+        }
+    }
+}
+
 struct MatchPlayerStatRow: View {
     let playerName: String
     let position: Int
