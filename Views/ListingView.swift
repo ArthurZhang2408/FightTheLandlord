@@ -16,27 +16,39 @@ struct ListingView: View {
         NavigationView {
             VStack {
                 HStack {
-                    TextField("", text: $viewModel.instance.room.aName)
-                        .frame(height: height)
-                        .padding(15)
-                        .overlay {
-                            RoundedRectangle(cornerRadius:  15)
-                                .stroke(Color.gray70, lineWidth: 1)
-                        }
-                    TextField("", text: $viewModel.instance.room.bName)
-                        .frame(height: height)
-                        .padding(15)
-                        .overlay {
-                            RoundedRectangle(cornerRadius:  15)
-                                .stroke(Color.gray70, lineWidth: 1)
-                        }
-                    TextField("", text: $viewModel.instance.room.cName)
-                        .frame(height: height)
-                        .padding(15)
-                        .overlay {
-                            RoundedRectangle(cornerRadius:  15)
-                                .stroke(Color.gray70, lineWidth: 1)
-                        }
+                    PlayerPickerView(
+                        selectedPlayer: Binding(
+                            get: { viewModel.instance.playerA },
+                            set: { player in
+                                viewModel.instance.playerA = player
+                                viewModel.instance.syncPlayerNames()
+                            }
+                        ),
+                        excludePlayers: [viewModel.instance.playerB, viewModel.instance.playerC].compactMap { $0 },
+                        position: "A"
+                    )
+                    PlayerPickerView(
+                        selectedPlayer: Binding(
+                            get: { viewModel.instance.playerB },
+                            set: { player in
+                                viewModel.instance.playerB = player
+                                viewModel.instance.syncPlayerNames()
+                            }
+                        ),
+                        excludePlayers: [viewModel.instance.playerA, viewModel.instance.playerC].compactMap { $0 },
+                        position: "B"
+                    )
+                    PlayerPickerView(
+                        selectedPlayer: Binding(
+                            get: { viewModel.instance.playerC },
+                            set: { player in
+                                viewModel.instance.playerC = player
+                                viewModel.instance.syncPlayerNames()
+                            }
+                        ),
+                        excludePlayers: [viewModel.instance.playerA, viewModel.instance.playerB].compactMap { $0 },
+                        position: "C"
+                    )
                 }
                 List {
                     ForEach(viewModel.instance.games.indices, id: \.self) {idx in
@@ -90,7 +102,7 @@ struct ListingView: View {
                 .frame(width: .screenWidth)
             }
             .padding()
-            .navigationTitle("今日第\(viewModel.instance.gameNum)局")
+            .navigationTitle("当前对局")
             .toolbar{
                 Button {
                     viewModel.showingSettingView = true
@@ -119,7 +131,7 @@ struct ListingView: View {
             }
             .confirmationDialog("确定", isPresented: $viewModel.showConfirm) {
                 Button {
-                    viewModel.instance.page = "welcome"
+                    viewModel.endMatch()
                 } label: {
                     Label("确定结束牌局吗？",
                     systemImage: "questionmark.circle")
