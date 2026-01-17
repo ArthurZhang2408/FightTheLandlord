@@ -678,29 +678,11 @@ struct SkeletonStatisticsView: View {
 
 struct SkeletonBox: View {
     let height: CGFloat
-    @State private var isAnimating = false
     
     var body: some View {
         RoundedRectangle(cornerRadius: 8)
             .fill(Color(.systemGray5))
             .frame(height: height)
-            .overlay(
-                RoundedRectangle(cornerRadius: 8)
-                    .fill(
-                        LinearGradient(
-                            gradient: Gradient(colors: [.clear, Color.white.opacity(0.3), .clear]),
-                            startPoint: .leading,
-                            endPoint: .trailing
-                        )
-                    )
-                    .offset(x: isAnimating ? 200 : -200)
-            )
-            .clipped()
-            .onAppear {
-                withAnimation(Animation.linear(duration: 1.5).repeatForever(autoreverses: false)) {
-                    isAnimating = true
-                }
-            }
     }
 }
 

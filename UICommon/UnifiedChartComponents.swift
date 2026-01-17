@@ -326,27 +326,34 @@ struct ZoomableChartContainer: View {
     
     @State private var scale: CGFloat = 1.0
     @State private var lastScale: CGFloat = 1.0
-    @State private var offset: CGFloat = 0
-    @State private var lastOffset: CGFloat = 0
+    @State private var panOffset: CGFloat = 0
+    @State private var lastPanOffset: CGFloat = 0
     
     private var dataPoints: [PlayerScorePoint] {
         scores.enumerated().map { PlayerScorePoint(index: $0.offset, playerName: playerName, score: $0.element, color: playerColor) }
     }
     
-    private var visiblePointCount: Int {
-        max(1, Int(Double(scores.count) / Double(scale)))
+    private var totalPoints: Int {
+        scores.count
+    }
+    
+    private var visibleRange: Int {
+        max(2, Int(Double(totalPoints) / Double(scale)))
     }
     
     private var shouldShowPoints: Bool {
-        visiblePointCount <= ChartConfig.pointVisibilityThreshold
+        visibleRange <= ChartConfig.pointVisibilityThreshold
     }
     
-    private var chartContentWidth: CGFloat {
-        chartWidth * scale
+    // Calculate the visible domain based on scale and pan
+    private var xDomainStart: Int {
+        let maxPanIndex = max(0, totalPoints - visibleRange)
+        let panIndex = Int(panOffset * Double(maxPanIndex))
+        return max(0, panIndex)
     }
     
-    private var maxOffset: CGFloat {
-        max(0, chartContentWidth - chartWidth)
+    private var xDomainEnd: Int {
+        min(totalPoints - 1, xDomainStart + visibleRange)
     }
     
     var body: some View {
@@ -356,14 +363,19 @@ struct ZoomableChartContainer: View {
                 Text("缩放: \(String(format: "%.1fx", scale))")
                     .font(.caption)
                     .foregroundColor(.secondary)
+                if scale > 1 {
+                    Text("(\(xDomainStart + 1)-\(xDomainEnd + 1) / \(totalPoints))")
+                        .font(.caption2)
+                        .foregroundColor(.secondary)
+                }
                 Spacer()
                 if scale > 1 {
                     Button("重置") {
                         withAnimation(.spring()) {
                             scale = 1.0
                             lastScale = 1.0
-                            offset = 0
-                            lastOffset = 0
+                            panOffset = 0
+                            lastPanOffset = 0
                         }
                     }
                     .font(.caption)
@@ -372,60 +384,75 @@ struct ZoomableChartContainer: View {
             .padding(.horizontal)
             .padding(.top, 8)
             
-            GeometryReader { proxy in
-                ScrollView(.horizontal, showsIndicators: false) {
-                    Chart {
-                        ForEach(dataPoints) { point in
-                            LineMark(
-                                x: .value(xAxisLabel, point.index),
-                                y: .value("分数", point.score)
-                            )
-                            .foregroundStyle(point.color)
-                            .lineStyle(StrokeStyle(lineWidth: 2.5))
-                            
-                            AreaMark(
-                                x: .value(xAxisLabel, point.index),
-                                y: .value("分数", point.score)
-                            )
-                            .foregroundStyle(
-                                LinearGradient(
-                                    colors: [point.color.opacity(0.3), point.color.opacity(0.05)],
-                                    startPoint: .top,
-                                    endPoint: .bottom
-                                )
-                            )
-                            
-                            if shouldShowPoints {
-                                PointMark(
-                                    x: .value(xAxisLabel, point.index),
-                                    y: .value("分数", point.score)
-                                )
-                                .foregroundStyle(point.color)
-                                .symbolSize(50)
-                            }
-                        }
-                        
-                        // Zero line reference
-                        RuleMark(y: .value("零分线", 0))
-                            .foregroundStyle(.secondary.opacity(0.5))
-                            .lineStyle(StrokeStyle(dash: [5, 3]))
+            // Chart with pinch-to-zoom and pan
+            Chart {
+                ForEach(dataPoints) { point in
+                    LineMark(
+                        x: .value(xAxisLabel, point.index),
+                        y: .value("分数", point.score)
+                    )
+                    .foregroundStyle(point.color)
+                    .lineStyle(StrokeStyle(lineWidth: 2.5))
+                    
+                    AreaMark(
+                        x: .value(xAxisLabel, point.index),
+                        y: .value("分数", point.score)
+                    )
+                    .foregroundStyle(
+                        LinearGradient(
+                            colors: [point.color.opacity(0.3), point.color.opacity(0.05)],
+                            startPoint: .top,
+                            endPoint: .bottom
+                        )
+                    )
+                    
+                    if shouldShowPoints {
+                        PointMark(
+                            x: .value(xAxisLabel, point.index),
+                            y: .value("分数", point.score)
+                        )
+                        .foregroundStyle(point.color)
+                        .symbolSize(50)
                     }
-                    .chartXAxisLabel(xAxisLabel)
-                    .chartYAxisLabel("累计得分")
-                    .frame(width: chartContentWidth, height: proxy.size.height)
-                    .padding(.horizontal)
                 }
-                .gesture(
-                    MagnificationGesture()
-                        .onChanged { value in
-                            let newScale = lastScale * value
-                            scale = min(max(newScale, 1.0), 10.0)
-                        }
-                        .onEnded { _ in
-                            lastScale = scale
-                        }
-                )
+                
+                // Zero line reference
+                RuleMark(y: .value("零分线", 0))
+                    .foregroundStyle(.secondary.opacity(0.5))
+                    .lineStyle(StrokeStyle(dash: [5, 3]))
             }
+            .chartXAxisLabel(xAxisLabel)
+            .chartYAxisLabel("累计得分")
+            .chartXScale(domain: xDomainStart...xDomainEnd)
+            .padding(.horizontal)
+            .contentShape(Rectangle())
+            .gesture(
+                MagnificationGesture()
+                    .onChanged { value in
+                        let newScale = lastScale * value
+                        scale = min(max(newScale, 1.0), 10.0)
+                    }
+                    .onEnded { _ in
+                        lastScale = scale
+                        // Keep pan within bounds after zoom
+                        panOffset = min(1.0, max(0, panOffset))
+                        lastPanOffset = panOffset
+                    }
+            )
+            .simultaneousGesture(
+                DragGesture()
+                    .onChanged { value in
+                        if scale > 1 {
+                            // Pan sensitivity based on chart width
+                            let dragSensitivity = 1.0 / chartWidth
+                            let newOffset = lastPanOffset - value.translation.width * dragSensitivity
+                            panOffset = min(1.0, max(0, newOffset))
+                        }
+                    }
+                    .onEnded { _ in
+                        lastPanOffset = panOffset
+                    }
+            )
         }
     }
 }
@@ -483,21 +510,30 @@ struct ZoomableMultiPlayerChartContainer: View {
     
     @State private var scale: CGFloat = 1.0
     @State private var lastScale: CGFloat = 1.0
+    @State private var panOffset: CGFloat = 0
+    @State private var lastPanOffset: CGFloat = 0
     
     private var maxDataCount: Int {
         playerData.map { $0.scores.count }.max() ?? 0
     }
     
-    private var visiblePointCount: Int {
-        max(1, Int(Double(maxDataCount) / Double(scale)))
+    private var visibleRange: Int {
+        max(2, Int(Double(maxDataCount) / Double(scale)))
     }
     
     private var shouldShowPoints: Bool {
-        visiblePointCount <= ChartConfig.pointVisibilityThreshold
+        visibleRange <= ChartConfig.pointVisibilityThreshold
     }
     
-    private var chartContentWidth: CGFloat {
-        chartWidth * scale
+    // Calculate the visible domain based on scale and pan
+    private var xDomainStart: Int {
+        let maxPanIndex = max(0, maxDataCount - visibleRange)
+        let panIndex = Int(panOffset * Double(maxPanIndex))
+        return max(0, panIndex)
+    }
+    
+    private var xDomainEnd: Int {
+        min(maxDataCount - 1, xDomainStart + visibleRange)
     }
     
     var body: some View {
@@ -507,12 +543,19 @@ struct ZoomableMultiPlayerChartContainer: View {
                 Text("缩放: \(String(format: "%.1fx", scale))")
                     .font(.caption)
                     .foregroundColor(.secondary)
+                if scale > 1 {
+                    Text("(\(xDomainStart + 1)-\(xDomainEnd + 1) / \(maxDataCount))")
+                        .font(.caption2)
+                        .foregroundColor(.secondary)
+                }
                 Spacer()
                 if scale > 1 {
                     Button("重置") {
                         withAnimation(.spring()) {
                             scale = 1.0
                             lastScale = 1.0
+                            panOffset = 0
+                            lastPanOffset = 0
                         }
                     }
                     .font(.caption)
@@ -538,54 +581,69 @@ struct ZoomableMultiPlayerChartContainer: View {
             }
             .padding(.vertical, 4)
             
-            GeometryReader { proxy in
-                ScrollView(.horizontal, showsIndicators: false) {
-                    Chart {
-                        ForEach(playerData, id: \.name) { player in
-                            let playerPoints = player.scores.enumerated().map { PlayerScorePoint(index: $0.offset, playerName: player.name, score: $0.element, color: player.color) }
-                            
-                            ForEach(playerPoints) { point in
-                                LineMark(
-                                    x: .value(xAxisLabel, point.index),
-                                    y: .value("分数", point.score)
-                                )
-                                .foregroundStyle(by: .value("玩家", point.playerName))
-                                .lineStyle(StrokeStyle(lineWidth: 2.5))
-                                
-                                if shouldShowPoints {
-                                    PointMark(
-                                        x: .value(xAxisLabel, point.index),
-                                        y: .value("分数", point.score)
-                                    )
-                                    .foregroundStyle(by: .value("玩家", point.playerName))
-                                    .symbolSize(50)
-                                }
-                            }
-                        }
+            // Chart with pinch-to-zoom and pan
+            Chart {
+                ForEach(playerData, id: \.name) { player in
+                    let playerPoints = player.scores.enumerated().map { PlayerScorePoint(index: $0.offset, playerName: player.name, score: $0.element, color: player.color) }
+                    
+                    ForEach(playerPoints) { point in
+                        LineMark(
+                            x: .value(xAxisLabel, point.index),
+                            y: .value("分数", point.score)
+                        )
+                        .foregroundStyle(by: .value("玩家", point.playerName))
+                        .lineStyle(StrokeStyle(lineWidth: 2.5))
                         
-                        // Zero line reference
-                        RuleMark(y: .value("零分线", 0))
-                            .foregroundStyle(.secondary.opacity(0.5))
-                            .lineStyle(StrokeStyle(dash: [5, 3]))
+                        if shouldShowPoints {
+                            PointMark(
+                                x: .value(xAxisLabel, point.index),
+                                y: .value("分数", point.score)
+                            )
+                            .foregroundStyle(by: .value("玩家", point.playerName))
+                            .symbolSize(50)
+                        }
                     }
-                    .chartXAxisLabel(xAxisLabel)
-                    .chartYAxisLabel("累计得分")
-                    .chartLegend(.hidden) // We have custom legend above
-                    .chartForegroundStyleScale(domain: playerData.map { $0.name }, range: playerData.map { $0.color })
-                    .frame(width: chartContentWidth, height: proxy.size.height)
-                    .padding(.horizontal)
                 }
-                .gesture(
-                    MagnificationGesture()
-                        .onChanged { value in
-                            let newScale = lastScale * value
-                            scale = min(max(newScale, 1.0), 10.0)
-                        }
-                        .onEnded { _ in
-                            lastScale = scale
-                        }
-                )
+                
+                // Zero line reference
+                RuleMark(y: .value("零分线", 0))
+                    .foregroundStyle(.secondary.opacity(0.5))
+                    .lineStyle(StrokeStyle(dash: [5, 3]))
             }
+            .chartXAxisLabel(xAxisLabel)
+            .chartYAxisLabel("累计得分")
+            .chartXScale(domain: xDomainStart...xDomainEnd)
+            .chartLegend(.hidden) // We have custom legend above
+            .chartForegroundStyleScale(domain: playerData.map { $0.name }, range: playerData.map { $0.color })
+            .padding(.horizontal)
+            .contentShape(Rectangle())
+            .gesture(
+                MagnificationGesture()
+                    .onChanged { value in
+                        let newScale = lastScale * value
+                        scale = min(max(newScale, 1.0), 10.0)
+                    }
+                    .onEnded { _ in
+                        lastScale = scale
+                        // Keep pan within bounds after zoom
+                        panOffset = min(1.0, max(0, panOffset))
+                        lastPanOffset = panOffset
+                    }
+            )
+            .simultaneousGesture(
+                DragGesture()
+                    .onChanged { value in
+                        if scale > 1 {
+                            // Pan sensitivity based on chart width
+                            let dragSensitivity = 1.0 / chartWidth
+                            let newOffset = lastPanOffset - value.translation.width * dragSensitivity
+                            panOffset = min(1.0, max(0, newOffset))
+                        }
+                    }
+                    .onEnded { _ in
+                        lastPanOffset = panOffset
+                    }
+            )
         }
     }
 }
