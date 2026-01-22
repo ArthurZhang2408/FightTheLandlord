@@ -987,7 +987,10 @@ struct ZoomableMatchChartContainer: View {
         
         // Check if same point is tapped again
         if let current = selectedPointIndex, current == clampedIndex {
-            // Second tap - trigger callback with 0-indexed game number (index - 1 since index 0 is starting point)
+            // Second tap - trigger callback
+            // The chart data has index 0 as the starting point (score = 0)
+            // Actual games start at index 1, so we subtract 1 to get the 0-indexed game number
+            // e.g., chart index 1 = game 0, chart index 2 = game 1, etc.
             if clampedIndex > 0 {
                 onGameSelected?(clampedIndex - 1)
             }
