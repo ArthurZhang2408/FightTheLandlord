@@ -504,6 +504,7 @@ struct MatchDetailView: View {
     
     // Highlighted game index for navigation from chart
     @State private var highlightedGameIndex: Int? = nil
+    @State private var pendingHighlightIndex: Int? = nil  // Stored until data loads
     
     private var displayScoreA: Int {
         games.isEmpty ? match.finalScoreA : aRe
@@ -609,7 +610,17 @@ struct MatchDetailView: View {
                             ScoreLineChart(
                                 scores: scores,
                                 playerNames: (match.playerAName, match.playerBName, match.playerCName),
-                                playerColors: (playerAColor, playerBColor, playerCColor)
+                                playerColors: (playerAColor, playerBColor, playerCColor),
+                                onGameSelected: { gameIndex in
+                                    // Set the highlight to scroll to and highlight the selected game
+                                    highlightedGameIndex = gameIndex
+                                    // Auto-clear highlight after a few seconds
+                                    DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
+                                        withAnimation {
+                                            highlightedGameIndex = nil
+                                        }
+                                    }
+                                }
                             )
                             .frame(height: 200)
                         } header: {
@@ -660,18 +671,13 @@ struct MatchDetailView: View {
             }
         }
         .onAppear {
-            loadGameRecords()
             // Check if we need to highlight a specific game from chart navigation
+            // Store it and apply after data loads
             if let gameIndex = dataSingleton.highlightGameIndex {
-                highlightedGameIndex = gameIndex
+                pendingHighlightIndex = gameIndex
                 dataSingleton.highlightGameIndex = nil
-                // Auto-clear highlight after a few seconds
-                DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
-                    withAnimation {
-                        highlightedGameIndex = nil
-                    }
-                }
             }
+            loadGameRecords()
         }
         .sheet(item: $editingGame) { editItem in
             HistoryEditView(
@@ -729,6 +735,21 @@ struct MatchDetailView: View {
                     return setting
                 }
                 updateScores()
+                
+                // Apply pending highlight after data loads
+                if let pending = pendingHighlightIndex {
+                    // Small delay to ensure UI is ready
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                        highlightedGameIndex = pending
+                        pendingHighlightIndex = nil
+                        // Auto-clear highlight after a few seconds
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
+                            withAnimation {
+                                highlightedGameIndex = nil
+                            }
+                        }
+                    }
+                }
             case .failure(let error):
                 print("Error loading game records: \(error.localizedDescription)")
             }
@@ -1491,14 +1512,16 @@ struct ScoreLineChart: View {
     let playerNames: (String, String, String)
     let playerColors: (Color, Color, Color)
     var showExpandButton: Bool = true
+    var onGameSelected: ((Int) -> Void)?  // Callback when a game point is selected (0-indexed game index)
     @State private var showFullscreen = false
     
-    init(scores: [ScoreTriple], playerNames: (String, String, String), playerColors: (Color, Color, Color)? = nil, showExpandButton: Bool = true) {
+    init(scores: [ScoreTriple], playerNames: (String, String, String), playerColors: (Color, Color, Color)? = nil, showExpandButton: Bool = true, onGameSelected: ((Int) -> Void)? = nil) {
         self.scores = scores
         self.playerNames = playerNames
         // Default colors if not provided
         self.playerColors = playerColors ?? (.blue, .green, .orange)
         self.showExpandButton = showExpandButton
+        self.onGameSelected = onGameSelected
     }
     
     private var playerData: [(name: String, scores: [Int], color: Color)] {
@@ -1529,10 +1552,17 @@ struct ScoreLineChart: View {
                 )
             }
             .fullScreenCover(isPresented: $showFullscreen) {
-                FullscreenMultiPlayerChartView(
+                FullscreenMatchChartView(
                     playerData: playerData,
                     xAxisLabel: "局数",
-                    title: "得分走势"
+                    title: "得分走势",
+                    onGameSelected: { gameIndex in
+                        showFullscreen = false
+                        // Delay to allow dismiss animation
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                            onGameSelected?(gameIndex)
+                        }
+                    }
                 )
             }
         } else {

@@ -82,6 +82,7 @@ struct ChartPointMetadata: Identifiable, Equatable {
     let score: Int
     let index: Int
     let playerName: String
+    let dayGameNumber: Int?  // Which game of the day (e.g., "第3局")
     
     static func == (lhs: ChartPointMetadata, rhs: ChartPointMetadata) -> Bool {
         return lhs.index == rhs.index && lhs.playerName == rhs.playerName
@@ -389,6 +390,7 @@ struct SelectedPointInfo: Equatable {
     let gameIndex: Int?
     let playerName: String
     let tapCount: Int  // 1 = show tooltip, 2 = navigate
+    let dayGameNumber: Int?  // Which game of the day
     
     static func == (lhs: SelectedPointInfo, rhs: SelectedPointInfo) -> Bool {
         return lhs.index == rhs.index && lhs.playerName == rhs.playerName
@@ -492,93 +494,101 @@ struct ZoomableChartContainer: View {
             .padding(.horizontal)
             .padding(.top, 8)
             
-            // Selected point tooltip
-            if let selected = selectedPoint, shouldShowPoints {
-                HStack(spacing: 12) {
-                    VStack(alignment: .leading, spacing: 2) {
-                        if let timestamp = selected.timestamp {
-                            Text("时间: \(ChartFormatters.dateTimeFormatter.string(from: timestamp))")
-                                .font(.caption)
-                        }
-                        Text("得分: \(selected.score)")
-                            .font(.caption.bold())
-                    }
-                    
-                    Spacer()
-                    
-                    if selected.matchId != nil {
-                        Text("再次点击跳转")
-                            .font(.caption2)
-                            .foregroundColor(.accentColor)
-                    }
-                    
-                    Button {
-                        selectedPoint = nil
-                    } label: {
-                        Image(systemName: "xmark.circle.fill")
-                            .foregroundColor(.secondary)
-                    }
-                }
-                .padding(.horizontal, 12)
-                .padding(.vertical, 6)
-                .background(Color(.systemGray6))
-                .cornerRadius(8)
-                .padding(.horizontal)
-                .padding(.top, 4)
-            }
-            
-            // Chart with pinch-to-zoom and pan
-            Chart {
-                ForEach(dataPoints) { point in
-                    LineMark(
-                        x: .value(xAxisLabel, point.index),
-                        y: .value("分数", point.score)
-                    )
-                    .foregroundStyle(point.color)
-                    .lineStyle(StrokeStyle(lineWidth: 2.5))
-                    
-                    AreaMark(
-                        x: .value(xAxisLabel, point.index),
-                        y: .value("分数", point.score)
-                    )
-                    .foregroundStyle(
-                        LinearGradient(
-                            colors: [point.color.opacity(0.3), point.color.opacity(0.05)],
-                            startPoint: .top,
-                            endPoint: .bottom
-                        )
-                    )
-                    
-                    if shouldShowPoints {
-                        PointMark(
+            // Chart with pinch-to-zoom and pan (with overlay tooltip)
+            ZStack(alignment: .top) {
+                Chart {
+                    ForEach(dataPoints) { point in
+                        LineMark(
                             x: .value(xAxisLabel, point.index),
                             y: .value("分数", point.score)
                         )
-                        .foregroundStyle(selectedPoint?.index == point.index ? Color.accentColor : point.color)
-                        .symbolSize(selectedPoint?.index == point.index ? 80 : 50)
+                        .foregroundStyle(point.color)
+                        .lineStyle(StrokeStyle(lineWidth: 2.5))
+                        
+                        AreaMark(
+                            x: .value(xAxisLabel, point.index),
+                            y: .value("分数", point.score)
+                        )
+                        .foregroundStyle(
+                            LinearGradient(
+                                colors: [point.color.opacity(0.3), point.color.opacity(0.05)],
+                                startPoint: .top,
+                                endPoint: .bottom
+                            )
+                        )
+                        
+                        if shouldShowPoints {
+                            PointMark(
+                                x: .value(xAxisLabel, point.index),
+                                y: .value("分数", point.score)
+                            )
+                            .foregroundStyle(selectedPoint?.index == point.index ? Color.accentColor : point.color)
+                            .symbolSize(selectedPoint?.index == point.index ? 80 : 50)
+                        }
+                    }
+                    
+                    // Zero line reference
+                    RuleMark(y: .value("零分线", 0))
+                        .foregroundStyle(.secondary.opacity(0.5))
+                        .lineStyle(StrokeStyle(dash: [5, 3]))
+                }
+                .chartXAxisLabel(xAxisLabel)
+                .chartYAxisLabel("累计得分")
+                .chartXScale(domain: xDomainStart...xDomainEnd)
+                .chartPlotStyle { plotArea in
+                    plotArea.clipped() // Clip the plot area precisely
+                }
+                .chartOverlay { proxy in
+                    GeometryReader { geometry in
+                        Rectangle()
+                            .fill(Color.clear)
+                            .contentShape(Rectangle())
+                            .onTapGesture { location in
+                                guard shouldShowPoints else { return }
+                                handleChartTap(at: location, proxy: proxy, geometry: geometry)
+                            }
                     }
                 }
                 
-                // Zero line reference
-                RuleMark(y: .value("零分线", 0))
-                    .foregroundStyle(.secondary.opacity(0.5))
-                    .lineStyle(StrokeStyle(dash: [5, 3]))
-            }
-            .chartXAxisLabel(xAxisLabel)
-            .chartYAxisLabel("累计得分")
-            .chartXScale(domain: xDomainStart...xDomainEnd)
-            .chartPlotStyle { plotArea in
-                plotArea.clipped() // Clip the plot area precisely
-            }
-            .chartOverlay { proxy in
-                GeometryReader { geometry in
-                    Rectangle()
-                        .fill(Color.clear)
-                        .contentShape(Rectangle())
-                        .onTapGesture { location in
-                            guard shouldShowPoints else { return }
-                            handleChartTap(at: location, proxy: proxy, geometry: geometry)
+                // Overlay tooltip (doesn't push content)
+                if let selected = selectedPoint, shouldShowPoints {
+                    HStack(spacing: 8) {
+                        VStack(alignment: .leading, spacing: 2) {
+                            if let timestamp = selected.timestamp {
+                                Text(ChartFormatters.dateTimeFormatter.string(from: timestamp))
+                                    .font(.caption2)
+                            }
+                            HStack(spacing: 4) {
+                                if let dayNum = selected.dayGameNumber {
+                                    Text("第\(dayNum)局")
+                                        .font(.caption2)
+                                        .foregroundColor(.secondary)
+                                }
+                                Text("得分: \(selected.score)")
+                                    .font(.caption.bold())
+                            }
                         }
+                        
+                        if selected.matchId != nil {
+                            Text("再点跳转")
+                                .font(.caption2)
+                                .foregroundColor(.accentColor)
+                        }
+                        
+                        Button {
+                            selectedPoint = nil
+                        } label: {
+                            Image(systemName: "xmark.circle.fill")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                    }
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 6)
+                    .background(Color(.systemBackground).opacity(0.95))
+                    .cornerRadius(8)
+                    .shadow(color: Color.black.opacity(0.15), radius: 4, x: 0, y: 2)
+                    .padding(.top, 8)
                 }
             }
             .padding(.horizontal)
@@ -643,6 +653,10 @@ struct ZoomableChartContainer: View {
             }
         } else {
             // First tap - show tooltip
+            var dayGameNumber: Int? = nil
+            if let metadataArray = metadata, clampedIndex < metadataArray.count {
+                dayGameNumber = metadataArray[clampedIndex].dayGameNumber
+            }
             selectedPoint = SelectedPointInfo(
                 index: clampedIndex,
                 score: tappedScore,
@@ -650,7 +664,8 @@ struct ZoomableChartContainer: View {
                 matchId: matchId,
                 gameIndex: gameIndex,
                 playerName: playerName,
-                tapCount: 1
+                tapCount: 1,
+                dayGameNumber: dayGameNumber
             )
         }
     }
@@ -707,6 +722,279 @@ struct FullscreenMultiPlayerChartView: View {
             windowScene.requestGeometryUpdate(.iOS(interfaceOrientations: .portrait))
         }
         UIDevice.current.setValue(UIInterfaceOrientation.portrait.rawValue, forKey: "orientation")
+    }
+}
+
+// MARK: - Fullscreen Match Chart View (for match detail with local game selection)
+
+@available(iOS 16.0, *)
+struct FullscreenMatchChartView: View {
+    let playerData: [(name: String, scores: [Int], color: Color)]
+    let xAxisLabel: String
+    let title: String
+    var onGameSelected: ((Int) -> Void)?  // Callback when game is selected (0-indexed)
+    
+    @Environment(\.dismiss) private var dismiss
+    
+    var body: some View {
+        NavigationStack {
+            GeometryReader { geometry in
+                ZoomableMatchChartContainer(
+                    playerData: playerData,
+                    xAxisLabel: xAxisLabel,
+                    chartWidth: geometry.size.width,
+                    chartHeight: geometry.size.height,
+                    onGameSelected: { gameIndex in
+                        restorePortrait()
+                        dismiss()
+                        onGameSelected?(gameIndex)
+                    }
+                )
+            }
+            .navigationTitle(title)
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("关闭") {
+                        restorePortrait()
+                        dismiss()
+                    }
+                }
+            }
+        }
+        .landscapeChart()
+    }
+    
+    private func restorePortrait() {
+        if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene {
+            windowScene.requestGeometryUpdate(.iOS(interfaceOrientations: .portrait))
+        }
+        UIDevice.current.setValue(UIInterfaceOrientation.portrait.rawValue, forKey: "orientation")
+    }
+}
+
+// MARK: - Zoomable Match Chart Container (for match detail with local game selection)
+
+@available(iOS 16.0, *)
+struct ZoomableMatchChartContainer: View {
+    let playerData: [(name: String, scores: [Int], color: Color)]
+    let xAxisLabel: String
+    let chartWidth: CGFloat
+    let chartHeight: CGFloat
+    var onGameSelected: ((Int) -> Void)?  // Callback when a game is selected
+    
+    @State private var scale: CGFloat = 1.0
+    @State private var lastScale: CGFloat = 1.0
+    @State private var panOffset: CGFloat = 0
+    @State private var lastPanOffset: CGFloat = 0
+    @State private var selectedPointIndex: Int?
+    
+    private var maxDataCount: Int {
+        playerData.map { $0.scores.count }.max() ?? 0
+    }
+    
+    private var maxScale: CGFloat {
+        guard maxDataCount > ChartConfig.minVisiblePoints else { return 1.0 }
+        return CGFloat(maxDataCount) / CGFloat(ChartConfig.minVisiblePoints)
+    }
+    
+    private var zoomEnabled: Bool {
+        maxDataCount > ChartConfig.minVisiblePoints
+    }
+    
+    private var visibleRange: Int {
+        max(ChartConfig.minVisiblePoints, Int(Double(maxDataCount) / Double(scale)))
+    }
+    
+    private var shouldShowPoints: Bool {
+        visibleRange <= ChartConfig.pointVisibilityThreshold
+    }
+    
+    private var xDomainStart: Int {
+        let maxPanIndex = max(0, maxDataCount - visibleRange)
+        let panIndex = Int(panOffset * Double(maxPanIndex))
+        return max(0, panIndex)
+    }
+    
+    private var xDomainEnd: Int {
+        min(maxDataCount - 1, xDomainStart + visibleRange - 1)
+    }
+    
+    var body: some View {
+        VStack(spacing: 0) {
+            // Zoom info and legend
+            HStack {
+                if zoomEnabled {
+                    Text("缩放: \(String(format: "%.1fx", scale))")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                    if scale > 1 {
+                        Text("(\(xDomainStart + 1)-\(xDomainEnd + 1) / \(maxDataCount))")
+                            .font(.caption2)
+                            .foregroundColor(.secondary)
+                    }
+                } else {
+                    Text("数据点: \(maxDataCount)")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+                Spacer()
+                if scale > 1 {
+                    Button("重置") {
+                        withAnimation(.spring()) {
+                            scale = 1.0
+                            lastScale = 1.0
+                            panOffset = 0
+                            lastPanOffset = 0
+                            selectedPointIndex = nil
+                        }
+                    }
+                    .font(.caption)
+                }
+            }
+            .padding(.horizontal)
+            .padding(.top, 8)
+            
+            // Legend
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 16) {
+                    ForEach(playerData, id: \.name) { player in
+                        HStack(spacing: 4) {
+                            Circle()
+                                .fill(player.color)
+                                .frame(width: 10, height: 10)
+                            Text(player.name)
+                                .font(.caption)
+                        }
+                    }
+                }
+                .padding(.horizontal)
+            }
+            .padding(.vertical, 4)
+            
+            // Chart with overlay tooltip
+            ZStack(alignment: .top) {
+                Chart {
+                    ForEach(playerData, id: \.name) { player in
+                        let playerPoints = player.scores.enumerated().map { PlayerScorePoint(index: $0.offset, playerName: player.name, score: $0.element, color: player.color) }
+                        
+                        ForEach(playerPoints) { point in
+                            LineMark(
+                                x: .value(xAxisLabel, point.index),
+                                y: .value("分数", point.score)
+                            )
+                            .foregroundStyle(by: .value("玩家", point.playerName))
+                            .lineStyle(StrokeStyle(lineWidth: 2.5))
+                            
+                            if shouldShowPoints {
+                                PointMark(
+                                    x: .value(xAxisLabel, point.index),
+                                    y: .value("分数", point.score)
+                                )
+                                .foregroundStyle(selectedPointIndex == point.index ? Color.accentColor : point.color)
+                                .symbolSize(selectedPointIndex == point.index ? 80 : 50)
+                            }
+                        }
+                    }
+                    
+                    RuleMark(y: .value("零分线", 0))
+                        .foregroundStyle(.secondary.opacity(0.5))
+                        .lineStyle(StrokeStyle(dash: [5, 3]))
+                }
+                .chartXAxisLabel(xAxisLabel)
+                .chartYAxisLabel("累计得分")
+                .chartXScale(domain: xDomainStart...xDomainEnd)
+                .chartLegend(.hidden)
+                .chartForegroundStyleScale(domain: playerData.map { $0.name }, range: playerData.map { $0.color })
+                .chartPlotStyle { plotArea in
+                    plotArea.clipped()
+                }
+                .chartOverlay { proxy in
+                    GeometryReader { geometry in
+                        Rectangle()
+                            .fill(Color.clear)
+                            .contentShape(Rectangle())
+                            .onTapGesture { location in
+                                guard shouldShowPoints else { return }
+                                handleChartTap(at: location, proxy: proxy, geometry: geometry)
+                            }
+                    }
+                }
+                
+                // Overlay tooltip
+                if let index = selectedPointIndex, shouldShowPoints, index > 0 {
+                    HStack(spacing: 8) {
+                        Text("第\(index)局")
+                            .font(.caption.bold())
+                        
+                        Text("再点跳转")
+                            .font(.caption2)
+                            .foregroundColor(.accentColor)
+                        
+                        Button {
+                            selectedPointIndex = nil
+                        } label: {
+                            Image(systemName: "xmark.circle.fill")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                    }
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 6)
+                    .background(Color(.systemBackground).opacity(0.95))
+                    .cornerRadius(8)
+                    .shadow(color: Color.black.opacity(0.15), radius: 4, x: 0, y: 2)
+                    .padding(.top, 8)
+                }
+            }
+            .padding(.horizontal)
+            .contentShape(Rectangle())
+            .gesture(
+                zoomEnabled ?
+                MagnificationGesture()
+                    .onChanged { value in
+                        let newScale = lastScale * value
+                        scale = min(max(newScale, 1.0), maxScale)
+                    }
+                    .onEnded { _ in
+                        lastScale = scale
+                        panOffset = min(1.0, max(0, panOffset))
+                        lastPanOffset = panOffset
+                    }
+                : nil
+            )
+            .simultaneousGesture(
+                DragGesture()
+                    .onChanged { value in
+                        if scale > 1 && zoomEnabled {
+                            let dragSensitivity = 1.0 / chartWidth
+                            let newOffset = lastPanOffset - value.translation.width * dragSensitivity
+                            panOffset = min(1.0, max(0, newOffset))
+                        }
+                    }
+                    .onEnded { _ in
+                        lastPanOffset = panOffset
+                    }
+            )
+        }
+    }
+    
+    private func handleChartTap(at location: CGPoint, proxy: ChartProxy, geometry: GeometryProxy) {
+        guard let xValue: Int = proxy.value(atX: location.x) else { return }
+        
+        let clampedIndex = max(xDomainStart, min(xDomainEnd, xValue))
+        guard clampedIndex >= 0 else { return }
+        
+        // Check if same point is tapped again
+        if let current = selectedPointIndex, current == clampedIndex {
+            // Second tap - trigger callback with 0-indexed game number (index - 1 since index 0 is starting point)
+            if clampedIndex > 0 {
+                onGameSelected?(clampedIndex - 1)
+            }
+        } else {
+            // First tap - show tooltip
+            selectedPointIndex = clampedIndex
+        }
     }
 }
 
@@ -837,89 +1125,97 @@ struct ZoomableMultiPlayerChartContainer: View {
             }
             .padding(.vertical, 4)
             
-            // Selected point tooltip
-            if let selected = selectedPoint, shouldShowPoints {
-                HStack(spacing: 12) {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("\(selected.playerName)")
-                            .font(.caption.bold())
-                        if let timestamp = selected.timestamp {
-                            Text("时间: \(ChartFormatters.dateTimeFormatter.string(from: timestamp))")
-                                .font(.caption)
-                        }
-                        Text("得分: \(selected.score)")
-                            .font(.caption.bold())
-                    }
-                    
-                    Spacer()
-                    
-                    if selected.matchId != nil {
-                        Text("再次点击跳转")
-                            .font(.caption2)
-                            .foregroundColor(.accentColor)
-                    }
-                    
-                    Button {
-                        selectedPoint = nil
-                    } label: {
-                        Image(systemName: "xmark.circle.fill")
-                            .foregroundColor(.secondary)
-                    }
-                }
-                .padding(.horizontal, 12)
-                .padding(.vertical, 6)
-                .background(Color(.systemGray6))
-                .cornerRadius(8)
-                .padding(.horizontal)
-                .padding(.top, 4)
-            }
-            
-            // Chart with pinch-to-zoom and pan
-            Chart {
-                ForEach(playerData, id: \.name) { player in
-                    let playerPoints = player.scores.enumerated().map { PlayerScorePoint(index: $0.offset, playerName: player.name, score: $0.element, color: player.color) }
-                    
-                    ForEach(playerPoints) { point in
-                        LineMark(
-                            x: .value(xAxisLabel, point.index),
-                            y: .value("分数", point.score)
-                        )
-                        .foregroundStyle(by: .value("玩家", point.playerName))
-                        .lineStyle(StrokeStyle(lineWidth: 2.5))
+            // Chart with pinch-to-zoom and pan (with overlay tooltip)
+            ZStack(alignment: .top) {
+                Chart {
+                    ForEach(playerData, id: \.name) { player in
+                        let playerPoints = player.scores.enumerated().map { PlayerScorePoint(index: $0.offset, playerName: player.name, score: $0.element, color: player.color) }
                         
-                        if shouldShowPoints {
-                            PointMark(
+                        ForEach(playerPoints) { point in
+                            LineMark(
                                 x: .value(xAxisLabel, point.index),
                                 y: .value("分数", point.score)
                             )
-                            .foregroundStyle(selectedPoint?.index == point.index && selectedPoint?.playerName == point.playerName ? Color.accentColor : point.color)
-                            .symbolSize(selectedPoint?.index == point.index && selectedPoint?.playerName == point.playerName ? 80 : 50)
+                            .foregroundStyle(by: .value("玩家", point.playerName))
+                            .lineStyle(StrokeStyle(lineWidth: 2.5))
+                            
+                            if shouldShowPoints {
+                                PointMark(
+                                    x: .value(xAxisLabel, point.index),
+                                    y: .value("分数", point.score)
+                                )
+                                .foregroundStyle(selectedPoint?.index == point.index && selectedPoint?.playerName == point.playerName ? Color.accentColor : point.color)
+                                .symbolSize(selectedPoint?.index == point.index && selectedPoint?.playerName == point.playerName ? 80 : 50)
+                            }
                         }
+                    }
+                    
+                    // Zero line reference
+                    RuleMark(y: .value("零分线", 0))
+                        .foregroundStyle(.secondary.opacity(0.5))
+                        .lineStyle(StrokeStyle(dash: [5, 3]))
+                }
+                .chartXAxisLabel(xAxisLabel)
+                .chartYAxisLabel("累计得分")
+                .chartXScale(domain: xDomainStart...xDomainEnd)
+                .chartLegend(.hidden) // We have custom legend above
+                .chartForegroundStyleScale(domain: playerData.map { $0.name }, range: playerData.map { $0.color })
+                .chartPlotStyle { plotArea in
+                    plotArea.clipped() // Clip the plot area precisely
+                }
+                .chartOverlay { proxy in
+                    GeometryReader { geometry in
+                        Rectangle()
+                            .fill(Color.clear)
+                            .contentShape(Rectangle())
+                            .onTapGesture { location in
+                                guard shouldShowPoints else { return }
+                                handleChartTap(at: location, proxy: proxy, geometry: geometry)
+                            }
                     }
                 }
                 
-                // Zero line reference
-                RuleMark(y: .value("零分线", 0))
-                    .foregroundStyle(.secondary.opacity(0.5))
-                    .lineStyle(StrokeStyle(dash: [5, 3]))
-            }
-            .chartXAxisLabel(xAxisLabel)
-            .chartYAxisLabel("累计得分")
-            .chartXScale(domain: xDomainStart...xDomainEnd)
-            .chartLegend(.hidden) // We have custom legend above
-            .chartForegroundStyleScale(domain: playerData.map { $0.name }, range: playerData.map { $0.color })
-            .chartPlotStyle { plotArea in
-                plotArea.clipped() // Clip the plot area precisely
-            }
-            .chartOverlay { proxy in
-                GeometryReader { geometry in
-                    Rectangle()
-                        .fill(Color.clear)
-                        .contentShape(Rectangle())
-                        .onTapGesture { location in
-                            guard shouldShowPoints else { return }
-                            handleChartTap(at: location, proxy: proxy, geometry: geometry)
+                // Overlay tooltip (doesn't push content)
+                if let selected = selectedPoint, shouldShowPoints {
+                    HStack(spacing: 8) {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(selected.playerName)
+                                .font(.caption.bold())
+                            if let timestamp = selected.timestamp {
+                                Text(ChartFormatters.dateTimeFormatter.string(from: timestamp))
+                                    .font(.caption2)
+                            }
+                            HStack(spacing: 4) {
+                                if let dayNum = selected.dayGameNumber {
+                                    Text("第\(dayNum)局")
+                                        .font(.caption2)
+                                        .foregroundColor(.secondary)
+                                }
+                                Text("得分: \(selected.score)")
+                                    .font(.caption.bold())
+                            }
                         }
+                        
+                        if selected.matchId != nil {
+                            Text("再点跳转")
+                                .font(.caption2)
+                                .foregroundColor(.accentColor)
+                        }
+                        
+                        Button {
+                            selectedPoint = nil
+                        } label: {
+                            Image(systemName: "xmark.circle.fill")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                    }
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 6)
+                    .background(Color(.systemBackground).opacity(0.95))
+                    .cornerRadius(8)
+                    .shadow(color: Color.black.opacity(0.15), radius: 4, x: 0, y: 2)
+                    .padding(.top, 8)
                 }
             }
             .padding(.horizontal)
@@ -985,12 +1281,14 @@ struct ZoomableMultiPlayerChartContainer: View {
         var timestamp: Date? = nil
         var matchId: String? = nil
         var gameIndex: Int? = nil
+        var dayGameNumber: Int? = nil
         
         if let metadata = metadataByPlayer?[player.name], clampedIndex < metadata.count {
             let meta = metadata[clampedIndex]
             timestamp = meta.timestamp
             matchId = meta.matchId
             gameIndex = meta.gameIndex
+            dayGameNumber = meta.dayGameNumber
         }
         
         // Check if same point is tapped again
@@ -1008,7 +1306,8 @@ struct ZoomableMultiPlayerChartContainer: View {
                 matchId: matchId,
                 gameIndex: gameIndex,
                 playerName: player.name,
-                tapCount: 1
+                tapCount: 1,
+                dayGameNumber: dayGameNumber
             )
         }
     }

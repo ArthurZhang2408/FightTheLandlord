@@ -443,20 +443,24 @@ struct StatisticsView: View {
             timestamp: nil,
             score: 0,
             index: 0,
-            playerName: playerName
+            playerName: playerName,
+            dayGameNumber: nil
         ))
         // Each subsequent point corresponds to a game record
         for (idx, record) in gameRecords.enumerated() {
             let position = getPlayerPosition(playerId: playerId, record: record)
             let score = getPlayerScore(position: position, record: record)
             cumulative += score
+            // dayGameNumber is gameIndex + 1 (1-indexed within the match)
+            let dayGameNum = record.gameIndex + 1
             metadata.append(ChartPointMetadata(
                 matchId: record.matchId,
                 gameIndex: record.gameIndex,
                 timestamp: record.playedAt,
                 score: cumulative,
                 index: idx + 1,
-                playerName: playerName
+                playerName: playerName,
+                dayGameNumber: dayGameNum
             ))
         }
         return metadata
@@ -473,7 +477,8 @@ struct StatisticsView: View {
             timestamp: nil,
             score: 0,
             index: 0,
-            playerName: playerName
+            playerName: playerName,
+            dayGameNumber: nil
         ))
         // Each subsequent point corresponds to a match record
         for (idx, match) in matchRecords.enumerated() {
@@ -486,7 +491,8 @@ struct StatisticsView: View {
                 timestamp: match.startedAt,
                 score: cumulative,
                 index: idx + 1,
-                playerName: playerName
+                playerName: playerName,
+                dayGameNumber: nil  // No day game number for match level
             ))
         }
         return metadata
