@@ -183,28 +183,9 @@ struct MatchHistoryView: View {
     
     @ViewBuilder
     private var hierarchicalMatchList: some View {
-        if hasMultipleYears {
-            // Group by year
-            ForEach(uniqueYears, id: \.self) { year in
-                yearSection(year: year)
-            }
-        } else if let singleYear = uniqueYears.first {
-            // Single year - skip year grouping
-            if hasMultipleMonths(forYear: singleYear) {
-                ForEach(uniqueMonths(forYear: singleYear), id: \.self) { month in
-                    monthSection(year: singleYear, month: month, showYear: false)
-                }
-            } else if let singleMonth = uniqueMonths(forYear: singleYear).first {
-                // Single month - skip month grouping
-                if hasMultipleDays(forYear: singleYear, month: singleMonth) {
-                    ForEach(uniqueDays(forYear: singleYear, month: singleMonth), id: \.self) { day in
-                        daySection(year: singleYear, month: singleMonth, day: day, showMonth: false)
-                    }
-                } else {
-                    // Single day - just show matches
-                    matchesList(year: singleYear, month: singleMonth, day: uniqueDays(forYear: singleYear, month: singleMonth).first ?? 1)
-                }
-            }
+        // Always show all levels (year -> month -> day)
+        ForEach(uniqueYears, id: \.self) { year in
+            yearSection(year: year)
         }
     }
     
@@ -223,7 +204,7 @@ struct MatchHistoryView: View {
                 HStack {
                     Image(systemName: expandedYears.contains(year) ? "chevron.down" : "chevron.right")
                         .font(.caption)
-                        .foregroundColor(.blue)
+                        .foregroundColor(.secondary)
                         .frame(width: 20)
                     Text("\(String(year))年")
                         .font(.headline)
@@ -239,25 +220,16 @@ struct MatchHistoryView: View {
             .buttonStyle(.plain)
             
             if expandedYears.contains(year) {
-                if hasMultipleMonths(forYear: year) {
-                    ForEach(uniqueMonths(forYear: year), id: \.self) { month in
-                        monthSection(year: year, month: month, showYear: false)
-                    }
-                } else if let singleMonth = uniqueMonths(forYear: year).first {
-                    if hasMultipleDays(forYear: year, month: singleMonth) {
-                        ForEach(uniqueDays(forYear: year, month: singleMonth), id: \.self) { day in
-                            daySection(year: year, month: singleMonth, day: day, showMonth: true)
-                        }
-                    } else {
-                        matchesList(year: year, month: singleMonth, day: uniqueDays(forYear: year, month: singleMonth).first ?? 1)
-                    }
+                // Always show all months
+                ForEach(uniqueMonths(forYear: year), id: \.self) { month in
+                    monthSection(year: year, month: month)
                 }
             }
         }
     }
     
     @ViewBuilder
-    private func monthSection(year: Int, month: Int, showYear: Bool) -> some View {
+    private func monthSection(year: Int, month: Int) -> some View {
         let monthKey = "\(year)-\(month)"
         
         Button {
@@ -272,9 +244,9 @@ struct MatchHistoryView: View {
             HStack {
                 Image(systemName: expandedMonths.contains(monthKey) ? "chevron.down" : "chevron.right")
                     .font(.caption)
-                    .foregroundColor(.green)
+                    .foregroundColor(.secondary)
                     .frame(width: 20)
-                Text(showYear ? "\(String(year))年\(month)月" : "\(month)月")
+                Text("\(month)月")
                     .font(.subheadline)
                     .fontWeight(.medium)
                     .foregroundColor(.primary)
@@ -284,26 +256,22 @@ struct MatchHistoryView: View {
                     .foregroundColor(.secondary)
             }
             .padding(.vertical, 2)
-            .padding(.leading, hasMultipleYears ? 20 : 0)
+            .padding(.leading, 20)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         
         if expandedMonths.contains(monthKey) {
-            if hasMultipleDays(forYear: year, month: month) {
-                ForEach(uniqueDays(forYear: year, month: month), id: \.self) { day in
-                    daySection(year: year, month: month, day: day, showMonth: false)
-                }
-            } else {
-                matchesList(year: year, month: month, day: uniqueDays(forYear: year, month: month).first ?? 1)
+            // Always show all days
+            ForEach(uniqueDays(forYear: year, month: month), id: \.self) { day in
+                daySection(year: year, month: month, day: day)
             }
         }
     }
     
     @ViewBuilder
-    private func daySection(year: Int, month: Int, day: Int, showMonth: Bool) -> some View {
+    private func daySection(year: Int, month: Int, day: Int) -> some View {
         let dayKey = "\(year)-\(month)-\(day)"
-        let indentLevel = (hasMultipleYears ? 20 : 0) + (hasMultipleMonths(forYear: year) ? 20 : 0)
         
         Button {
             withAnimation(.easeInOut(duration: 0.2)) {
@@ -317,9 +285,9 @@ struct MatchHistoryView: View {
             HStack {
                 Image(systemName: expandedDays.contains(dayKey) ? "chevron.down" : "chevron.right")
                     .font(.caption2)
-                    .foregroundColor(.gray)
+                    .foregroundColor(.secondary)
                     .frame(width: 16)
-                Text(showMonth ? "\(month)月\(day)日" : "\(day)日")
+                Text("\(day)日")
                     .font(.subheadline)
                     .foregroundColor(.primary)
                 Spacer()
@@ -328,7 +296,7 @@ struct MatchHistoryView: View {
                     .foregroundColor(.secondary)
             }
             .padding(.vertical, 2)
-            .padding(.leading, CGFloat(indentLevel))
+            .padding(.leading, 40)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
@@ -341,7 +309,6 @@ struct MatchHistoryView: View {
     @ViewBuilder
     private func matchesList(year: Int, month: Int, day: Int) -> some View {
         let dayMatches = matches(forYear: year, month: month, day: day)
-        let indentLevel = (hasMultipleYears ? 20 : 0) + (hasMultipleMonths(forYear: year) ? 20 : 0) + (hasMultipleDays(forYear: year, month: month) ? 20 : 0)
         
         ForEach(dayMatches) { match in
             Button {
@@ -349,7 +316,7 @@ struct MatchHistoryView: View {
             } label: {
                 MatchRowCompactView(match: match)
             }
-            .padding(.leading, CGFloat(indentLevel))
+            .padding(.leading, 60)
             .swipeActions(edge: .trailing, allowsFullSwipe: false) {
                 Button {
                     matchToDelete = match
