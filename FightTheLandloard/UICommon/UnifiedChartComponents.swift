@@ -36,6 +36,23 @@ struct ChartConfig {
     }
 }
 
+// MARK: - Chart Point Metadata for Navigation
+
+/// Metadata for a chart data point to enable navigation
+struct ChartPointMetadata: Identifiable, Equatable {
+    let id = UUID()
+    let matchId: String?
+    let gameIndex: Int?
+    let timestamp: Date?
+    let score: Int
+    let index: Int
+    let playerName: String
+    
+    static func == (lhs: ChartPointMetadata, rhs: ChartPointMetadata) -> Bool {
+        return lhs.index == rhs.index && lhs.playerName == rhs.playerName
+    }
+}
+
 // MARK: - Player Score Data Point
 
 struct PlayerScorePoint: Identifiable {
@@ -44,6 +61,7 @@ struct PlayerScorePoint: Identifiable {
     let playerName: String
     let score: Int
     let color: Color
+    var metadata: ChartPointMetadata?
 }
 
 // MARK: - Single Player Line Chart (for player detail view)
@@ -247,21 +265,30 @@ struct FullscreenSinglePlayerChartView: View {
     let playerName: String
     let playerColor: Color
     let initialShowGameChart: Bool
+    var gameMetadata: [ChartPointMetadata]?
+    var matchMetadata: [ChartPointMetadata]?
     
     @State private var showGameChart: Bool
     @Environment(\.dismiss) private var dismiss
     
-    init(gameScores: [Int], matchScores: [Int], playerName: String, playerColor: Color, initialShowGameChart: Bool) {
+    init(gameScores: [Int], matchScores: [Int], playerName: String, playerColor: Color, initialShowGameChart: Bool, 
+         gameMetadata: [ChartPointMetadata]? = nil, matchMetadata: [ChartPointMetadata]? = nil) {
         self.gameScores = gameScores
         self.matchScores = matchScores
         self.playerName = playerName
         self.playerColor = playerColor
         self.initialShowGameChart = initialShowGameChart
+        self.gameMetadata = gameMetadata
+        self.matchMetadata = matchMetadata
         self._showGameChart = State(initialValue: initialShowGameChart)
     }
     
     private var currentScores: [Int] {
         showGameChart ? gameScores : matchScores
+    }
+    
+    private var currentMetadata: [ChartPointMetadata]? {
+        showGameChart ? gameMetadata : matchMetadata
     }
     
     private var xAxisLabel: String {
@@ -277,7 +304,8 @@ struct FullscreenSinglePlayerChartView: View {
                     playerColor: playerColor,
                     xAxisLabel: xAxisLabel,
                     chartWidth: geometry.size.width,
-                    chartHeight: geometry.size.height
+                    chartHeight: geometry.size.height,
+                    metadata: currentMetadata
                 )
             }
             .navigationTitle("\(playerName) - 得分走势")
@@ -317,6 +345,21 @@ struct FullscreenSinglePlayerChartView: View {
 
 // MARK: - Zoomable Chart Container (Single Player)
 
+/// State for selected point tooltip and navigation
+struct SelectedPointInfo: Equatable {
+    let index: Int
+    let score: Int
+    let timestamp: Date?
+    let matchId: String?
+    let gameIndex: Int?
+    let playerName: String
+    let tapCount: Int  // 1 = show tooltip, 2 = navigate
+    
+    static func == (lhs: SelectedPointInfo, rhs: SelectedPointInfo) -> Bool {
+        return lhs.index == rhs.index && lhs.playerName == rhs.playerName
+    }
+}
+
 @available(iOS 16.0, *)
 struct ZoomableChartContainer: View {
     let scores: [Int]
@@ -325,14 +368,24 @@ struct ZoomableChartContainer: View {
     let xAxisLabel: String
     let chartWidth: CGFloat
     let chartHeight: CGFloat
+    var metadata: [ChartPointMetadata]?  // Optional metadata for navigation
     
     @State private var scale: CGFloat = 1.0
     @State private var lastScale: CGFloat = 1.0
     @State private var panOffset: CGFloat = 0
     @State private var lastPanOffset: CGFloat = 0
+    @State private var selectedPoint: SelectedPointInfo?
+    @ObservedObject private var dataSingleton = DataSingleton.instance
+    @Environment(\.dismiss) private var dismiss
     
     private var dataPoints: [PlayerScorePoint] {
-        scores.enumerated().map { PlayerScorePoint(index: $0.offset, playerName: playerName, score: $0.element, color: playerColor) }
+        scores.enumerated().map { idx, score in
+            var point = PlayerScorePoint(index: idx, playerName: playerName, score: score, color: playerColor)
+            if let metadataArray = metadata, idx < metadataArray.count {
+                point.metadata = metadataArray[idx]
+            }
+            return point
+        }
     }
     
     private var totalPoints: Int {
@@ -369,6 +422,12 @@ struct ZoomableChartContainer: View {
         min(totalPoints - 1, xDomainStart + visibleRange - 1)
     }
     
+    private var dateFormatter: DateFormatter {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd HH:mm"
+        return formatter
+    }
+    
     var body: some View {
         VStack(spacing: 0) {
             // Zoom info
@@ -395,6 +454,7 @@ struct ZoomableChartContainer: View {
                             lastScale = 1.0
                             panOffset = 0
                             lastPanOffset = 0
+                            selectedPoint = nil
                         }
                     }
                     .font(.caption)
@@ -402,6 +462,41 @@ struct ZoomableChartContainer: View {
             }
             .padding(.horizontal)
             .padding(.top, 8)
+            
+            // Selected point tooltip
+            if let selected = selectedPoint, shouldShowPoints {
+                HStack(spacing: 12) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        if let timestamp = selected.timestamp {
+                            Text("时间: \(dateFormatter.string(from: timestamp))")
+                                .font(.caption)
+                        }
+                        Text("得分: \(selected.score)")
+                            .font(.caption.bold())
+                    }
+                    
+                    Spacer()
+                    
+                    if selected.matchId != nil {
+                        Text("再次点击跳转")
+                            .font(.caption2)
+                            .foregroundColor(.accentColor)
+                    }
+                    
+                    Button {
+                        selectedPoint = nil
+                    } label: {
+                        Image(systemName: "xmark.circle.fill")
+                            .foregroundColor(.secondary)
+                    }
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 6)
+                .background(Color(.systemGray6))
+                .cornerRadius(8)
+                .padding(.horizontal)
+                .padding(.top, 4)
+            }
             
             // Chart with pinch-to-zoom and pan
             Chart {
@@ -430,8 +525,8 @@ struct ZoomableChartContainer: View {
                             x: .value(xAxisLabel, point.index),
                             y: .value("分数", point.score)
                         )
-                        .foregroundStyle(point.color)
-                        .symbolSize(50)
+                        .foregroundStyle(selectedPoint?.index == point.index ? Color.accentColor : point.color)
+                        .symbolSize(selectedPoint?.index == point.index ? 80 : 50)
                     }
                 }
                 
@@ -445,6 +540,17 @@ struct ZoomableChartContainer: View {
             .chartXScale(domain: xDomainStart...xDomainEnd)
             .chartPlotStyle { plotArea in
                 plotArea.clipped() // Clip the plot area precisely
+            }
+            .chartOverlay { proxy in
+                GeometryReader { geometry in
+                    Rectangle()
+                        .fill(Color.clear)
+                        .contentShape(Rectangle())
+                        .onTapGesture { location in
+                            guard shouldShowPoints else { return }
+                            handleChartTap(at: location, proxy: proxy, geometry: geometry)
+                        }
+                }
             }
             .padding(.horizontal)
             .contentShape(Rectangle())
@@ -479,6 +585,56 @@ struct ZoomableChartContainer: View {
             )
         }
     }
+    
+    private func handleChartTap(at location: CGPoint, proxy: ChartProxy, geometry: GeometryProxy) {
+        // Find the x value at the tap location
+        guard let xValue: Int = proxy.value(atX: location.x) else { return }
+        
+        // Find the closest data point
+        let clampedIndex = max(xDomainStart, min(xDomainEnd, xValue))
+        guard clampedIndex >= 0 && clampedIndex < scores.count else { return }
+        
+        let tappedScore = scores[clampedIndex]
+        var timestamp: Date? = nil
+        var matchId: String? = nil
+        var gameIndex: Int? = nil
+        
+        if let metadataArray = metadata, clampedIndex < metadataArray.count {
+            let meta = metadataArray[clampedIndex]
+            timestamp = meta.timestamp
+            matchId = meta.matchId
+            gameIndex = meta.gameIndex
+        }
+        
+        // Check if same point is tapped again
+        if let current = selectedPoint, current.index == clampedIndex {
+            // Second tap - navigate if we have matchId
+            if let mId = matchId {
+                navigateToMatch(matchId: mId, gameIndex: gameIndex)
+            }
+        } else {
+            // First tap - show tooltip
+            selectedPoint = SelectedPointInfo(
+                index: clampedIndex,
+                score: tappedScore,
+                timestamp: timestamp,
+                matchId: matchId,
+                gameIndex: gameIndex,
+                playerName: playerName,
+                tapCount: 1
+            )
+        }
+    }
+    
+    private func navigateToMatch(matchId: String, gameIndex: Int?) {
+        // Set navigation state in DataSingleton
+        dataSingleton.navigateToMatchId = matchId
+        dataSingleton.highlightGameIndex = gameIndex
+        dataSingleton.selectedTab = 1  // Switch to History tab
+        
+        // Dismiss the fullscreen chart
+        dismiss()
+    }
 }
 
 // MARK: - Fullscreen Multi-Player Chart View with Zoom/Pan
@@ -488,6 +644,7 @@ struct FullscreenMultiPlayerChartView: View {
     let playerData: [(name: String, scores: [Int], color: Color)]
     let xAxisLabel: String
     let title: String
+    var metadataByPlayer: [String: [ChartPointMetadata]]?
     
     @Environment(\.dismiss) private var dismiss
     
@@ -498,7 +655,8 @@ struct FullscreenMultiPlayerChartView: View {
                     playerData: playerData,
                     xAxisLabel: xAxisLabel,
                     chartWidth: geometry.size.width,
-                    chartHeight: geometry.size.height
+                    chartHeight: geometry.size.height,
+                    metadataByPlayer: metadataByPlayer
                 )
             }
             .navigationTitle(title)
@@ -525,17 +683,44 @@ struct FullscreenMultiPlayerChartView: View {
 
 // MARK: - Zoomable Multi-Player Chart Container
 
+/// Extended player data with optional metadata for navigation
+struct PlayerDataWithMetadata {
+    let name: String
+    let scores: [Int]
+    let color: Color
+    var metadata: [ChartPointMetadata]?
+    
+    init(name: String, scores: [Int], color: Color, metadata: [ChartPointMetadata]? = nil) {
+        self.name = name
+        self.scores = scores
+        self.color = color
+        self.metadata = metadata
+    }
+    
+    /// Convert from tuple format for backwards compatibility
+    init(from tuple: (name: String, scores: [Int], color: Color)) {
+        self.name = tuple.name
+        self.scores = tuple.scores
+        self.color = tuple.color
+        self.metadata = nil
+    }
+}
+
 @available(iOS 16.0, *)
 struct ZoomableMultiPlayerChartContainer: View {
     let playerData: [(name: String, scores: [Int], color: Color)]
     let xAxisLabel: String
     let chartWidth: CGFloat
     let chartHeight: CGFloat
+    var metadataByPlayer: [String: [ChartPointMetadata]]?  // Optional metadata keyed by player name
     
     @State private var scale: CGFloat = 1.0
     @State private var lastScale: CGFloat = 1.0
     @State private var panOffset: CGFloat = 0
     @State private var lastPanOffset: CGFloat = 0
+    @State private var selectedPoint: SelectedPointInfo?
+    @ObservedObject private var dataSingleton = DataSingleton.instance
+    @Environment(\.dismiss) private var dismiss
     
     private var maxDataCount: Int {
         playerData.map { $0.scores.count }.max() ?? 0
@@ -571,6 +756,12 @@ struct ZoomableMultiPlayerChartContainer: View {
         min(maxDataCount - 1, xDomainStart + visibleRange - 1)
     }
     
+    private var dateFormatter: DateFormatter {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd HH:mm"
+        return formatter
+    }
+    
     var body: some View {
         VStack(spacing: 0) {
             // Zoom info and legend
@@ -597,6 +788,7 @@ struct ZoomableMultiPlayerChartContainer: View {
                             lastScale = 1.0
                             panOffset = 0
                             lastPanOffset = 0
+                            selectedPoint = nil
                         }
                     }
                     .font(.caption)
@@ -622,6 +814,43 @@ struct ZoomableMultiPlayerChartContainer: View {
             }
             .padding(.vertical, 4)
             
+            // Selected point tooltip
+            if let selected = selectedPoint, shouldShowPoints {
+                HStack(spacing: 12) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("\(selected.playerName)")
+                            .font(.caption.bold())
+                        if let timestamp = selected.timestamp {
+                            Text("时间: \(dateFormatter.string(from: timestamp))")
+                                .font(.caption)
+                        }
+                        Text("得分: \(selected.score)")
+                            .font(.caption.bold())
+                    }
+                    
+                    Spacer()
+                    
+                    if selected.matchId != nil {
+                        Text("再次点击跳转")
+                            .font(.caption2)
+                            .foregroundColor(.accentColor)
+                    }
+                    
+                    Button {
+                        selectedPoint = nil
+                    } label: {
+                        Image(systemName: "xmark.circle.fill")
+                            .foregroundColor(.secondary)
+                    }
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 6)
+                .background(Color(.systemGray6))
+                .cornerRadius(8)
+                .padding(.horizontal)
+                .padding(.top, 4)
+            }
+            
             // Chart with pinch-to-zoom and pan
             Chart {
                 ForEach(playerData, id: \.name) { player in
@@ -640,8 +869,8 @@ struct ZoomableMultiPlayerChartContainer: View {
                                 x: .value(xAxisLabel, point.index),
                                 y: .value("分数", point.score)
                             )
-                            .foregroundStyle(by: .value("玩家", point.playerName))
-                            .symbolSize(50)
+                            .foregroundStyle(selectedPoint?.index == point.index && selectedPoint?.playerName == point.playerName ? Color.accentColor : point.color)
+                            .symbolSize(selectedPoint?.index == point.index && selectedPoint?.playerName == point.playerName ? 80 : 50)
                         }
                     }
                 }
@@ -658,6 +887,17 @@ struct ZoomableMultiPlayerChartContainer: View {
             .chartForegroundStyleScale(domain: playerData.map { $0.name }, range: playerData.map { $0.color })
             .chartPlotStyle { plotArea in
                 plotArea.clipped() // Clip the plot area precisely
+            }
+            .chartOverlay { proxy in
+                GeometryReader { geometry in
+                    Rectangle()
+                        .fill(Color.clear)
+                        .contentShape(Rectangle())
+                        .onTapGesture { location in
+                            guard shouldShowPoints else { return }
+                            handleChartTap(at: location, proxy: proxy, geometry: geometry)
+                        }
+                }
             }
             .padding(.horizontal)
             .contentShape(Rectangle())
@@ -691,6 +931,73 @@ struct ZoomableMultiPlayerChartContainer: View {
                     }
             )
         }
+    }
+    
+    private func handleChartTap(at location: CGPoint, proxy: ChartProxy, geometry: GeometryProxy) {
+        // Find the x value at the tap location
+        guard let xValue: Int = proxy.value(atX: location.x) else { return }
+        guard let yValue: Int = proxy.value(atY: location.y) else { return }
+        
+        // Find the closest data point
+        let clampedIndex = max(xDomainStart, min(xDomainEnd, xValue))
+        guard clampedIndex >= 0 else { return }
+        
+        // Find the closest player at this index based on Y value
+        var closestPlayer: (name: String, scores: [Int], color: Color)?
+        var closestDistance = Int.max
+        
+        for player in playerData {
+            guard clampedIndex < player.scores.count else { continue }
+            let playerScore = player.scores[clampedIndex]
+            let distance = abs(playerScore - yValue)
+            if distance < closestDistance {
+                closestDistance = distance
+                closestPlayer = player
+            }
+        }
+        
+        guard let player = closestPlayer, clampedIndex < player.scores.count else { return }
+        
+        let tappedScore = player.scores[clampedIndex]
+        var timestamp: Date? = nil
+        var matchId: String? = nil
+        var gameIndex: Int? = nil
+        
+        if let metadata = metadataByPlayer?[player.name], clampedIndex < metadata.count {
+            let meta = metadata[clampedIndex]
+            timestamp = meta.timestamp
+            matchId = meta.matchId
+            gameIndex = meta.gameIndex
+        }
+        
+        // Check if same point is tapped again
+        if let current = selectedPoint, current.index == clampedIndex && current.playerName == player.name {
+            // Second tap - navigate if we have matchId
+            if let mId = matchId {
+                navigateToMatch(matchId: mId, gameIndex: gameIndex)
+            }
+        } else {
+            // First tap - show tooltip
+            selectedPoint = SelectedPointInfo(
+                index: clampedIndex,
+                score: tappedScore,
+                timestamp: timestamp,
+                matchId: matchId,
+                gameIndex: gameIndex,
+                playerName: player.name,
+                tapCount: 1
+            )
+        }
+    }
+    
+    private func navigateToMatch(matchId: String, gameIndex: Int?) {
+        // Set navigation state in DataSingleton
+        dataSingleton.navigateToMatchId = matchId
+        dataSingleton.highlightGameIndex = gameIndex
+        dataSingleton.selectedTab = 1  // Switch to History tab
+        
+        // Dismiss the fullscreen chart
+        dismiss()
     }
 }
 

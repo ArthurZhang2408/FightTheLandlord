@@ -27,6 +27,7 @@ class DataSingleton: ObservableObject {
     // Tab selection
     @Published var selectedTab: Int = 0  // 0 = 对局, 1 = 历史, 2 = 统计
     @Published var navigateToMatchId: String?  // When set, History tab will navigate to this match
+    @Published var highlightGameIndex: Int?  // When set, highlight this game row in match detail
     
     // Player tracking
     @Published var playerA: Player?
