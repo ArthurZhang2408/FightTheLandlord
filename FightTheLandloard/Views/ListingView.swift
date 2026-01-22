@@ -214,7 +214,7 @@ struct ScoreSummaryCard: View {
     @EnvironmentObject var instance: DataSingleton
     
     private func scoreColor(_ score: Int) -> Color {
-        if score == 0 { return .primary }
+        if score == 0 { return Color(.secondaryLabel) }
         let isPositive = score > 0
         if instance.greenWin {
             return isPositive ? .green : .red
