@@ -502,6 +502,9 @@ struct MatchDetailView: View {
     @State private var playerBColor: Color = .green
     @State private var playerCColor: Color = .orange
     
+    // Highlighted game index for navigation from chart
+    @State private var highlightedGameIndex: Int? = nil
+    
     private var displayScoreA: Int {
         games.isEmpty ? match.finalScoreA : aRe
     }
@@ -533,55 +536,58 @@ struct MatchDetailView: View {
             if isLoading {
                 SkeletonMatchDetailView()
             } else {
-                List {
-                    Section {
-                        VStack(spacing: 12) {
-                            Text(dateFormatter.string(from: match.startedAt))
-                                .font(.subheadline)
-                                .foregroundColor(.secondary)
-                            
-                            HStack(spacing: 20) {
-                                VStack {
-                                    Text(match.playerAName)
-                                        .font(.headline)
-                                    Text("\(displayScoreA)")
-                                        .font(.title2)
-                                        .fontWeight(.bold)
-                                        .foregroundColor(scoreColor(displayScoreA))
-                                }
-                                VStack {
-                                    Text(match.playerBName)
-                                        .font(.headline)
-                                    Text("\(displayScoreB)")
-                                        .font(.title2)
-                                        .fontWeight(.bold)
-                                        .foregroundColor(scoreColor(displayScoreB))
-                                }
-                                VStack {
-                                    Text(match.playerCName)
-                                        .font(.headline)
-                                    Text("\(displayScoreC)")
-                                        .font(.title2)
-                                        .fontWeight(.bold)
-                                        .foregroundColor(scoreColor(displayScoreC))
+                ScrollViewReader { scrollProxy in
+                    List {
+                        Section {
+                            VStack(spacing: 12) {
+                                Text(dateFormatter.string(from: match.startedAt))
+                                    .font(.subheadline)
+                                    .foregroundColor(.secondary)
+                                
+                                HStack(spacing: 20) {
+                                    VStack {
+                                        Text(match.playerAName)
+                                            .font(.headline)
+                                        Text("\(displayScoreA)")
+                                            .font(.title2)
+                                            .fontWeight(.bold)
+                                            .foregroundColor(scoreColor(displayScoreA))
+                                    }
+                                    VStack {
+                                        Text(match.playerBName)
+                                            .font(.headline)
+                                        Text("\(displayScoreB)")
+                                            .font(.title2)
+                                            .fontWeight(.bold)
+                                            .foregroundColor(scoreColor(displayScoreB))
+                                    }
+                                    VStack {
+                                        Text(match.playerCName)
+                                            .font(.headline)
+                                        Text("\(displayScoreC)")
+                                            .font(.title2)
+                                            .fontWeight(.bold)
+                                            .foregroundColor(scoreColor(displayScoreC))
+                                    }
                                 }
                             }
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 8)
                         }
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 8)
-                    }
-                    
-                    Section {
-                        if games.isEmpty {
-                            Text("暂无详细记录")
-                                .foregroundColor(.secondary)
+                        
+                        Section {
+                            if games.isEmpty {
+                                Text("暂无详细记录")
+                                    .foregroundColor(.secondary)
                         } else {
                             ForEach(games.indices, id: \.self) { idx in
                                 GameRecordRow(
                                     gameNumber: idx + 1,
                                     game: games[idx],
-                                    playerNames: (match.playerAName, match.playerBName, match.playerCName)
+                                    playerNames: (match.playerAName, match.playerBName, match.playerCName),
+                                    isHighlighted: highlightedGameIndex == idx
                                 )
+                                .id("game-\(idx)")
                                 .swipeActions(allowsFullSwipe: false) {
                                     Button {
                                         // Use item-based sheet to ensure proper index binding
@@ -631,6 +637,14 @@ struct MatchDetailView: View {
                     }
                 }
                 .listStyle(.insetGrouped)
+                .onChange(of: highlightedGameIndex) { newIndex in
+                    if let index = newIndex {
+                        withAnimation {
+                            scrollProxy.scrollTo("game-\(index)", anchor: .center)
+                        }
+                    }
+                }
+                }
             }
         }
         .navigationTitle("对局详情")
@@ -647,6 +661,17 @@ struct MatchDetailView: View {
         }
         .onAppear {
             loadGameRecords()
+            // Check if we need to highlight a specific game from chart navigation
+            if let gameIndex = dataSingleton.highlightGameIndex {
+                highlightedGameIndex = gameIndex
+                dataSingleton.highlightGameIndex = nil
+                // Auto-clear highlight after a few seconds
+                DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
+                    withAnimation {
+                        highlightedGameIndex = nil
+                    }
+                }
+            }
         }
         .sheet(item: $editingGame) { editItem in
             HistoryEditView(
@@ -828,6 +853,7 @@ struct GameRecordRow: View {
     let gameNumber: Int
     let game: GameSetting
     let playerNames: (String, String, String)
+    var isHighlighted: Bool = false
     @ObservedObject private var dataSingleton = DataSingleton.instance
     
     private func scoreColor(for colorString: String) -> Color {
@@ -841,7 +867,7 @@ struct GameRecordRow: View {
                 .fontWeight(.medium)
                 .foregroundColor(.white)
                 .frame(width: 24, height: 24)
-                .background(Circle().fill(Color.accentColor.opacity(0.8)))
+                .background(Circle().fill(isHighlighted ? Color.orange : Color.accentColor.opacity(0.8)))
             
             HStack(spacing: 0) {
                 GameScoreItem(name: playerNames.0, score: game.A, isLandlord: game.landlord == 1, color: scoreColor(for: game.aC))
@@ -850,6 +876,9 @@ struct GameRecordRow: View {
             }
         }
         .padding(.vertical, 4)
+        .background(isHighlighted ? Color.orange.opacity(0.15) : Color.clear)
+        .cornerRadius(8)
+        .animation(.easeInOut(duration: 0.3), value: isHighlighted)
     }
 }
 

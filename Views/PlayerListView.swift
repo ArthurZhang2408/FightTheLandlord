@@ -432,6 +432,66 @@ struct StatisticsView: View {
         return scores
     }
     
+    // Generate metadata for game chart points
+    private var gameMetadata: [ChartPointMetadata] {
+        var metadata: [ChartPointMetadata] = []
+        var cumulative = 0
+        // First point (index 0) is starting point with no game
+        metadata.append(ChartPointMetadata(
+            matchId: nil,
+            gameIndex: nil,
+            timestamp: nil,
+            score: 0,
+            index: 0,
+            playerName: playerName
+        ))
+        // Each subsequent point corresponds to a game record
+        for (idx, record) in gameRecords.enumerated() {
+            let position = getPlayerPosition(playerId: playerId, record: record)
+            let score = getPlayerScore(position: position, record: record)
+            cumulative += score
+            metadata.append(ChartPointMetadata(
+                matchId: record.matchId,
+                gameIndex: record.gameIndex,
+                timestamp: record.playedAt,
+                score: cumulative,
+                index: idx + 1,
+                playerName: playerName
+            ))
+        }
+        return metadata
+    }
+    
+    // Generate metadata for match chart points
+    private var matchMetadata: [ChartPointMetadata] {
+        var metadata: [ChartPointMetadata] = []
+        var cumulative = 0
+        // First point (index 0) is starting point with no match
+        metadata.append(ChartPointMetadata(
+            matchId: nil,
+            gameIndex: nil,
+            timestamp: nil,
+            score: 0,
+            index: 0,
+            playerName: playerName
+        ))
+        // Each subsequent point corresponds to a match record
+        for (idx, match) in matchRecords.enumerated() {
+            let position = getPlayerPositionInMatch(playerId: playerId, match: match)
+            let finalScore = getPlayerFinalScore(position: position, match: match)
+            cumulative += finalScore
+            metadata.append(ChartPointMetadata(
+                matchId: match.id,
+                gameIndex: nil,  // For match-level navigation, no specific game
+                timestamp: match.startedAt,
+                score: cumulative,
+                index: idx + 1,
+                playerName: playerName
+            ))
+        }
+        return metadata
+    }
+    
     private func getPlayerPosition(playerId: String, record: GameRecord) -> Int {
         if record.playerAId == playerId { return 1 }
         if record.playerBId == playerId { return 2 }
@@ -626,7 +686,9 @@ struct StatisticsView: View {
                     matchScores: matchScoreHistory,
                     playerName: playerName,
                     playerColor: playerColor,
-                    initialShowGameChart: showGameChart
+                    initialShowGameChart: showGameChart,
+                    gameMetadata: gameMetadata,
+                    matchMetadata: matchMetadata
                 )
             }
         }
