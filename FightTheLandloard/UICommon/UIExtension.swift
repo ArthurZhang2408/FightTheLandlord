@@ -82,22 +82,23 @@ extension CGFloat {
 
 extension Color {
     
-    static var primary: Color {
+    // Note: Renamed from 'primary' to 'brandPrimary' to avoid conflict with SwiftUI's built-in Color.primary
+    static var brandPrimary: Color {
         return Color(hex: "5E00F5")
     }
-    static var primary500: Color {
+    static var brandPrimary500: Color {
         return Color(hex: "7722FF")
     }
-    static var primary20: Color {
+    static var brandPrimary20: Color {
         return Color(hex: "924EFF")
     }
-    static var primary10: Color {
+    static var brandPrimary10: Color {
         return Color(hex: "AD7BFF")
     }
-    static var primary5: Color {
+    static var brandPrimary5: Color {
         return Color(hex: "C9A7FF")
     }
-    static var primary0: Color {
+    static var brandPrimary0: Color {
         return Color(hex: "E4D3FF")
     }
     
