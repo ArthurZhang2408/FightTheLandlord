@@ -506,6 +506,10 @@ struct MatchDetailView: View {
     @State private var highlightedGameIndex: Int? = nil
     @State private var pendingHighlightIndex: Int? = nil  // Stored until data loads
     
+    // Timing constants for highlight animations
+    private static let highlightScrollDelay: TimeInterval = 0.3  // Delay before scrolling to allow UI to settle
+    private static let highlightDuration: TimeInterval = 3.0     // How long highlight stays visible
+    
     private var displayScoreA: Int {
         games.isEmpty ? match.finalScoreA : aRe
     }
@@ -612,14 +616,7 @@ struct MatchDetailView: View {
                                 playerNames: (match.playerAName, match.playerBName, match.playerCName),
                                 playerColors: (playerAColor, playerBColor, playerCColor),
                                 onGameSelected: { gameIndex in
-                                    // Set the highlight to scroll to and highlight the selected game
-                                    highlightedGameIndex = gameIndex
-                                    // Auto-clear highlight after a few seconds
-                                    DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
-                                        withAnimation {
-                                            highlightedGameIndex = nil
-                                        }
-                                    }
+                                    applyHighlight(gameIndex: gameIndex)
                                 }
                             )
                             .frame(height: 200)
@@ -738,17 +735,8 @@ struct MatchDetailView: View {
                 
                 // Apply pending highlight after data loads
                 if let pending = pendingHighlightIndex {
-                    // Small delay to ensure UI is ready
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                        highlightedGameIndex = pending
-                        pendingHighlightIndex = nil
-                        // Auto-clear highlight after a few seconds
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
-                            withAnimation {
-                                highlightedGameIndex = nil
-                            }
-                        }
-                    }
+                    pendingHighlightIndex = nil
+                    applyHighlight(gameIndex: pending, withDelay: true)
                 }
             case .failure(let error):
                 print("Error loading game records: \(error.localizedDescription)")
@@ -779,6 +767,25 @@ struct MatchDetailView: View {
             bRe += game.B
             cRe += game.C
             scores.append(ScoreTriple(A: aRe, B: bRe, C: cRe))
+        }
+    }
+    
+    /// Apply highlight to a game row with auto-clear after duration
+    private func applyHighlight(gameIndex: Int, withDelay: Bool = false) {
+        let applyBlock = {
+            highlightedGameIndex = gameIndex
+            // Auto-clear highlight after duration
+            DispatchQueue.main.asyncAfter(deadline: .now() + Self.highlightDuration) {
+                withAnimation {
+                    highlightedGameIndex = nil
+                }
+            }
+        }
+        
+        if withDelay {
+            DispatchQueue.main.asyncAfter(deadline: .now() + Self.highlightScrollDelay, execute: applyBlock)
+        } else {
+            applyBlock()
         }
     }
 }
