@@ -22,35 +22,55 @@ struct PlayerPickerView: View {
     }
     
     var body: some View {
-        VStack {
-            Menu {
-                ForEach(availablePlayers) { player in
-                    Button(player.name) {
-                        selectedPlayer = player
+        Menu {
+            ForEach(availablePlayers) { player in
+                Button {
+                    selectedPlayer = player
+                } label: {
+                    HStack {
+                        Text(player.name)
+                        if selectedPlayer?.id == player.id {
+                            Image(systemName: "checkmark")
+                        }
+                    }
+                }
+            }
+            
+            Divider()
+            
+            Button {
+                showingAddPlayer = true
+            } label: {
+                Label("添加新玩家", systemImage: "plus.circle")
+            }
+        } label: {
+            VStack(spacing: 4) {
+                ZStack {
+                    Circle()
+                        .fill(selectedPlayer != nil ? selectedPlayer!.displayColor.opacity(0.15) : Color(.tertiarySystemFill))
+                        .frame(width: 50, height: 50)
+                    
+                    if let player = selectedPlayer {
+                        Text(String(player.name.prefix(1)))
+                            .font(.title2)
+                            .fontWeight(.medium)
+                            .foregroundColor(player.displayColor)
+                    } else {
+                        Image(systemName: "person.badge.plus")
+                            .font(.title3)
+                            .foregroundColor(.secondary)
                     }
                 }
                 
-                Divider()
-                
-                Button {
-                    showingAddPlayer = true
-                } label: {
-                    Label("添加新玩家", systemImage: "plus")
-                }
-            } label: {
-                HStack {
-                    Text(selectedPlayer?.name ?? "选择玩家\(position)")
-                        .foregroundColor(selectedPlayer == nil ? .gray : .white)
-                    Spacer()
-                    Image(systemName: "chevron.down")
-                        .foregroundColor(.gray)
-                }
-                .padding(15)
-                .overlay {
-                    RoundedRectangle(cornerRadius: 15)
-                        .stroke(Color.gray70, lineWidth: 1)
-                }
+                Text(selectedPlayer?.name ?? "玩家\(position)")
+                    .font(.caption)
+                    .foregroundColor(selectedPlayer != nil ? Color(.label) : .secondary)
+                    .lineLimit(1)
             }
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 8)
+            .background(Color(.secondarySystemGroupedBackground))
+            .clipShape(RoundedRectangle(cornerRadius: 12))
         }
         .sheet(isPresented: $showingAddPlayer) {
             AddPlayerView(isPresented: $showingAddPlayer)
@@ -59,5 +79,10 @@ struct PlayerPickerView: View {
 }
 
 #Preview {
-    PlayerPickerView(selectedPlayer: .constant(nil), excludePlayers: [], position: "A")
+    HStack {
+        PlayerPickerView(selectedPlayer: .constant(nil), excludePlayers: [], position: "A")
+        PlayerPickerView(selectedPlayer: .constant(Player(name: "张三")), excludePlayers: [], position: "B")
+        PlayerPickerView(selectedPlayer: .constant(nil), excludePlayers: [], position: "C")
+    }
+    .padding()
 }
