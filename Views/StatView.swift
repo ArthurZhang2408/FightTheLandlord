@@ -135,7 +135,7 @@ struct StatView: View {
                         // Name
                         Text(player.name)
                             .font(.body)
-                            .foregroundColor(.primary)
+                            .foregroundColor(Color(.label))
                         
                         Spacer()
                         

@@ -91,10 +91,13 @@ struct MatchHistoryView: View {
     }
     
     private var matchListView: some View {
-        List {
-            hierarchicalMatchList
+        ScrollView {
+            LazyVStack(alignment: .leading, spacing: 0) {
+                hierarchicalMatchList
+            }
+            .padding(.horizontal, 16)
         }
-        .listStyle(.insetGrouped)
+        .background(Color(.systemGroupedBackground))
         .onAppear {
             if !hasInitializedExpansion {
                 initializeExpansionState()
@@ -191,39 +194,38 @@ struct MatchHistoryView: View {
     
     @ViewBuilder
     private func yearSection(year: Int) -> some View {
-        Section {
-            Button {
-                withAnimation(.easeInOut(duration: 0.2)) {
-                    if expandedYears.contains(year) {
-                        expandedYears.remove(year)
-                    } else {
-                        expandedYears.insert(year)
-                    }
+        // Year header - just a simple collapsible header
+        Button {
+            withAnimation(.easeInOut(duration: 0.2)) {
+                if expandedYears.contains(year) {
+                    expandedYears.remove(year)
+                } else {
+                    expandedYears.insert(year)
                 }
-            } label: {
-                HStack {
-                    Image(systemName: expandedYears.contains(year) ? "chevron.down" : "chevron.right")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                        .frame(width: 20)
-                    Text("\(String(year))年")
-                        .font(.headline)
-                        .foregroundColor(.primary)
-                    Spacer()
-                    Text("\(matchCount(forYear: year))场")
-                        .font(.subheadline)
-                        .foregroundColor(.secondary)
-                }
-                .padding(.vertical, 4)
-                .contentShape(Rectangle())
             }
-            .buttonStyle(.plain)
-            
-            if expandedYears.contains(year) {
-                // Always show all months
-                ForEach(uniqueMonths(forYear: year), id: \.self) { month in
-                    monthSection(year: year, month: month)
-                }
+        } label: {
+            HStack {
+                Image(systemName: expandedYears.contains(year) ? "chevron.down" : "chevron.right")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                    .frame(width: 16)
+                Text("\(String(year))年")
+                    .font(.headline)
+                    .foregroundColor(Color(.label))
+                Spacer()
+                Text("\(matchCount(forYear: year))场")
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
+            }
+            .padding(.vertical, 10)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        
+        if expandedYears.contains(year) {
+            // Always show all months
+            ForEach(uniqueMonths(forYear: year), id: \.self) { month in
+                monthSection(year: year, month: month)
             }
         }
     }
@@ -232,6 +234,7 @@ struct MatchHistoryView: View {
     private func monthSection(year: Int, month: Int) -> some View {
         let monthKey = "\(year)-\(month)"
         
+        // Month header - indented
         Button {
             withAnimation(.easeInOut(duration: 0.2)) {
                 if expandedMonths.contains(monthKey) {
@@ -245,17 +248,17 @@ struct MatchHistoryView: View {
                 Image(systemName: expandedMonths.contains(monthKey) ? "chevron.down" : "chevron.right")
                     .font(.caption)
                     .foregroundColor(.secondary)
-                    .frame(width: 20)
+                    .frame(width: 16)
                 Text("\(month)月")
                     .font(.subheadline)
                     .fontWeight(.medium)
-                    .foregroundColor(.primary)
+                    .foregroundColor(Color(.label))
                 Spacer()
                 Text("\(matchCount(forYear: year, month: month))场")
                     .font(.caption)
                     .foregroundColor(.secondary)
             }
-            .padding(.vertical, 2)
+            .padding(.vertical, 6)
             .padding(.leading, 20)
             .contentShape(Rectangle())
         }
@@ -273,6 +276,7 @@ struct MatchHistoryView: View {
     private func daySection(year: Int, month: Int, day: Int) -> some View {
         let dayKey = "\(year)-\(month)-\(day)"
         
+        // Day header - more indented
         Button {
             withAnimation(.easeInOut(duration: 0.2)) {
                 if expandedDays.contains(dayKey) {
@@ -286,16 +290,16 @@ struct MatchHistoryView: View {
                 Image(systemName: expandedDays.contains(dayKey) ? "chevron.down" : "chevron.right")
                     .font(.caption2)
                     .foregroundColor(.secondary)
-                    .frame(width: 16)
+                    .frame(width: 14)
                 Text("\(day)日")
                     .font(.subheadline)
-                    .foregroundColor(.primary)
+                    .foregroundColor(Color(.label))
                 Spacer()
                 Text("\(matchCount(forYear: year, month: month, day: day))场")
                     .font(.caption2)
                     .foregroundColor(.secondary)
             }
-            .padding(.vertical, 2)
+            .padding(.vertical, 4)
             .padding(.leading, 40)
             .contentShape(Rectangle())
         }
@@ -310,23 +314,37 @@ struct MatchHistoryView: View {
     private func matchesList(year: Int, month: Int, day: Int) -> some View {
         let dayMatches = matches(forYear: year, month: month, day: day)
         
-        ForEach(dayMatches) { match in
-            Button {
-                navigationPath.append(match)
-            } label: {
-                MatchRowCompactView(match: match)
-            }
-            .padding(.leading, 60)
-            .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+        // Match rows in a card container
+        VStack(spacing: 0) {
+            ForEach(Array(dayMatches.enumerated()), id: \.element.id) { index, match in
                 Button {
-                    matchToDelete = match
-                    showingDeleteConfirm = true
+                    navigationPath.append(match)
                 } label: {
-                    Label("删除", systemImage: "trash")
+                    MatchRowCompactView(match: match)
                 }
-                .tint(.red)
+                .buttonStyle(.plain)
+                .contextMenu {
+                    Button(role: .destructive) {
+                        matchToDelete = match
+                        showingDeleteConfirm = true
+                    } label: {
+                        Label("删除", systemImage: "trash")
+                    }
+                }
+                
+                if index < dayMatches.count - 1 {
+                    Divider()
+                        .padding(.leading, 52)
+                }
             }
         }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+        .background(Color(.secondarySystemGroupedBackground))
+        .clipShape(RoundedRectangle(cornerRadius: 10))
+        .padding(.leading, 40)
+        .padding(.top, 4)
+        .padding(.bottom, 8)
     }
 }
 
@@ -343,7 +361,7 @@ struct MatchRowCompactView: View {
     }
     
     private func scoreColor(_ score: Int) -> Color {
-        if score == 0 { return .primary }
+        if score == 0 { return Color(.secondaryLabel) }
         let isPositive = score > 0
         if dataSingleton.greenWin {
             return isPositive ? .green : .red
@@ -366,6 +384,7 @@ struct MatchRowCompactView: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text("\(match.playerAName)、\(match.playerBName)、\(match.playerCName)")
                     .font(.subheadline)
+                    .foregroundColor(Color(.label))
                     .lineLimit(1)
                 
                 HStack(spacing: 8) {

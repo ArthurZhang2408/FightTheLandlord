@@ -47,14 +47,14 @@ struct PlayerPickerView: View {
             VStack(spacing: 4) {
                 ZStack {
                     Circle()
-                        .fill(selectedPlayer != nil ? Color.accentColor.opacity(0.15) : Color(.tertiarySystemFill))
+                        .fill(selectedPlayer != nil ? selectedPlayer!.displayColor.opacity(0.15) : Color(.tertiarySystemFill))
                         .frame(width: 50, height: 50)
                     
                     if let player = selectedPlayer {
                         Text(String(player.name.prefix(1)))
                             .font(.title2)
                             .fontWeight(.medium)
-                            .foregroundColor(.accentColor)
+                            .foregroundColor(player.displayColor)
                     } else {
                         Image(systemName: "person.badge.plus")
                             .font(.title3)
@@ -64,7 +64,7 @@ struct PlayerPickerView: View {
                 
                 Text(selectedPlayer?.name ?? "玩家\(position)")
                     .font(.caption)
-                    .foregroundColor(selectedPlayer != nil ? .primary : .secondary)
+                    .foregroundColor(selectedPlayer != nil ? Color(.label) : .secondary)
                     .lineLimit(1)
             }
             .frame(maxWidth: .infinity)

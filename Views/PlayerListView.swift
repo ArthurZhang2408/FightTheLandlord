@@ -334,7 +334,7 @@ struct PlayerColorPickerSheet: View {
                                     .fill(color.color)
                                     .frame(width: 24, height: 24)
                                 Text(color.displayName)
-                                    .foregroundColor(.primary)
+                                    .foregroundColor(Color(.label))
                                 Spacer()
                                 if selectedColor == color {
                                     Image(systemName: "checkmark")
@@ -1181,7 +1181,7 @@ struct StatRow: View {
                     .frame(width: 24)
             }
             Text(label)
-                .foregroundColor(.primary)
+                .foregroundColor(Color(.label))
             Spacer()
             Text(value)
                 .foregroundColor(valueColor)
