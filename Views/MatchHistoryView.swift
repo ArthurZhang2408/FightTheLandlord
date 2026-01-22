@@ -15,6 +15,12 @@ struct MatchHistoryView: View {
     @State private var showingDeleteConfirm = false
     @State private var navigationPath = NavigationPath()
     
+    // MARK: - Expand/Collapse State
+    @State private var expandedYears: Set<Int> = []
+    @State private var expandedMonths: Set<String> = [] // "2024-01" format
+    @State private var expandedDays: Set<String> = [] // "2024-01-15" format
+    @State private var hasInitializedExpansion = false
+    
     var body: some View {
         NavigationStack(path: $navigationPath) {
             Group {
@@ -86,24 +92,343 @@ struct MatchHistoryView: View {
     
     private var matchListView: some View {
         List {
-            ForEach(firebaseService.matches) { match in
-                Button {
-                    navigationPath.append(match)
-                } label: {
-                    MatchRowView(match: match)
-                }
-                .swipeActions(edge: .trailing, allowsFullSwipe: false) {
-                    Button {
-                        matchToDelete = match
-                        showingDeleteConfirm = true
-                    } label: {
-                        Label("删除", systemImage: "trash")
-                    }
-                    .tint(.red)
+            hierarchicalMatchList
+        }
+        .listStyle(.insetGrouped)
+        .onAppear {
+            if !hasInitializedExpansion {
+                initializeExpansionState()
+                hasInitializedExpansion = true
+            }
+        }
+    }
+    
+    // MARK: - Grouping Helpers
+    
+    private var groupedMatches: [Int: [Int: [Int: [MatchRecord]]]] {
+        // Group by Year -> Month -> Day
+        var result: [Int: [Int: [Int: [MatchRecord]]]] = [:]
+        
+        for match in firebaseService.matches {
+            let components = Calendar.current.dateComponents([.year, .month, .day], from: match.startedAt)
+            let year = components.year ?? 2024
+            let month = components.month ?? 1
+            let day = components.day ?? 1
+            
+            if result[year] == nil { result[year] = [:] }
+            if result[year]![month] == nil { result[year]![month] = [:] }
+            if result[year]![month]![day] == nil { result[year]![month]![day] = [] }
+            result[year]![month]![day]!.append(match)
+        }
+        
+        return result
+    }
+    
+    private var uniqueYears: [Int] {
+        Array(groupedMatches.keys).sorted(by: >)
+    }
+    
+    private var hasMultipleYears: Bool {
+        uniqueYears.count > 1
+    }
+    
+    private func uniqueMonths(forYear year: Int) -> [Int] {
+        guard let yearData = groupedMatches[year] else { return [] }
+        return Array(yearData.keys).sorted(by: >)
+    }
+    
+    private func hasMultipleMonths(forYear year: Int) -> Bool {
+        uniqueMonths(forYear: year).count > 1
+    }
+    
+    private func uniqueDays(forYear year: Int, month: Int) -> [Int] {
+        guard let monthData = groupedMatches[year]?[month] else { return [] }
+        return Array(monthData.keys).sorted(by: >)
+    }
+    
+    private func hasMultipleDays(forYear year: Int, month: Int) -> Bool {
+        uniqueDays(forYear: year, month: month).count > 1
+    }
+    
+    private func matches(forYear year: Int, month: Int, day: Int) -> [MatchRecord] {
+        groupedMatches[year]?[month]?[day] ?? []
+    }
+    
+    private func matchCount(forYear year: Int) -> Int {
+        groupedMatches[year]?.values.reduce(0) { $0 + $1.values.reduce(0) { $0 + $1.count } } ?? 0
+    }
+    
+    private func matchCount(forYear year: Int, month: Int) -> Int {
+        groupedMatches[year]?[month]?.values.reduce(0) { $0 + $1.count } ?? 0
+    }
+    
+    private func matchCount(forYear year: Int, month: Int, day: Int) -> Int {
+        matches(forYear: year, month: month, day: day).count
+    }
+    
+    private func initializeExpansionState() {
+        // Expand all by default
+        expandedYears = Set(uniqueYears)
+        for year in uniqueYears {
+            for month in uniqueMonths(forYear: year) {
+                expandedMonths.insert("\(year)-\(month)")
+                for day in uniqueDays(forYear: year, month: month) {
+                    expandedDays.insert("\(year)-\(month)-\(day)")
                 }
             }
         }
-        .listStyle(.insetGrouped)
+    }
+    
+    // MARK: - Hierarchical List View
+    
+    @ViewBuilder
+    private var hierarchicalMatchList: some View {
+        if hasMultipleYears {
+            // Group by year
+            ForEach(uniqueYears, id: \.self) { year in
+                yearSection(year: year)
+            }
+        } else if let singleYear = uniqueYears.first {
+            // Single year - skip year grouping
+            if hasMultipleMonths(forYear: singleYear) {
+                ForEach(uniqueMonths(forYear: singleYear), id: \.self) { month in
+                    monthSection(year: singleYear, month: month, showYear: false)
+                }
+            } else if let singleMonth = uniqueMonths(forYear: singleYear).first {
+                // Single month - skip month grouping
+                if hasMultipleDays(forYear: singleYear, month: singleMonth) {
+                    ForEach(uniqueDays(forYear: singleYear, month: singleMonth), id: \.self) { day in
+                        daySection(year: singleYear, month: singleMonth, day: day, showMonth: false)
+                    }
+                } else {
+                    // Single day - just show matches
+                    matchesList(year: singleYear, month: singleMonth, day: uniqueDays(forYear: singleYear, month: singleMonth).first ?? 1)
+                }
+            }
+        }
+    }
+    
+    @ViewBuilder
+    private func yearSection(year: Int) -> some View {
+        Section {
+            Button {
+                withAnimation(.easeInOut(duration: 0.2)) {
+                    if expandedYears.contains(year) {
+                        expandedYears.remove(year)
+                    } else {
+                        expandedYears.insert(year)
+                    }
+                }
+            } label: {
+                HStack {
+                    Image(systemName: expandedYears.contains(year) ? "chevron.down" : "chevron.right")
+                        .font(.caption)
+                        .foregroundColor(.blue)
+                        .frame(width: 20)
+                    Text("\(String(year))年")
+                        .font(.headline)
+                        .foregroundColor(.primary)
+                    Spacer()
+                    Text("\(matchCount(forYear: year))场")
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                }
+                .padding(.vertical, 4)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            
+            if expandedYears.contains(year) {
+                if hasMultipleMonths(forYear: year) {
+                    ForEach(uniqueMonths(forYear: year), id: \.self) { month in
+                        monthSection(year: year, month: month, showYear: false)
+                    }
+                } else if let singleMonth = uniqueMonths(forYear: year).first {
+                    if hasMultipleDays(forYear: year, month: singleMonth) {
+                        ForEach(uniqueDays(forYear: year, month: singleMonth), id: \.self) { day in
+                            daySection(year: year, month: singleMonth, day: day, showMonth: true)
+                        }
+                    } else {
+                        matchesList(year: year, month: singleMonth, day: uniqueDays(forYear: year, month: singleMonth).first ?? 1)
+                    }
+                }
+            }
+        }
+    }
+    
+    @ViewBuilder
+    private func monthSection(year: Int, month: Int, showYear: Bool) -> some View {
+        let monthKey = "\(year)-\(month)"
+        
+        Button {
+            withAnimation(.easeInOut(duration: 0.2)) {
+                if expandedMonths.contains(monthKey) {
+                    expandedMonths.remove(monthKey)
+                } else {
+                    expandedMonths.insert(monthKey)
+                }
+            }
+        } label: {
+            HStack {
+                Image(systemName: expandedMonths.contains(monthKey) ? "chevron.down" : "chevron.right")
+                    .font(.caption)
+                    .foregroundColor(.green)
+                    .frame(width: 20)
+                Text(showYear ? "\(String(year))年\(month)月" : "\(month)月")
+                    .font(.subheadline)
+                    .fontWeight(.medium)
+                    .foregroundColor(.primary)
+                Spacer()
+                Text("\(matchCount(forYear: year, month: month))场")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
+            .padding(.vertical, 2)
+            .padding(.leading, hasMultipleYears ? 20 : 0)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        
+        if expandedMonths.contains(monthKey) {
+            if hasMultipleDays(forYear: year, month: month) {
+                ForEach(uniqueDays(forYear: year, month: month), id: \.self) { day in
+                    daySection(year: year, month: month, day: day, showMonth: false)
+                }
+            } else {
+                matchesList(year: year, month: month, day: uniqueDays(forYear: year, month: month).first ?? 1)
+            }
+        }
+    }
+    
+    @ViewBuilder
+    private func daySection(year: Int, month: Int, day: Int, showMonth: Bool) -> some View {
+        let dayKey = "\(year)-\(month)-\(day)"
+        let indentLevel = (hasMultipleYears ? 20 : 0) + (hasMultipleMonths(forYear: year) ? 20 : 0)
+        
+        Button {
+            withAnimation(.easeInOut(duration: 0.2)) {
+                if expandedDays.contains(dayKey) {
+                    expandedDays.remove(dayKey)
+                } else {
+                    expandedDays.insert(dayKey)
+                }
+            }
+        } label: {
+            HStack {
+                Image(systemName: expandedDays.contains(dayKey) ? "chevron.down" : "chevron.right")
+                    .font(.caption2)
+                    .foregroundColor(.gray)
+                    .frame(width: 16)
+                Text(showMonth ? "\(month)月\(day)日" : "\(day)日")
+                    .font(.subheadline)
+                    .foregroundColor(.primary)
+                Spacer()
+                Text("\(matchCount(forYear: year, month: month, day: day))场")
+                    .font(.caption2)
+                    .foregroundColor(.secondary)
+            }
+            .padding(.vertical, 2)
+            .padding(.leading, CGFloat(indentLevel))
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        
+        if expandedDays.contains(dayKey) {
+            matchesList(year: year, month: month, day: day)
+        }
+    }
+    
+    @ViewBuilder
+    private func matchesList(year: Int, month: Int, day: Int) -> some View {
+        let dayMatches = matches(forYear: year, month: month, day: day)
+        let indentLevel = (hasMultipleYears ? 20 : 0) + (hasMultipleMonths(forYear: year) ? 20 : 0) + (hasMultipleDays(forYear: year, month: month) ? 20 : 0)
+        
+        ForEach(dayMatches) { match in
+            Button {
+                navigationPath.append(match)
+            } label: {
+                MatchRowCompactView(match: match)
+            }
+            .padding(.leading, CGFloat(indentLevel))
+            .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+                Button {
+                    matchToDelete = match
+                    showingDeleteConfirm = true
+                } label: {
+                    Label("删除", systemImage: "trash")
+                }
+                .tint(.red)
+            }
+        }
+    }
+}
+
+// MARK: - Compact Match Row (for hierarchical list)
+
+struct MatchRowCompactView: View {
+    let match: MatchRecord
+    @ObservedObject private var dataSingleton = DataSingleton.instance
+    
+    private var timeFormatter: DateFormatter {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "HH:mm"
+        return formatter
+    }
+    
+    private func scoreColor(_ score: Int) -> Color {
+        if score == 0 { return .primary }
+        let isPositive = score > 0
+        if dataSingleton.greenWin {
+            return isPositive ? .green : .red
+        } else {
+            return isPositive ? .red : .green
+        }
+    }
+    
+    private var totalScore: Int {
+        max(match.finalScoreA, max(match.finalScoreB, match.finalScoreC))
+    }
+    
+    var body: some View {
+        HStack(spacing: 12) {
+            Text(timeFormatter.string(from: match.startedAt))
+                .font(.caption)
+                .foregroundColor(.secondary)
+                .frame(width: 40)
+            
+            VStack(alignment: .leading, spacing: 2) {
+                Text("\(match.playerAName)、\(match.playerBName)、\(match.playerCName)")
+                    .font(.subheadline)
+                    .lineLimit(1)
+                
+                HStack(spacing: 8) {
+                    Text("\(match.totalGames)局")
+                        .font(.caption2)
+                        .foregroundColor(.secondary)
+                    
+                    HStack(spacing: 4) {
+                        scoreLabel(match.finalScoreA)
+                        scoreLabel(match.finalScoreB)
+                        scoreLabel(match.finalScoreC)
+                    }
+                }
+            }
+            
+            Spacer()
+            
+            Image(systemName: "chevron.right")
+                .font(.caption)
+                .foregroundColor(.secondary)
+        }
+        .padding(.vertical, 4)
+    }
+    
+    @ViewBuilder
+    private func scoreLabel(_ score: Int) -> some View {
+        Text(score >= 0 ? "+\(score)" : "\(score)")
+            .font(.caption2)
+            .fontWeight(.medium)
+            .foregroundColor(scoreColor(score))
     }
 }
 
