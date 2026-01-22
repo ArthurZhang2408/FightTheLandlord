@@ -590,6 +590,7 @@ struct MatchDetailView: View {
                                     gameNumber: idx + 1,
                                     game: games[idx],
                                     playerNames: (match.playerAName, match.playerBName, match.playerCName),
+                                    cumulativeScore: idx < scores.count ? scores[idx] : nil,
                                     isHighlighted: highlightedGameIndex == idx
                                 )
                                 .id("game-\(idx)")
@@ -881,8 +882,14 @@ struct GameRecordRow: View {
     let gameNumber: Int
     let game: GameSetting
     let playerNames: (String, String, String)
+    var cumulativeScore: ScoreTriple?  // Optional cumulative scores for display
     var isHighlighted: Bool = false
     @ObservedObject private var dataSingleton = DataSingleton.instance
+    
+    // Display scores based on scorePerGame setting
+    private var displayScoreA: Int { dataSingleton.scorePerGame ? game.A : (cumulativeScore?.A ?? game.A) }
+    private var displayScoreB: Int { dataSingleton.scorePerGame ? game.B : (cumulativeScore?.B ?? game.B) }
+    private var displayScoreC: Int { dataSingleton.scorePerGame ? game.C : (cumulativeScore?.C ?? game.C) }
     
     private func scoreColor(for colorString: String) -> Color {
         return colorString.color
@@ -898,9 +905,9 @@ struct GameRecordRow: View {
                 .background(Circle().fill(isHighlighted ? Color.orange : Color.accentColor.opacity(0.8)))
             
             HStack(spacing: 0) {
-                GameScoreItem(name: playerNames.0, score: game.A, isLandlord: game.landlord == 1, color: scoreColor(for: game.aC))
-                GameScoreItem(name: playerNames.1, score: game.B, isLandlord: game.landlord == 2, color: scoreColor(for: game.bC))
-                GameScoreItem(name: playerNames.2, score: game.C, isLandlord: game.landlord == 3, color: scoreColor(for: game.cC))
+                GameScoreItem(name: playerNames.0, score: displayScoreA, isLandlord: game.landlord == 1, color: scoreColor(for: game.aC))
+                GameScoreItem(name: playerNames.1, score: displayScoreB, isLandlord: game.landlord == 2, color: scoreColor(for: game.bC))
+                GameScoreItem(name: playerNames.2, score: displayScoreC, isLandlord: game.landlord == 3, color: scoreColor(for: game.cC))
             }
         }
         .padding(.vertical, 4)

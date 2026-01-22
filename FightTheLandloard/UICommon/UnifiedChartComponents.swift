@@ -379,6 +379,13 @@ struct FullscreenSinglePlayerChartView: View {
     }
 }
 
+// MARK: - Chart Display Constants
+
+/// Standard colors used across charts
+enum ChartHighlightColor {
+    static let selected = Color.white  // Highlight color for selected data points
+}
+
 // MARK: - Zoomable Chart Container (Single Player)
 
 /// State for selected point tooltip and navigation
@@ -522,7 +529,7 @@ struct ZoomableChartContainer: View {
                                 x: .value(xAxisLabel, point.index),
                                 y: .value("分数", point.score)
                             )
-                            .foregroundStyle(selectedPoint?.index == point.index ? Color.accentColor : point.color)
+                            .foregroundStyle(selectedPoint?.index == point.index ? ChartHighlightColor.selected : point.color)
                             .symbolSize(selectedPoint?.index == point.index ? 80 : 50)
                         }
                     }
@@ -787,7 +794,7 @@ struct ZoomableMatchChartContainer: View {
     @State private var lastScale: CGFloat = 1.0
     @State private var panOffset: CGFloat = 0
     @State private var lastPanOffset: CGFloat = 0
-    @State private var selectedPointIndex: Int?
+    @State private var selectedPoint: (index: Int, playerName: String, score: Int)?  // Track both index and player
     
     private var maxDataCount: Int {
         playerData.map { $0.scores.count }.max() ?? 0
@@ -846,7 +853,7 @@ struct ZoomableMatchChartContainer: View {
                             lastScale = 1.0
                             panOffset = 0
                             lastPanOffset = 0
-                            selectedPointIndex = nil
+                            selectedPoint = nil
                         }
                     }
                     .font(.caption)
@@ -887,12 +894,14 @@ struct ZoomableMatchChartContainer: View {
                             .lineStyle(StrokeStyle(lineWidth: 2.5))
                             
                             if shouldShowPoints {
+                                // Only highlight the selected player's point at the selected index
+                                let isSelected = selectedPoint?.index == point.index && selectedPoint?.playerName == point.playerName
                                 PointMark(
                                     x: .value(xAxisLabel, point.index),
                                     y: .value("分数", point.score)
                                 )
-                                .foregroundStyle(selectedPointIndex == point.index ? Color.accentColor : point.color)
-                                .symbolSize(selectedPointIndex == point.index ? 80 : 50)
+                                .foregroundStyle(isSelected ? ChartHighlightColor.selected : point.color)
+                                .symbolSize(isSelected ? 80 : 50)
                             }
                         }
                     }
@@ -921,18 +930,27 @@ struct ZoomableMatchChartContainer: View {
                     }
                 }
                 
-                // Overlay tooltip
-                if let index = selectedPointIndex, shouldShowPoints, index > 0 {
+                // Overlay tooltip - shows player name, game number, and score
+                if let selected = selectedPoint, shouldShowPoints, selected.index > 0 {
                     HStack(spacing: 8) {
-                        Text("第\(index)局")
-                            .font(.caption.bold())
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(selected.playerName)
+                                .font(.caption.bold())
+                            HStack(spacing: 4) {
+                                Text("第\(selected.index)局")
+                                    .font(.caption2)
+                                    .foregroundColor(.secondary)
+                                Text("得分: \(selected.score)")
+                                    .font(.caption.bold())
+                            }
+                        }
                         
                         Text("再点跳转")
                             .font(.caption2)
                             .foregroundColor(.accentColor)
                         
                         Button {
-                            selectedPointIndex = nil
+                            selectedPoint = nil
                         } label: {
                             Image(systemName: "xmark.circle.fill")
                                 .font(.caption)
@@ -981,12 +999,31 @@ struct ZoomableMatchChartContainer: View {
     
     private func handleChartTap(at location: CGPoint, proxy: ChartProxy, geometry: GeometryProxy) {
         guard let xValue: Int = proxy.value(atX: location.x) else { return }
+        guard let yValue: Int = proxy.value(atY: location.y) else { return }
         
         let clampedIndex = max(xDomainStart, min(xDomainEnd, xValue))
         guard clampedIndex >= 0 else { return }
         
+        // Find the closest player at this index based on Y value
+        var closestPlayer: (name: String, scores: [Int], color: Color)?
+        var closestDistance = Int.max
+        var closestScore = 0
+        
+        for player in playerData {
+            guard clampedIndex < player.scores.count else { continue }
+            let playerScore = player.scores[clampedIndex]
+            let distance = abs(playerScore - yValue)
+            if distance < closestDistance {
+                closestDistance = distance
+                closestPlayer = player
+                closestScore = playerScore
+            }
+        }
+        
+        guard let player = closestPlayer else { return }
+        
         // Check if same point is tapped again
-        if let current = selectedPointIndex, current == clampedIndex {
+        if let current = selectedPoint, current.index == clampedIndex && current.playerName == player.name {
             // Second tap - trigger callback
             // The chart data has index 0 as the starting point (score = 0)
             // Actual games start at index 1, so we subtract 1 to get the 0-indexed game number
@@ -995,8 +1032,8 @@ struct ZoomableMatchChartContainer: View {
                 onGameSelected?(clampedIndex - 1)
             }
         } else {
-            // First tap - show tooltip
-            selectedPointIndex = clampedIndex
+            // First tap - show tooltip with player-specific info
+            selectedPoint = (index: clampedIndex, playerName: player.name, score: closestScore)
         }
     }
 }
@@ -1147,7 +1184,7 @@ struct ZoomableMultiPlayerChartContainer: View {
                                     x: .value(xAxisLabel, point.index),
                                     y: .value("分数", point.score)
                                 )
-                                .foregroundStyle(selectedPoint?.index == point.index && selectedPoint?.playerName == point.playerName ? Color.accentColor : point.color)
+                                .foregroundStyle(selectedPoint?.index == point.index && selectedPoint?.playerName == point.playerName ? ChartHighlightColor.selected : point.color)
                                 .symbolSize(selectedPoint?.index == point.index && selectedPoint?.playerName == point.playerName ? 80 : 50)
                             }
                         }
