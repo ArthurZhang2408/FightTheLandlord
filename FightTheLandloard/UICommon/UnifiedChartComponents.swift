@@ -36,6 +36,41 @@ struct ChartConfig {
     }
 }
 
+// MARK: - Tab Constants
+
+enum AppTab {
+    static let game = 0      // 对局 tab
+    static let history = 1   // 历史 tab
+    static let stats = 2     // 统计 tab
+}
+
+// MARK: - Shared Formatters
+
+enum ChartFormatters {
+    static let dateTimeFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd HH:mm"
+        return formatter
+    }()
+}
+
+// MARK: - Chart Navigation Helper
+
+/// Helper class for chart-to-history navigation
+class ChartNavigationHelper {
+    static func navigateToMatch(
+        matchId: String,
+        gameIndex: Int?,
+        dataSingleton: DataSingleton,
+        dismissAction: () -> Void
+    ) {
+        dataSingleton.navigateToMatchId = matchId
+        dataSingleton.highlightGameIndex = gameIndex
+        dataSingleton.selectedTab = AppTab.history
+        dismissAction()
+    }
+}
+
 // MARK: - Chart Point Metadata for Navigation
 
 /// Metadata for a chart data point to enable navigation
@@ -422,12 +457,6 @@ struct ZoomableChartContainer: View {
         min(totalPoints - 1, xDomainStart + visibleRange - 1)
     }
     
-    private var dateFormatter: DateFormatter {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "yyyy-MM-dd HH:mm"
-        return formatter
-    }
-    
     var body: some View {
         VStack(spacing: 0) {
             // Zoom info
@@ -468,7 +497,7 @@ struct ZoomableChartContainer: View {
                 HStack(spacing: 12) {
                     VStack(alignment: .leading, spacing: 2) {
                         if let timestamp = selected.timestamp {
-                            Text("时间: \(dateFormatter.string(from: timestamp))")
+                            Text("时间: \(ChartFormatters.dateTimeFormatter.string(from: timestamp))")
                                 .font(.caption)
                         }
                         Text("得分: \(selected.score)")
@@ -628,12 +657,12 @@ struct ZoomableChartContainer: View {
     
     private func navigateToMatch(matchId: String, gameIndex: Int?) {
         // Set navigation state in DataSingleton
-        dataSingleton.navigateToMatchId = matchId
-        dataSingleton.highlightGameIndex = gameIndex
-        dataSingleton.selectedTab = 1  // Switch to History tab
-        
-        // Dismiss the fullscreen chart
-        dismiss()
+        ChartNavigationHelper.navigateToMatch(
+            matchId: matchId,
+            gameIndex: gameIndex,
+            dataSingleton: dataSingleton,
+            dismissAction: { dismiss() }
+        )
     }
 }
 
@@ -756,12 +785,6 @@ struct ZoomableMultiPlayerChartContainer: View {
         min(maxDataCount - 1, xDomainStart + visibleRange - 1)
     }
     
-    private var dateFormatter: DateFormatter {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "yyyy-MM-dd HH:mm"
-        return formatter
-    }
-    
     var body: some View {
         VStack(spacing: 0) {
             // Zoom info and legend
@@ -821,7 +844,7 @@ struct ZoomableMultiPlayerChartContainer: View {
                         Text("\(selected.playerName)")
                             .font(.caption.bold())
                         if let timestamp = selected.timestamp {
-                            Text("时间: \(dateFormatter.string(from: timestamp))")
+                            Text("时间: \(ChartFormatters.dateTimeFormatter.string(from: timestamp))")
                                 .font(.caption)
                         }
                         Text("得分: \(selected.score)")
@@ -991,13 +1014,12 @@ struct ZoomableMultiPlayerChartContainer: View {
     }
     
     private func navigateToMatch(matchId: String, gameIndex: Int?) {
-        // Set navigation state in DataSingleton
-        dataSingleton.navigateToMatchId = matchId
-        dataSingleton.highlightGameIndex = gameIndex
-        dataSingleton.selectedTab = 1  // Switch to History tab
-        
-        // Dismiss the fullscreen chart
-        dismiss()
+        ChartNavigationHelper.navigateToMatch(
+            matchId: matchId,
+            gameIndex: gameIndex,
+            dataSingleton: dataSingleton,
+            dismissAction: { dismiss() }
+        )
     }
 }
 
