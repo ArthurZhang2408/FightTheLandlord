@@ -30,9 +30,10 @@ struct MatchShareButton: View {
         } label: {
             if isGenerating {
                 ProgressView()
-                    .scaleEffect(0.8)
+                    .frame(width: 22, height: 22)
             } else {
                 Image(systemName: "square.and.arrow.up")
+                    .font(.body)
             }
         }
         .disabled(isGenerating)
@@ -90,9 +91,10 @@ struct PlayerStatsShareButton: View {
         } label: {
             if isGenerating {
                 ProgressView()
-                    .scaleEffect(0.8)
+                    .frame(width: 22, height: 22)
             } else {
                 Image(systemName: "square.and.arrow.up")
+                    .font(.body)
             }
         }
         .disabled(isGenerating)
@@ -154,34 +156,7 @@ struct PlayerStatsShareButton: View {
 
 // MARK: - Share Sheet Helper
 
-/// Custom image item provider that ensures proper image saving
-class ShareImageItem: NSObject, UIActivityItemSource {
-    let image: UIImage
-    let title: String
-    
-    init(image: UIImage, title: String = "斗地主计分板") {
-        self.image = image
-        self.title = title
-        super.init()
-    }
-    
-    func activityViewControllerPlaceholderItem(_ activityViewController: UIActivityViewController) -> Any {
-        return image
-    }
-    
-    func activityViewController(_ activityViewController: UIActivityViewController, itemForActivityType activityType: UIActivity.ActivityType?) -> Any? {
-        return image
-    }
-    
-    func activityViewController(_ activityViewController: UIActivityViewController, subjectForActivityType activityType: UIActivity.ActivityType?) -> String {
-        return title
-    }
-    
-    func activityViewController(_ activityViewController: UIActivityViewController, dataTypeIdentifierForActivityType activityType: UIActivity.ActivityType?) -> String {
-        return "public.png"
-    }
-}
-
+/// Share sheet that allows saving image to Photos or sharing
 struct ShareSheet: UIViewControllerRepresentable {
     let image: UIImage
     let title: String
@@ -192,9 +167,9 @@ struct ShareSheet: UIViewControllerRepresentable {
     }
     
     func makeUIViewController(context: Context) -> UIActivityViewController {
-        let item = ShareImageItem(image: image, title: title)
-        // Use only the custom item to ensure proper image handling
-        let controller = UIActivityViewController(activityItems: [item], applicationActivities: nil)
+        // Pass the raw UIImage directly - this allows iOS to properly handle
+        // "Save Image" to Photos as well as other sharing activities
+        let controller = UIActivityViewController(activityItems: [image], applicationActivities: nil)
         return controller
     }
     
@@ -479,10 +454,10 @@ struct PlayerStatsShareImageView: View {
             .padding()
             .background(Color(.systemGray6))
             
-            ScrollView {
-                VStack(spacing: 20) {
-                    // Score Trend Chart
-                    if scoreHistory.count > 2 {
+            // Content - no ScrollView for ImageRenderer compatibility
+            VStack(spacing: 20) {
+                // Score Trend Chart
+                if scoreHistory.count > 2 {
                         VStack(alignment: .leading, spacing: 8) {
                             Text("得分走势")
                                 .font(.headline)
@@ -758,9 +733,8 @@ struct PlayerStatsShareImageView: View {
                     .padding(.bottom, 16)
                 }
             }
-        }
-        .background(Color(.systemBackground))
-        .frame(width: 420)
+            .background(Color(.systemBackground))
+            .frame(width: 420)
     }
 }
 
