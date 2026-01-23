@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import Charts
 
 // MARK: - Image Renderer Helper
 
