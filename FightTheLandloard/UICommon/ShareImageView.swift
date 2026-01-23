@@ -686,11 +686,11 @@ struct PlayerStatsShareImageView: View {
                             Text("加倍 \(stats.doubledGames)")
                                 .font(.caption)
                             Spacer()
-                            Text("炸弹 \(stats.bombsPlayed)")
+                            Text("加倍赢 \(stats.doubledWins)")
                                 .font(.caption)
-                            Image(systemName: "burst.fill")
+                            Image(systemName: "checkmark.circle.fill")
                                 .font(.caption)
-                                .foregroundColor(.red)
+                                .foregroundColor(.green)
                         }
                     }
                     .padding(8)
