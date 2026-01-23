@@ -39,7 +39,7 @@ struct MatchShareButton: View {
         .disabled(isGenerating)
         .sheet(isPresented: $showingShareSheet) {
             if let image = shareImage {
-                ShareSheet(image: image)
+                ShareSheetWithSave(image: image)
             }
         }
     }
@@ -100,7 +100,7 @@ struct PlayerStatsShareButton: View {
         .disabled(isGenerating)
         .sheet(isPresented: $showingShareSheet) {
             if let image = shareImage {
-                ShareSheet(image: image)
+                ShareSheetWithSave(image: image)
             }
         }
     }
@@ -156,13 +156,137 @@ struct PlayerStatsShareButton: View {
 
 // MARK: - Share Sheet Helper
 
-/// Share sheet that allows saving image to Photos or sharing
+/// Image saver that uses UIImageWriteToSavedPhotosAlbum for direct Photos saving
+/// This mimics how apps like 知乎 save images directly to Photos
+class ImageSaver: NSObject {
+    var onSuccess: (() -> Void)?
+    var onError: ((Error) -> Void)?
+    
+    func saveToPhotos(_ image: UIImage) {
+        UIImageWriteToSavedPhotosAlbum(image, self, #selector(saveCompleted), nil)
+    }
+    
+    @objc func saveCompleted(_ image: UIImage, didFinishSavingWithError error: Error?, contextInfo: UnsafeRawPointer) {
+        if let error = error {
+            onError?(error)
+        } else {
+            onSuccess?()
+        }
+    }
+}
+
+/// Share sheet with option to save directly to Photos (like 知乎)
+struct ShareSheetWithSave: View {
+    let image: UIImage
+    @Environment(\.dismiss) private var dismiss
+    @State private var showingSaveAlert = false
+    @State private var saveAlertMessage = ""
+    @State private var saveSuccess = false
+    
+    var body: some View {
+        NavigationView {
+            VStack(spacing: 24) {
+                // Image preview
+                Image(uiImage: image)
+                    .resizable()
+                    .scaledToFit()
+                    .cornerRadius(12)
+                    .shadow(radius: 5)
+                    .padding()
+                
+                // Action buttons
+                VStack(spacing: 12) {
+                    // Save to Photos button - primary action
+                    Button {
+                        saveToPhotos()
+                    } label: {
+                        HStack {
+                            Image(systemName: "square.and.arrow.down")
+                            Text("保存到相册")
+                        }
+                        .font(.headline)
+                        .foregroundColor(.white)
+                        .frame(maxWidth: .infinity)
+                        .padding()
+                        .background(Color.blue)
+                        .cornerRadius(12)
+                    }
+                    
+                    // Share button - opens system share sheet
+                    Button {
+                        shareImage()
+                    } label: {
+                        HStack {
+                            Image(systemName: "square.and.arrow.up")
+                            Text("分享到其他应用")
+                        }
+                        .font(.headline)
+                        .foregroundColor(.blue)
+                        .frame(maxWidth: .infinity)
+                        .padding()
+                        .background(Color(.systemGray6))
+                        .cornerRadius(12)
+                    }
+                }
+                .padding(.horizontal)
+                
+                Spacer()
+            }
+            .navigationTitle("分享图片")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button("关闭") {
+                        dismiss()
+                    }
+                }
+            }
+            .alert(saveAlertMessage, isPresented: $showingSaveAlert) {
+                Button("好") {
+                    if saveSuccess {
+                        dismiss()
+                    }
+                }
+            }
+        }
+    }
+    
+    private func saveToPhotos() {
+        let saver = ImageSaver()
+        saver.onSuccess = {
+            saveSuccess = true
+            saveAlertMessage = "图片已保存到相册"
+            showingSaveAlert = true
+        }
+        saver.onError = { error in
+            saveSuccess = false
+            saveAlertMessage = "保存失败: \(error.localizedDescription)"
+            showingSaveAlert = true
+        }
+        saver.saveToPhotos(image)
+    }
+    
+    private func shareImage() {
+        let activityVC = UIActivityViewController(activityItems: [image], applicationActivities: nil)
+        
+        // Get the key window scene
+        if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+           let rootVC = windowScene.windows.first?.rootViewController {
+            // Find the topmost presented view controller
+            var topVC = rootVC
+            while let presented = topVC.presentedViewController {
+                topVC = presented
+            }
+            topVC.present(activityVC, animated: true)
+        }
+    }
+}
+
+/// Legacy share sheet for compatibility
 struct ShareSheet: UIViewControllerRepresentable {
     let image: UIImage
     
     func makeUIViewController(context: Context) -> UIActivityViewController {
-        // Pass the raw UIImage directly - this allows iOS to properly handle
-        // "Save Image" to Photos as well as other sharing activities
         let controller = UIActivityViewController(activityItems: [image], applicationActivities: nil)
         return controller
     }
@@ -391,15 +515,6 @@ struct PlayerStatsShareImageView: View {
         return score > 0 ? .green : .red
     }
     
-    // Data for win rate pie chart
-    private var winRateData: [(String, Int, Color)] {
-        [
-            ("胜", stats.gamesWon, Color.green),
-            ("负", stats.gamesLost, Color.red)
-        ]
-    }
-    
-    // Data for role comparison
     private var landlordWinRate: Double {
         guard stats.gamesAsLandlord > 0 else { return 0 }
         return Double(stats.landlordWins) / Double(stats.gamesAsLandlord) * 100
@@ -448,287 +563,253 @@ struct PlayerStatsShareImageView: View {
             .padding()
             .background(Color(.systemGray6))
             
-            // Content - no ScrollView for ImageRenderer compatibility
-            VStack(spacing: 20) {
-                // Score Trend Chart
+            // Content with compact 2-column layout
+            VStack(spacing: 16) {
+                // Score Trend Chart - compact
                 if scoreHistory.count > 2 {
-                        VStack(alignment: .leading, spacing: 8) {
-                            Text("得分走势")
-                                .font(.headline)
-                                .foregroundColor(.secondary)
-                            
-                            Chart {
-                                ForEach(Array(scoreHistory.enumerated()), id: \.offset) { index, score in
-                                    AreaMark(
-                                        x: .value("局", index),
-                                        y: .value("分", score)
-                                    )
-                                    .foregroundStyle(
-                                        LinearGradient(
-                                            colors: [playerColor.opacity(0.3), playerColor.opacity(0.05)],
-                                            startPoint: .top,
-                                            endPoint: .bottom
-                                        )
-                                    )
-                                    
-                                    LineMark(
-                                        x: .value("局", index),
-                                        y: .value("分", score)
-                                    )
-                                    .foregroundStyle(playerColor)
-                                    .lineStyle(StrokeStyle(lineWidth: 2.5))
-                                }
-                                
-                                RuleMark(y: .value("零", 0))
-                                    .foregroundStyle(.secondary.opacity(0.3))
-                                    .lineStyle(StrokeStyle(dash: [5, 5]))
-                            }
-                            .chartYAxis {
-                                AxisMarks(position: .leading)
-                            }
-                            .frame(height: 160)
-                        }
-                        .padding(.horizontal)
-                        .padding(.top, 12)
-                    }
-                    
-                    // Win Rate Pie Chart
-                    if stats.totalGames > 0 {
-                        VStack(alignment: .leading, spacing: 8) {
-                            Text("胜率概览")
-                                .font(.headline)
-                                .foregroundColor(.secondary)
-                            
-                            HStack(spacing: 24) {
-                                // Pie chart
-                                ShareWinRatePieChart(wins: stats.gamesWon, losses: stats.gamesLost)
-                                    .frame(width: 120, height: 120)
-                                
-                                // Legend and details
-                                VStack(alignment: .leading, spacing: 12) {
-                                    HStack {
-                                        Circle().fill(Color.green).frame(width: 12, height: 12)
-                                        Text("胜利 \(stats.gamesWon)")
-                                            .font(.subheadline)
-                                        Text("(\(String(format: "%.1f%%", stats.winRate)))")
-                                            .font(.caption)
-                                            .foregroundColor(.secondary)
-                                    }
-                                    HStack {
-                                        Circle().fill(Color.red).frame(width: 12, height: 12)
-                                        Text("失败 \(stats.gamesLost)")
-                                            .font(.subheadline)
-                                    }
-                                    
-                                    Divider()
-                                    
-                                    Text("场均得分")
-                                        .font(.caption)
-                                        .foregroundColor(.secondary)
-                                    Text(String(format: "%.1f", stats.averageScorePerGame))
-                                        .font(.title2)
-                                        .fontWeight(.bold)
-                                        .foregroundColor(scoreColor(Int(stats.averageScorePerGame)))
-                                }
-                                
-                                Spacer()
-                            }
-                        }
-                        .padding(.horizontal)
-                    }
-                    
-                    // Role Comparison Bar Chart
-                    if stats.gamesAsLandlord > 0 || stats.gamesAsFarmer > 0 {
-                        VStack(alignment: .leading, spacing: 12) {
-                            Text("角色对比")
-                                .font(.headline)
-                                .foregroundColor(.secondary)
-                            
-                            // Landlord stats
-                            VStack(alignment: .leading, spacing: 4) {
-                                HStack {
-                                    Image(systemName: "crown.fill")
-                                        .foregroundColor(.orange)
-                                    Text("地主")
-                                        .fontWeight(.medium)
-                                    Spacer()
-                                    Text("\(stats.gamesAsLandlord)局 · 胜率\(String(format: "%.0f%%", landlordWinRate))")
-                                        .font(.caption)
-                                        .foregroundColor(.secondary)
-                                }
-                                
-                                GeometryReader { geo in
-                                    ZStack(alignment: .leading) {
-                                        RoundedRectangle(cornerRadius: 4)
-                                            .fill(Color(.systemGray5))
-                                            .frame(height: 20)
-                                        
-                                        if stats.gamesAsLandlord > 0 {
-                                            HStack(spacing: 0) {
-                                                RoundedRectangle(cornerRadius: 4)
-                                                    .fill(Color.green)
-                                                    .frame(width: geo.size.width * CGFloat(stats.landlordWins) / CGFloat(stats.gamesAsLandlord), height: 20)
-                                            }
-                                        }
-                                    }
-                                }
-                                .frame(height: 20)
-                            }
-                            
-                            // Farmer stats
-                            VStack(alignment: .leading, spacing: 4) {
-                                HStack {
-                                    Image(systemName: "leaf.fill")
-                                        .foregroundColor(.green)
-                                    Text("农民")
-                                        .fontWeight(.medium)
-                                    Spacer()
-                                    Text("\(stats.gamesAsFarmer)局 · 胜率\(String(format: "%.0f%%", farmerWinRate))")
-                                        .font(.caption)
-                                        .foregroundColor(.secondary)
-                                }
-                                
-                                GeometryReader { geo in
-                                    ZStack(alignment: .leading) {
-                                        RoundedRectangle(cornerRadius: 4)
-                                            .fill(Color(.systemGray5))
-                                            .frame(height: 20)
-                                        
-                                        if stats.gamesAsFarmer > 0 {
-                                            HStack(spacing: 0) {
-                                                RoundedRectangle(cornerRadius: 4)
-                                                    .fill(Color.green)
-                                                    .frame(width: geo.size.width * CGFloat(stats.farmerWins) / CGFloat(stats.gamesAsFarmer), height: 20)
-                                            }
-                                        }
-                                    }
-                                }
-                                .frame(height: 20)
-                            }
-                        }
-                        .padding(.horizontal)
-                    }
-                    
-                    // Key Stats Grid
-                    VStack(alignment: .leading, spacing: 12) {
-                        Text("精彩数据")
-                            .font(.headline)
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("得分走势")
+                            .font(.subheadline)
+                            .fontWeight(.semibold)
                             .foregroundColor(.secondary)
                         
-                        LazyVGrid(columns: [
-                            GridItem(.flexible()),
-                            GridItem(.flexible()),
-                            GridItem(.flexible())
-                        ], spacing: 12) {
-                            ShareHighlightCard(
-                                title: "单局最高",
-                                value: "+\(stats.bestGameScore)",
-                                icon: "arrow.up.circle.fill",
-                                color: .green
-                            )
-                            ShareHighlightCard(
-                                title: "单局最低",
-                                value: "\(stats.worstGameScore)",
-                                icon: "arrow.down.circle.fill",
-                                color: .red
-                            )
-                            ShareHighlightCard(
-                                title: "最长连胜",
-                                value: "\(stats.maxWinStreak)",
-                                icon: "flame.fill",
-                                color: .orange
-                            )
-                            ShareHighlightCard(
-                                title: "春天次数",
-                                value: "\(stats.springCount)",
-                                icon: "sun.max.fill",
-                                color: .yellow
-                            )
-                            ShareHighlightCard(
-                                title: "被春次数",
-                                value: "\(stats.springAgainstCount)",
-                                icon: "cloud.rain.fill",
-                                color: .gray
-                            )
-                            ShareHighlightCard(
-                                title: "加倍次数",
-                                value: "\(stats.doubledGames)",
-                                icon: "2.circle.fill",
-                                color: .blue
-                            )
+                        Chart {
+                            ForEach(Array(scoreHistory.enumerated()), id: \.offset) { index, score in
+                                AreaMark(
+                                    x: .value("局", index),
+                                    y: .value("分", score)
+                                )
+                                .foregroundStyle(
+                                    LinearGradient(
+                                        colors: [playerColor.opacity(0.3), playerColor.opacity(0.05)],
+                                        startPoint: .top,
+                                        endPoint: .bottom
+                                    )
+                                )
+                                
+                                LineMark(
+                                    x: .value("局", index),
+                                    y: .value("分", score)
+                                )
+                                .foregroundStyle(playerColor)
+                                .lineStyle(StrokeStyle(lineWidth: 2))
+                            }
+                            
+                            RuleMark(y: .value("零", 0))
+                                .foregroundStyle(.secondary.opacity(0.3))
+                                .lineStyle(StrokeStyle(dash: [5, 5]))
                         }
-                    }
-                    .padding(.horizontal)
-                    
-                    // Match Statistics Summary
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("对局统计")
-                            .font(.headline)
-                            .foregroundColor(.secondary)
-                        
-                        HStack(spacing: 16) {
-                            VStack {
-                                Text("\(stats.totalMatches)")
-                                    .font(.title2)
-                                    .fontWeight(.bold)
-                                Text("总场次")
-                                    .font(.caption)
-                                    .foregroundColor(.secondary)
-                            }
-                            .frame(maxWidth: .infinity)
-                            
-                            VStack {
-                                Text("\(stats.matchesWon)")
-                                    .font(.title2)
-                                    .fontWeight(.bold)
-                                    .foregroundColor(.green)
-                                Text("胜利")
-                                    .font(.caption)
-                                    .foregroundColor(.secondary)
-                            }
-                            .frame(maxWidth: .infinity)
-                            
-                            VStack {
-                                Text("\(stats.matchesLost)")
-                                    .font(.title2)
-                                    .fontWeight(.bold)
-                                    .foregroundColor(.red)
-                                Text("失败")
-                                    .font(.caption)
-                                    .foregroundColor(.secondary)
-                            }
-                            .frame(maxWidth: .infinity)
-                            
-                            VStack {
-                                Text(String(format: "%.0f%%", stats.matchWinRate))
-                                    .font(.title2)
-                                    .fontWeight(.bold)
-                                    .foregroundColor(.purple)
-                                Text("胜率")
-                                    .font(.caption)
-                                    .foregroundColor(.secondary)
-                            }
-                            .frame(maxWidth: .infinity)
+                        .chartYAxis {
+                            AxisMarks(position: .leading)
                         }
-                        .padding()
-                        .background(Color(.systemGray6))
-                        .clipShape(RoundedRectangle(cornerRadius: 12))
+                        .frame(height: 100)
                     }
-                    .padding(.horizontal)
+                }
+                
+                // Stats Grid - 2x3 compact layout
+                VStack(spacing: 8) {
+                    HStack(spacing: 8) {
+                        CompactStatCell(title: "胜率", value: String(format: "%.1f%%", stats.winRate), color: .blue)
+                        CompactStatCell(title: "地主胜率", value: String(format: "%.0f%%", landlordWinRate), color: .orange)
+                        CompactStatCell(title: "农民胜率", value: String(format: "%.0f%%", farmerWinRate), color: .green)
+                    }
+                    HStack(spacing: 8) {
+                        CompactStatCell(title: "场均得分", value: String(format: "%.1f", stats.averageScorePerGame), color: scoreColor(Int(stats.averageScorePerGame)))
+                        CompactStatCell(title: "地主场次", value: "\(stats.gamesAsLandlord)", color: .orange)
+                        CompactStatCell(title: "农民场次", value: "\(stats.gamesAsFarmer)", color: .green)
+                    }
+                }
+                
+                // Highlight Stats - 2x2 grid
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("精彩数据")
+                        .font(.subheadline)
+                        .fontWeight(.semibold)
+                        .foregroundColor(.secondary)
                     
-                    // Footer
+                    HStack(spacing: 8) {
+                        CompactHighlightCard(title: "单局最高", value: "+\(stats.bestGameScore)", icon: "arrow.up.circle.fill", color: .green)
+                        CompactHighlightCard(title: "单局最低", value: "\(stats.worstGameScore)", icon: "arrow.down.circle.fill", color: .red)
+                    }
+                    HStack(spacing: 8) {
+                        CompactHighlightCard(title: "最长连胜", value: "\(stats.maxWinStreak)", icon: "flame.fill", color: .orange)
+                        CompactHighlightCard(title: "最长连败", value: "\(stats.maxLoseStreak)", icon: "cloud.rain.fill", color: .gray)
+                    }
+                }
+                
+                // Role & Special Stats Row
+                HStack(spacing: 8) {
+                    // Win/Loss with mini pie
                     HStack {
-                        Spacer()
-                        Text("来自 斗地主计分板 App")
-                            .font(.caption)
+                        // Mini pie chart
+                        if stats.totalGames > 0 {
+                            ShareWinRatePieChart(wins: stats.gamesWon, losses: stats.gamesLost)
+                                .frame(width: 50, height: 50)
+                        }
+                        
+                        VStack(alignment: .leading, spacing: 2) {
+                            HStack(spacing: 4) {
+                                Circle().fill(Color.green).frame(width: 8, height: 8)
+                                Text("胜 \(stats.gamesWon)")
+                                    .font(.caption)
+                            }
+                            HStack(spacing: 4) {
+                                Circle().fill(Color.red).frame(width: 8, height: 8)
+                                Text("负 \(stats.gamesLost)")
+                                    .font(.caption)
+                            }
+                        }
+                    }
+                    .padding(8)
+                    .background(Color(.systemGray6))
+                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                    
+                    // Special stats
+                    VStack(alignment: .leading, spacing: 4) {
+                        HStack {
+                            Image(systemName: "sun.max.fill")
+                                .font(.caption)
+                                .foregroundColor(.yellow)
+                            Text("春天 \(stats.springCount)")
+                                .font(.caption)
+                            Spacer()
+                            Text("被春 \(stats.springAgainstCount)")
+                                .font(.caption)
+                            Image(systemName: "cloud.rain.fill")
+                                .font(.caption)
+                                .foregroundColor(.gray)
+                        }
+                        HStack {
+                            Image(systemName: "2.circle.fill")
+                                .font(.caption)
+                                .foregroundColor(.blue)
+                            Text("加倍 \(stats.doubledGames)")
+                                .font(.caption)
+                            Spacer()
+                            Text("炸弹 \(stats.bombsPlayed)")
+                                .font(.caption)
+                            Image(systemName: "burst.fill")
+                                .font(.caption)
+                                .foregroundColor(.red)
+                        }
+                    }
+                    .padding(8)
+                    .frame(maxWidth: .infinity)
+                    .background(Color(.systemGray6))
+                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                }
+                
+                // Match Stats Row
+                HStack(spacing: 12) {
+                    VStack {
+                        Text("\(stats.totalMatches)")
+                            .font(.headline)
+                            .fontWeight(.bold)
+                        Text("场次")
+                            .font(.caption2)
                             .foregroundColor(.secondary)
                     }
-                    .padding(.horizontal)
-                    .padding(.bottom, 16)
+                    
+                    VStack {
+                        Text("\(stats.matchesWon)")
+                            .font(.headline)
+                            .fontWeight(.bold)
+                            .foregroundColor(.green)
+                        Text("胜利")
+                            .font(.caption2)
+                            .foregroundColor(.secondary)
+                    }
+                    
+                    VStack {
+                        Text("\(stats.matchesLost)")
+                            .font(.headline)
+                            .fontWeight(.bold)
+                            .foregroundColor(.red)
+                        Text("失败")
+                            .font(.caption2)
+                            .foregroundColor(.secondary)
+                    }
+                    
+                    VStack {
+                        Text(String(format: "%.0f%%", stats.matchWinRate))
+                            .font(.headline)
+                            .fontWeight(.bold)
+                            .foregroundColor(.purple)
+                        Text("胜率")
+                            .font(.caption2)
+                            .foregroundColor(.secondary)
+                    }
+                }
+                .padding(.vertical, 8)
+                .padding(.horizontal, 16)
+                .frame(maxWidth: .infinity)
+                .background(Color(.systemGray6))
+                .clipShape(RoundedRectangle(cornerRadius: 10))
+                
+                // Footer
+                HStack {
+                    Spacer()
+                    Text("来自 斗地主计分板 App")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
                 }
             }
-            .background(Color(.systemBackground))
-            .frame(width: 420)
+            .padding()
+        }
+        .background(Color(.systemBackground))
+        .frame(width: 380)
+    }
+}
+
+// MARK: - Compact Stat Cell for 2-column layout
+struct CompactStatCell: View {
+    let title: String
+    let value: String
+    let color: Color
+    
+    var body: some View {
+        VStack(spacing: 2) {
+            Text(value)
+                .font(.headline)
+                .fontWeight(.bold)
+                .foregroundColor(color)
+            Text(title)
+                .font(.caption2)
+                .foregroundColor(.secondary)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 8)
+        .background(Color(.systemGray6))
+        .clipShape(RoundedRectangle(cornerRadius: 8))
+    }
+}
+
+// MARK: - Compact Highlight Card
+struct CompactHighlightCard: View {
+    let title: String
+    let value: String
+    let icon: String
+    let color: Color
+    
+    var body: some View {
+        HStack(spacing: 8) {
+            Image(systemName: icon)
+                .font(.title3)
+                .foregroundColor(color)
+            VStack(alignment: .leading, spacing: 0) {
+                Text(value)
+                    .font(.subheadline)
+                    .fontWeight(.bold)
+                Text(title)
+                    .font(.caption2)
+                    .foregroundColor(.secondary)
+            }
+            Spacer()
+        }
+        .padding(8)
+        .frame(maxWidth: .infinity)
+        .background(Color(.systemGray6))
+        .clipShape(RoundedRectangle(cornerRadius: 8))
     }
 }
 
