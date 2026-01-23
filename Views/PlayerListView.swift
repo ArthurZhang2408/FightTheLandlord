@@ -240,7 +240,10 @@ struct PlayerDetailView: View {
                     if #available(iOS 16.0, *), let stats = statistics {
                         PlayerStatsShareButton(
                             stats: stats,
-                            playerColor: currentPlayerColor
+                            playerColor: currentPlayerColor,
+                            gameRecords: gameRecords,
+                            matchRecords: matchRecords,
+                            playerId: player.id ?? ""
                         )
                         .disabled(isLoading)
                     }
