@@ -182,6 +182,8 @@ struct ShareSheetWithSave: View {
     @State private var showingSaveAlert = false
     @State private var saveAlertMessage = ""
     @State private var saveSuccess = false
+    // Keep strong reference to ImageSaver to prevent deallocation during async save
+    @State private var imageSaver: ImageSaver?
     
     var body: some View {
         NavigationView {
@@ -253,16 +255,19 @@ struct ShareSheetWithSave: View {
     
     private func saveToPhotos() {
         let saver = ImageSaver()
-        saver.onSuccess = {
+        saver.onSuccess = { [self] in
             saveSuccess = true
             saveAlertMessage = "图片已保存到相册"
             showingSaveAlert = true
+            imageSaver = nil  // Release after completion
         }
-        saver.onError = { error in
+        saver.onError = { [self] error in
             saveSuccess = false
             saveAlertMessage = "保存失败: \(error.localizedDescription)"
             showingSaveAlert = true
+            imageSaver = nil  // Release after completion
         }
+        imageSaver = saver  // Keep strong reference during async operation
         saver.saveToPhotos(image)
     }
     
