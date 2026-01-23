@@ -348,7 +348,11 @@ struct PlayerCompareView: View {
                                     playerData: selectedPlayerData,
                                     xAxisLabel: chartMode == .games ? "小局" : "大局",
                                     title: "玩家对比 - \(chartMode.rawValue)",
-                                    metadataByPlayer: selectedPlayerMetadata
+                                    metadataByPlayer: selectedPlayerMetadata,
+                                    onNavigate: {
+                                        // Dismiss the PlayerCompareView when navigation happens
+                                        dismiss()
+                                    }
                                 )
                             }
                         } else {
