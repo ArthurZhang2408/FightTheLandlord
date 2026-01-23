@@ -194,26 +194,38 @@ class ImageSaver: NSObject {
     }
     
     private func performSave(_ image: UIImage) {
-        // Convert image to JPEG data with explicit colorspace to avoid crashes
-        // Some UIImages from ImageRenderer may have colorspace issues with PNG
+        // Following Apple's PHPhotoLibrary documentation:
+        // Write to a temporary file first, then use addResource with fileURL
+        // This approach avoids memory/colorspace issues that can cause crashes
+        
+        // Convert to JPEG data
         guard let jpegData = image.jpegData(compressionQuality: 1.0) else {
             DispatchQueue.main.async { [weak self] in
-                self?.onError?(NSError(domain: "ImageSaver", code: -1, userInfo: [NSLocalizedDescriptionKey: "Failed to convert image to JPEG"]))
+                self?.onError?(NSError(domain: "ImageSaver", code: -1, userInfo: [NSLocalizedDescriptionKey: "无法转换图片格式"]))
             }
             return
         }
         
-        // Create a new UIImage from JPEG data to ensure proper colorspace
-        guard let safeImage = UIImage(data: jpegData) else {
+        // Write to temporary file
+        let tempURL = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".jpg")
+        
+        do {
+            try jpegData.write(to: tempURL)
+        } catch {
             DispatchQueue.main.async { [weak self] in
-                self?.onError?(NSError(domain: "ImageSaver", code: -2, userInfo: [NSLocalizedDescriptionKey: "Failed to create image from JPEG data"]))
+                self?.onError?(error)
             }
             return
         }
         
+        // Save using file URL (Apple recommended approach)
         PHPhotoLibrary.shared().performChanges({
-            PHAssetChangeRequest.creationRequestForAsset(from: safeImage)
+            let request = PHAssetCreationRequest.forAsset()
+            request.addResource(with: .photo, fileURL: tempURL, options: nil)
         }) { [weak self] success, error in
+            // Clean up temp file
+            try? FileManager.default.removeItem(at: tempURL)
+            
             DispatchQueue.main.async {
                 if success {
                     self?.onSuccess?()
