@@ -194,10 +194,25 @@ class ImageSaver: NSObject {
     }
     
     private func performSave(_ image: UIImage) {
+        // Convert image to JPEG data with explicit colorspace to avoid crashes
+        // Some UIImages from ImageRenderer may have colorspace issues with PNG
+        guard let jpegData = image.jpegData(compressionQuality: 1.0) else {
+            DispatchQueue.main.async { [weak self] in
+                self?.onError?(NSError(domain: "ImageSaver", code: -1, userInfo: [NSLocalizedDescriptionKey: "Failed to convert image to JPEG"]))
+            }
+            return
+        }
+        
+        // Create a new UIImage from JPEG data to ensure proper colorspace
+        guard let safeImage = UIImage(data: jpegData) else {
+            DispatchQueue.main.async { [weak self] in
+                self?.onError?(NSError(domain: "ImageSaver", code: -2, userInfo: [NSLocalizedDescriptionKey: "Failed to create image from JPEG data"]))
+            }
+            return
+        }
+        
         PHPhotoLibrary.shared().performChanges({
-            guard let imageData = image.pngData() else { return }
-            let creationRequest = PHAssetCreationRequest.forAsset()
-            creationRequest.addResource(with: .photo, data: imageData, options: nil)
+            PHAssetChangeRequest.creationRequestForAsset(from: safeImage)
         }) { [weak self] success, error in
             DispatchQueue.main.async {
                 if success {
