@@ -191,19 +191,10 @@ struct ShareSheet: UIViewControllerRepresentable {
         self.title = title
     }
     
-    // Legacy initializer for compatibility
-    init(items: [Any]) {
-        if let img = items.first as? UIImage {
-            self.image = img
-        } else {
-            self.image = UIImage()
-        }
-        self.title = "斗地主计分板"
-    }
-    
     func makeUIViewController(context: Context) -> UIActivityViewController {
         let item = ShareImageItem(image: image, title: title)
-        let controller = UIActivityViewController(activityItems: [item, image], applicationActivities: nil)
+        // Use only the custom item to ensure proper image handling
+        let controller = UIActivityViewController(activityItems: [item], applicationActivities: nil)
         return controller
     }
     
