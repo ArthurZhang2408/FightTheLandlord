@@ -696,6 +696,7 @@ struct FullscreenMultiPlayerChartView: View {
     let xAxisLabel: String
     let title: String
     var metadataByPlayer: [String: [ChartPointMetadata]]?
+    var onNavigate: (() -> Void)?  // Callback when navigation happens (to dismiss parent views)
     
     @Environment(\.dismiss) private var dismiss
     
@@ -707,7 +708,12 @@ struct FullscreenMultiPlayerChartView: View {
                     xAxisLabel: xAxisLabel,
                     chartWidth: geometry.size.width,
                     chartHeight: geometry.size.height,
-                    metadataByPlayer: metadataByPlayer
+                    metadataByPlayer: metadataByPlayer,
+                    onNavigate: {
+                        restorePortrait()
+                        dismiss()
+                        onNavigate?()
+                    }
                 )
             }
             .navigationTitle(title)
@@ -1070,6 +1076,7 @@ struct ZoomableMultiPlayerChartContainer: View {
     let chartWidth: CGFloat
     let chartHeight: CGFloat
     var metadataByPlayer: [String: [ChartPointMetadata]]?  // Optional metadata keyed by player name
+    var onNavigate: (() -> Void)?  // Callback when navigation happens
     
     @State private var scale: CGFloat = 1.0
     @State private var lastScale: CGFloat = 1.0
@@ -1357,7 +1364,10 @@ struct ZoomableMultiPlayerChartContainer: View {
             matchId: matchId,
             gameIndex: gameIndex,
             dataSingleton: dataSingleton,
-            dismissAction: { dismiss() }
+            dismissAction: {
+                dismiss()
+                onNavigate?()  // Notify parent to also dismiss
+            }
         )
     }
 }
