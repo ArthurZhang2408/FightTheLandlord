@@ -39,7 +39,7 @@ struct MatchShareButton: View {
         .disabled(isGenerating)
         .sheet(isPresented: $showingShareSheet) {
             if let image = shareImage {
-                ShareSheet(image: image, title: "斗地主对局 - \(match.playerAName) vs \(match.playerBName) vs \(match.playerCName)")
+                ShareSheet(image: image)
             }
         }
     }
@@ -100,7 +100,7 @@ struct PlayerStatsShareButton: View {
         .disabled(isGenerating)
         .sheet(isPresented: $showingShareSheet) {
             if let image = shareImage {
-                ShareSheet(image: image, title: "斗地主玩家数据 - \(stats.playerName)")
+                ShareSheet(image: image)
             }
         }
     }
@@ -159,12 +159,6 @@ struct PlayerStatsShareButton: View {
 /// Share sheet that allows saving image to Photos or sharing
 struct ShareSheet: UIViewControllerRepresentable {
     let image: UIImage
-    let title: String
-    
-    init(image: UIImage, title: String = "斗地主计分板") {
-        self.image = image
-        self.title = title
-    }
     
     func makeUIViewController(context: Context) -> UIActivityViewController {
         // Pass the raw UIImage directly - this allows iOS to properly handle
