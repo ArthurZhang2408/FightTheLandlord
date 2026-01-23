@@ -7,6 +7,7 @@
 
 import SwiftUI
 import Charts
+import Photos
 
 // MARK: - Share Button with Loading State
 
@@ -156,21 +157,55 @@ struct PlayerStatsShareButton: View {
 
 // MARK: - Share Sheet Helper
 
-/// Image saver that uses UIImageWriteToSavedPhotosAlbum for direct Photos saving
-/// This mimics how apps like 知乎 save images directly to Photos
+/// Image saver that uses PHPhotoLibrary for direct Photos saving
+/// This is the recommended approach for iOS and handles permissions properly
 class ImageSaver: NSObject {
     var onSuccess: (() -> Void)?
     var onError: ((Error) -> Void)?
+    var onPermissionDenied: (() -> Void)?
     
     func saveToPhotos(_ image: UIImage) {
-        UIImageWriteToSavedPhotosAlbum(image, self, #selector(saveCompleted), nil)
+        // Check authorization status first
+        let status = PHPhotoLibrary.authorizationStatus(for: .addOnly)
+        
+        switch status {
+        case .authorized, .limited:
+            performSave(image)
+        case .notDetermined:
+            // Request permission
+            PHPhotoLibrary.requestAuthorization(for: .addOnly) { [weak self] newStatus in
+                DispatchQueue.main.async {
+                    if newStatus == .authorized || newStatus == .limited {
+                        self?.performSave(image)
+                    } else {
+                        self?.onPermissionDenied?()
+                    }
+                }
+            }
+        case .denied, .restricted:
+            DispatchQueue.main.async { [weak self] in
+                self?.onPermissionDenied?()
+            }
+        @unknown default:
+            DispatchQueue.main.async { [weak self] in
+                self?.onPermissionDenied?()
+            }
+        }
     }
     
-    @objc func saveCompleted(_ image: UIImage, didFinishSavingWithError error: Error?, contextInfo: UnsafeRawPointer) {
-        if let error = error {
-            onError?(error)
-        } else {
-            onSuccess?()
+    private func performSave(_ image: UIImage) {
+        PHPhotoLibrary.shared().performChanges({
+            guard let imageData = image.pngData() else { return }
+            let creationRequest = PHAssetCreationRequest.forAsset()
+            creationRequest.addResource(with: .photo, data: imageData, options: nil)
+        }) { [weak self] success, error in
+            DispatchQueue.main.async {
+                if success {
+                    self?.onSuccess?()
+                } else if let error = error {
+                    self?.onError?(error)
+                }
+            }
         }
     }
 }
@@ -264,6 +299,12 @@ struct ShareSheetWithSave: View {
         saver.onError = { [self] error in
             saveSuccess = false
             saveAlertMessage = "保存失败: \(error.localizedDescription)"
+            showingSaveAlert = true
+            imageSaver = nil  // Release after completion
+        }
+        saver.onPermissionDenied = { [self] in
+            saveSuccess = false
+            saveAlertMessage = "无法访问相册。请在设置中允许本应用访问照片库。"
             showingSaveAlert = true
             imageSaver = nil  // Release after completion
         }
