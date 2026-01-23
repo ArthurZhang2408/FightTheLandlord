@@ -633,7 +633,7 @@ struct PlayerStatsShareImageView: View {
                     }
                     HStack(spacing: 8) {
                         CompactHighlightCard(title: "最长连胜", value: "\(stats.maxWinStreak)", icon: "flame.fill", color: .orange)
-                        CompactHighlightCard(title: "最长连败", value: "\(stats.maxLoseStreak)", icon: "cloud.rain.fill", color: .gray)
+                        CompactHighlightCard(title: "最长连败", value: "\(stats.maxLossStreak)", icon: "cloud.rain.fill", color: .gray)
                     }
                 }
                 
