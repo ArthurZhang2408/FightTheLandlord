@@ -659,12 +659,29 @@ struct MatchDetailView: View {
         .navigationTitle("对局详情")
         .toolbar {
             ToolbarItem(placement: .navigationBarTrailing) {
-                if let matchId = match.id {
-                    NavigationLink(destination: FullMatchStatsView(matchId: matchId)) {
-                        Image(systemName: "chart.bar")
+                HStack(spacing: 16) {
+                    // Share button
+                    if #available(iOS 16.0, *) {
+                        MatchShareButton(
+                            match: match,
+                            games: games,
+                            scores: scores,
+                            playerAColor: playerAColor,
+                            playerBColor: playerBColor,
+                            playerCColor: playerCColor
+                        )
+                        .disabled(isLoading)
+                        .opacity(isLoading ? 0.5 : 1.0)
                     }
-                    .disabled(isLoading)
-                    .opacity(isLoading ? 0.5 : 1.0)
+                    
+                    // Stats button
+                    if let matchId = match.id {
+                        NavigationLink(destination: FullMatchStatsView(matchId: matchId)) {
+                            Image(systemName: "chart.bar")
+                        }
+                        .disabled(isLoading)
+                        .opacity(isLoading ? 0.5 : 1.0)
+                    }
                 }
             }
         }

@@ -235,16 +235,28 @@ struct PlayerDetailView: View {
         .navigationBarTitleDisplayMode(.large)
         .toolbar {
             ToolbarItem(placement: .navigationBarTrailing) {
-                Button {
-                    showingColorPicker = true
-                } label: {
-                    Circle()
-                        .fill(currentPlayerColor)
-                        .frame(width: 24, height: 24)
-                        .overlay(
-                            Circle()
-                                .stroke(Color.secondary.opacity(0.3), lineWidth: 1)
+                HStack(spacing: 16) {
+                    // Share button
+                    if #available(iOS 16.0, *), let stats = statistics {
+                        PlayerStatsShareButton(
+                            stats: stats,
+                            playerColor: currentPlayerColor
                         )
+                        .disabled(isLoading)
+                    }
+                    
+                    // Color picker button
+                    Button {
+                        showingColorPicker = true
+                    } label: {
+                        Circle()
+                            .fill(currentPlayerColor)
+                            .frame(width: 24, height: 24)
+                            .overlay(
+                                Circle()
+                                    .stroke(Color.secondary.opacity(0.3), lineWidth: 1)
+                            )
+                    }
                 }
             }
         }
