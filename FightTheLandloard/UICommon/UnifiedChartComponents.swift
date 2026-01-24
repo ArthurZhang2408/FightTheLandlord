@@ -174,6 +174,7 @@ struct SinglePlayerLineChart: View {
                     .foregroundStyle(.secondary.opacity(0.5))
                     .lineStyle(StrokeStyle(dash: [5, 3]))
             }
+            .chartXScale(domain: 0...(max(scores.count - 1, 1)))  // Auto-scale to fit data
             .chartXAxisLabel(xAxisLabel)
             .chartYAxisLabel("累计得分")
         }

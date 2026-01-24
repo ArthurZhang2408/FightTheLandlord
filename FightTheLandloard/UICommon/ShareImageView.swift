@@ -113,7 +113,11 @@ struct PlayerStatsShareButton: View {
             // Calculate score history for the chart
             var cumulative = 0
             var scores: [Int] = [0]
-            for record in gameRecords {
+            
+            // Sort game records by date
+            let sortedRecords = gameRecords.sorted { $0.playedAt < $1.playedAt }
+            
+            for record in sortedRecords {
                 let position = getPlayerPosition(playerId: playerId, record: record)
                 let score = getPlayerScore(position: position, record: record)
                 cumulative += score
@@ -123,7 +127,10 @@ struct PlayerStatsShareButton: View {
             let shareView = PlayerStatsShareImageView(
                 stats: stats,
                 playerColor: playerColor,
-                scoreHistory: scores
+                scoreHistory: scores,
+                gameRecords: sortedRecords,
+                matchRecords: matchRecords,
+                playerId: playerId
             )
             .environment(\.colorScheme, .light)
             
@@ -583,10 +590,12 @@ struct ChartMilestone: Identifiable, Equatable {
     let type: MilestoneType
     
     enum MilestoneType: String, CaseIterable {
-        case totalHigh = "总最高"      // Highest cumulative score ever
-        case totalLow = "总最低"       // Lowest cumulative score ever  
-        case sessionPeakHigh = "场内巅峰" // Highest point within any single session
-        case sessionPeakLow = "场内谷底"  // Lowest point within any single session
+        case totalHigh = "总最高"        // Highest cumulative score ever
+        case totalLow = "总最低"         // Lowest cumulative score ever  
+        case sessionPeakHigh = "场内巅峰"  // Highest point within any single session
+        case sessionPeakLow = "场内谷底"   // Lowest point within any single session
+        case singleGameHigh = "单局最高"   // Highest single game score change
+        case singleGameLow = "单局最低"    // Lowest single game score change
         
         var color: Color {
             switch self {
@@ -594,6 +603,8 @@ struct ChartMilestone: Identifiable, Equatable {
             case .totalLow: return .red
             case .sessionPeakHigh: return .orange
             case .sessionPeakLow: return .purple
+            case .singleGameHigh: return .cyan
+            case .singleGameLow: return .pink
             }
         }
         
@@ -603,6 +614,8 @@ struct ChartMilestone: Identifiable, Equatable {
             case .totalLow: return "arrow.down.circle.fill"
             case .sessionPeakHigh: return "star.fill"
             case .sessionPeakLow: return "moon.fill"
+            case .singleGameHigh: return "bolt.fill"
+            case .singleGameLow: return "bolt.slash.fill"
             }
         }
     }
@@ -620,6 +633,9 @@ struct PlayerStatsShareImageView: View {
     let stats: PlayerStatistics
     let playerColor: Color
     let scoreHistory: [Int]
+    let gameRecords: [GameRecord]
+    let matchRecords: [MatchRecord]
+    let playerId: String
     
     private func scoreColor(_ score: Int) -> Color {
         if score == 0 { return Color(.label) }
@@ -641,31 +657,107 @@ struct PlayerStatsShareImageView: View {
         return Double(stats.doubledWins) / Double(stats.doubledGames) * 100
     }
     
-    // Calculate chart milestones with color deduplication
+    private func getPlayerPosition(playerId: String, record: GameRecord) -> Int {
+        if record.playerAId == playerId { return 1 }
+        if record.playerBId == playerId { return 2 }
+        return 3
+    }
+    
+    private func getPlayerScore(position: Int, record: GameRecord) -> Int {
+        switch position {
+        case 1: return record.scoreA
+        case 2: return record.scoreB
+        default: return record.scoreC
+        }
+    }
+    
+    // Calculate chart milestones including single game best/worst
     private var chartMilestones: [ChartMilestone] {
         guard scoreHistory.count > 2 else { return [] }
         
         var milestones: [ChartMilestone] = []
         
         // Total high/low (from the cumulative score history)
-        if let maxScore = scoreHistory.max(), let maxIndex = scoreHistory.firstIndex(of: maxScore) {
+        if let maxScore = scoreHistory.max(), let maxIndex = scoreHistory.firstIndex(of: maxScore), maxIndex > 0 {
             milestones.append(ChartMilestone(index: maxIndex, score: maxScore, type: .totalHigh))
         }
-        if let minScore = scoreHistory.min(), let minIndex = scoreHistory.firstIndex(of: minScore) {
+        if let minScore = scoreHistory.min(), let minIndex = scoreHistory.firstIndex(of: minScore), minIndex > 0 {
             milestones.append(ChartMilestone(index: minIndex, score: minScore, type: .totalLow))
         }
         
-        // Session peak high/low (bestSnapshot, worstSnapshot)
-        // These represent the highest/lowest cumulative scores within any single session
-        if stats.bestSnapshot > 0 {
-            if let idx = scoreHistory.firstIndex(of: stats.bestSnapshot), idx < scoreHistory.count {
-                milestones.append(ChartMilestone(index: idx, score: stats.bestSnapshot, type: .sessionPeakHigh))
+        // Session peak tracking - find game indices where session peaks occurred
+        var sessionCumulatives: [String: (cumulative: Int, maxVal: Int, maxIndex: Int, minVal: Int, minIndex: Int, startIndex: Int)] = [:]
+        
+        for (globalIndex, record) in gameRecords.enumerated() {
+            let matchId = record.matchId
+            let position = getPlayerPosition(playerId: playerId, record: record)
+            let score = getPlayerScore(position: position, record: record)
+            
+            if var session = sessionCumulatives[matchId] {
+                session.cumulative += score
+                if session.cumulative > session.maxVal {
+                    session.maxVal = session.cumulative
+                    session.maxIndex = globalIndex + 1 // +1 because scoreHistory[0] is initial 0
+                }
+                if session.cumulative < session.minVal {
+                    session.minVal = session.cumulative
+                    session.minIndex = globalIndex + 1
+                }
+                sessionCumulatives[matchId] = session
+            } else {
+                sessionCumulatives[matchId] = (score, score > 0 ? score : 0, globalIndex + 1, score < 0 ? score : 0, globalIndex + 1, globalIndex)
             }
         }
-        if stats.worstSnapshot < 0 {
-            if let idx = scoreHistory.firstIndex(of: stats.worstSnapshot), idx < scoreHistory.count {
-                milestones.append(ChartMilestone(index: idx, score: stats.worstSnapshot, type: .sessionPeakLow))
+        
+        // Find the session with highest peak and lowest valley
+        var bestSessionPeakIndex: Int? = nil
+        var bestSessionPeakVal: Int = 0
+        var worstSessionValleyIndex: Int? = nil
+        var worstSessionValleyVal: Int = 0
+        
+        for (_, session) in sessionCumulatives {
+            if session.maxVal > bestSessionPeakVal {
+                bestSessionPeakVal = session.maxVal
+                bestSessionPeakIndex = session.maxIndex
             }
+            if session.minVal < worstSessionValleyVal {
+                worstSessionValleyVal = session.minVal
+                worstSessionValleyIndex = session.minIndex
+            }
+        }
+        
+        // Add session peak milestone (use the global cumulative value at that index)
+        if let peakIndex = bestSessionPeakIndex, peakIndex < scoreHistory.count, bestSessionPeakVal > 0 {
+            milestones.append(ChartMilestone(index: peakIndex, score: scoreHistory[peakIndex], type: .sessionPeakHigh))
+        }
+        if let valleyIndex = worstSessionValleyIndex, valleyIndex < scoreHistory.count, worstSessionValleyVal < 0 {
+            milestones.append(ChartMilestone(index: valleyIndex, score: scoreHistory[valleyIndex], type: .sessionPeakLow))
+        }
+        
+        // Find single game best/worst score indices
+        var bestGameScore = 0
+        var bestGameIndex = 0
+        var worstGameScore = 0
+        var worstGameIndex = 0
+        
+        for (idx, record) in gameRecords.enumerated() {
+            let position = getPlayerPosition(playerId: playerId, record: record)
+            let score = getPlayerScore(position: position, record: record)
+            if score > bestGameScore {
+                bestGameScore = score
+                bestGameIndex = idx + 1 // +1 for scoreHistory offset
+            }
+            if score < worstGameScore {
+                worstGameScore = score
+                worstGameIndex = idx + 1
+            }
+        }
+        
+        if bestGameScore > 0, bestGameIndex < scoreHistory.count {
+            milestones.append(ChartMilestone(index: bestGameIndex, score: scoreHistory[bestGameIndex], type: .singleGameHigh))
+        }
+        if worstGameScore < 0, worstGameIndex < scoreHistory.count {
+            milestones.append(ChartMilestone(index: worstGameIndex, score: scoreHistory[worstGameIndex], type: .singleGameLow))
         }
         
         return milestones

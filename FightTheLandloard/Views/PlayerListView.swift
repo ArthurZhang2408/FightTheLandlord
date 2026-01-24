@@ -689,14 +689,26 @@ struct StatisticsView: View {
                 Text("对局统计")
             }
             
-            // Score Records
+            // Score Records - with game index info
             Section {
                 StatRow(label: "单局最高得分", value: "\(stats.bestGameScore)", valueColor: .green, icon: "arrow.up.circle.fill", iconColor: .green)
                 StatRow(label: "单局最低得分", value: "\(stats.worstGameScore)", valueColor: .red, icon: "arrow.down.circle.fill", iconColor: .red)
-                StatRow(label: "对局最高得分", value: "\(stats.bestMatchScore)", valueColor: .green, icon: "arrow.up.forward.circle.fill", iconColor: .green)
-                StatRow(label: "对局最低得分", value: "\(stats.worstMatchScore)", valueColor: .red, icon: "arrow.down.backward.circle.fill", iconColor: .red)
+                StatRow(label: "单场最高得分", value: "\(stats.bestMatchScore)", valueColor: .green, icon: "arrow.up.forward.circle.fill", iconColor: .green)
+                StatRow(label: "单场最低得分", value: "\(stats.worstMatchScore)", valueColor: .red, icon: "arrow.down.backward.circle.fill", iconColor: .red)
             } header: {
                 Text("得分记录")
+            }
+            
+            // Cumulative Score Milestones
+            Section {
+                StatRow(label: "总最高分", value: "\(stats.totalHighScore) (第\(stats.totalHighGameIndex + 1)局)", valueColor: .green, icon: "chart.line.uptrend.xyaxis", iconColor: .green)
+                StatRow(label: "总最低分", value: "\(stats.totalLowScore) (第\(stats.totalLowGameIndex + 1)局)", valueColor: .red, icon: "chart.line.downtrend.xyaxis", iconColor: .red)
+                StatRow(label: "场内巅峰", value: "\(stats.bestSnapshot)", valueColor: .orange, icon: "star.fill", iconColor: .orange)
+                StatRow(label: "场内谷底", value: "\(stats.worstSnapshot)", valueColor: .purple, icon: "star.leadinghalf.filled", iconColor: .purple)
+            } header: {
+                Text("累计分数里程碑")
+            } footer: {
+                Text("总最高/最低：历史累计分数的最高/最低点\n场内巅峰/谷底：单场内累计分数的最高/最低")
             }
         }
         .listStyle(.insetGrouped)
