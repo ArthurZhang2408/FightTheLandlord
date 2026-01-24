@@ -638,13 +638,19 @@ struct PlayerStatsShareImageView: View {
             
             // Content with compact 2-column layout
             VStack(spacing: 16) {
-                // Score Trend Chart - compact
+                // Score Trend Chart - larger for visual impact
                 if scoreHistory.count > 2 {
                     VStack(alignment: .leading, spacing: 6) {
-                        Text("得分走势")
-                            .font(.subheadline)
-                            .fontWeight(.semibold)
-                            .foregroundColor(.secondary)
+                        HStack {
+                            Text("得分走势")
+                                .font(.subheadline)
+                                .fontWeight(.semibold)
+                                .foregroundColor(.secondary)
+                            Spacer()
+                            Text("共 \(scoreHistory.count) 局")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
                         
                         Chart {
                             ForEach(Array(scoreHistory.enumerated()), id: \.offset) { index, score in
@@ -671,12 +677,27 @@ struct PlayerStatsShareImageView: View {
                             RuleMark(y: .value("零", 0))
                                 .foregroundStyle(.secondary.opacity(0.3))
                                 .lineStyle(StrokeStyle(dash: [5, 5]))
+                            
+                            // Mark high and low points
+                            if let maxScore = scoreHistory.max(), let maxIndex = scoreHistory.firstIndex(of: maxScore) {
+                                PointMark(x: .value("局", maxIndex), y: .value("分", maxScore))
+                                    .foregroundStyle(Color.green)
+                                    .symbolSize(50)
+                            }
+                            if let minScore = scoreHistory.min(), let minIndex = scoreHistory.firstIndex(of: minScore) {
+                                PointMark(x: .value("局", minIndex), y: .value("分", minScore))
+                                    .foregroundStyle(Color.red)
+                                    .symbolSize(50)
+                            }
                         }
                         .chartYAxis {
                             AxisMarks(position: .leading)
                         }
-                        .frame(height: 100)
+                        .frame(height: 120)
                     }
+                    .padding(12)
+                    .background(Color(.systemGray6))
+                    .clipShape(RoundedRectangle(cornerRadius: 10))
                 }
                 
                 // Stats Grid - 2x3 compact layout
@@ -710,66 +731,124 @@ struct PlayerStatsShareImageView: View {
                     }
                 }
                 
-                // Role & Special Stats Row
-                HStack(spacing: 8) {
-                    // Win/Loss with mini pie
-                    HStack {
-                        // Mini pie chart
-                        if stats.totalGames > 0 {
-                            ShareWinRatePieChart(wins: stats.gamesWon, losses: stats.gamesLost)
-                                .frame(width: 50, height: 50)
+                // Role Comparison Bar Chart
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("角色对比")
+                        .font(.subheadline)
+                        .fontWeight(.semibold)
+                        .foregroundColor(.secondary)
+                    
+                    HStack(spacing: 12) {
+                        // Landlord bar
+                        VStack(spacing: 4) {
+                            Text("地主")
+                                .font(.caption2)
+                                .foregroundColor(.secondary)
+                            ZStack(alignment: .bottom) {
+                                RoundedRectangle(cornerRadius: 4)
+                                    .fill(Color(.systemGray5))
+                                    .frame(width: 40, height: 60)
+                                RoundedRectangle(cornerRadius: 4)
+                                    .fill(Color.orange)
+                                    .frame(width: 40, height: CGFloat(min(60, 60 * landlordWinRate / 100)))
+                            }
+                            Text(String(format: "%.0f%%", landlordWinRate))
+                                .font(.caption)
+                                .fontWeight(.bold)
+                                .foregroundColor(.orange)
+                            Text("\(stats.landlordWins)/\(stats.gamesAsLandlord)")
+                                .font(.caption2)
+                                .foregroundColor(.secondary)
                         }
                         
-                        VStack(alignment: .leading, spacing: 2) {
-                            HStack(spacing: 4) {
-                                Circle().fill(Color.green).frame(width: 8, height: 8)
-                                Text("胜 \(stats.gamesWon)")
-                                    .font(.caption)
+                        // Farmer bar
+                        VStack(spacing: 4) {
+                            Text("农民")
+                                .font(.caption2)
+                                .foregroundColor(.secondary)
+                            ZStack(alignment: .bottom) {
+                                RoundedRectangle(cornerRadius: 4)
+                                    .fill(Color(.systemGray5))
+                                    .frame(width: 40, height: 60)
+                                RoundedRectangle(cornerRadius: 4)
+                                    .fill(Color.green)
+                                    .frame(width: 40, height: CGFloat(min(60, 60 * farmerWinRate / 100)))
                             }
-                            HStack(spacing: 4) {
-                                Circle().fill(Color.red).frame(width: 8, height: 8)
-                                Text("负 \(stats.gamesLost)")
-                                    .font(.caption)
-                            }
-                        }
-                    }
-                    .padding(8)
-                    .background(Color(.systemGray6))
-                    .clipShape(RoundedRectangle(cornerRadius: 8))
-                    
-                    // Special stats
-                    VStack(alignment: .leading, spacing: 4) {
-                        HStack {
-                            Image(systemName: "sun.max.fill")
+                            Text(String(format: "%.0f%%", farmerWinRate))
                                 .font(.caption)
-                                .foregroundColor(.yellow)
-                            Text("春天 \(stats.springCount)")
-                                .font(.caption)
-                            Spacer()
-                            Text("被春 \(stats.springAgainstCount)")
-                                .font(.caption)
-                            Image(systemName: "cloud.rain.fill")
-                                .font(.caption)
-                                .foregroundColor(.gray)
-                        }
-                        HStack {
-                            Image(systemName: "2.circle.fill")
-                                .font(.caption)
-                                .foregroundColor(.blue)
-                            Text("加倍 \(stats.doubledGames)")
-                                .font(.caption)
-                            Spacer()
-                            Text("加倍赢 \(stats.doubledWins)")
-                                .font(.caption)
-                            Image(systemName: "checkmark.circle.fill")
-                                .font(.caption)
+                                .fontWeight(.bold)
                                 .foregroundColor(.green)
+                            Text("\(stats.farmerWins)/\(stats.gamesAsFarmer)")
+                                .font(.caption2)
+                                .foregroundColor(.secondary)
+                        }
+                        
+                        Spacer()
+                        
+                        // Win/Loss Pie Chart - same height as bars
+                        VStack(spacing: 4) {
+                            Text("胜负比")
+                                .font(.caption2)
+                                .foregroundColor(.secondary)
+                            if stats.totalGames > 0 {
+                                ShareWinRatePieChart(wins: stats.gamesWon, losses: stats.gamesLost)
+                                    .frame(width: 60, height: 60)
+                            }
+                            HStack(spacing: 8) {
+                                HStack(spacing: 2) {
+                                    Circle().fill(Color.green).frame(width: 6, height: 6)
+                                    Text("\(stats.gamesWon)")
+                                        .font(.caption2)
+                                }
+                                HStack(spacing: 2) {
+                                    Circle().fill(Color.red).frame(width: 6, height: 6)
+                                    Text("\(stats.gamesLost)")
+                                        .font(.caption2)
+                                }
+                            }
+                        }
+                        
+                        Spacer()
+                        
+                        // Special stats column - same height as bars
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text("特殊数据")
+                                .font(.caption2)
+                                .foregroundColor(.secondary)
+                            
+                            HStack(spacing: 4) {
+                                Image(systemName: "sun.max.fill")
+                                    .font(.caption2)
+                                    .foregroundColor(.yellow)
+                                Text("春天 \(stats.springCount)")
+                                    .font(.caption)
+                            }
+                            HStack(spacing: 4) {
+                                Image(systemName: "cloud.rain.fill")
+                                    .font(.caption2)
+                                    .foregroundColor(.gray)
+                                Text("被春 \(stats.springAgainstCount)")
+                                    .font(.caption)
+                            }
+                            HStack(spacing: 4) {
+                                Image(systemName: "2.circle.fill")
+                                    .font(.caption2)
+                                    .foregroundColor(.blue)
+                                Text("加倍 \(stats.doubledGames)")
+                                    .font(.caption)
+                            }
+                            HStack(spacing: 4) {
+                                Image(systemName: "checkmark.circle.fill")
+                                    .font(.caption2)
+                                    .foregroundColor(.green)
+                                Text("加倍赢 \(stats.doubledWins)")
+                                    .font(.caption)
+                            }
                         }
                     }
-                    .padding(8)
-                    .frame(maxWidth: .infinity)
+                    .padding(12)
                     .background(Color(.systemGray6))
-                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                    .clipShape(RoundedRectangle(cornerRadius: 10))
                 }
                 
                 // Match Stats Row
@@ -830,7 +909,7 @@ struct PlayerStatsShareImageView: View {
             .padding()
         }
         .background(Color(.systemBackground))
-        .frame(width: 380)
+        .frame(width: 420)
     }
 }
 
