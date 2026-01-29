@@ -117,10 +117,14 @@ struct ListingView: View {
             .navigationTitle("当前对局")
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
-                    Button {
-                        viewModel.showingSettingView = true
-                    } label: {
-                        Image(systemName: "gearshape")
+                    HStack(spacing: 12) {
+                        Button {
+                            viewModel.showingSettingView = true
+                        } label: {
+                            Image(systemName: "gearshape")
+                        }
+                        // 同步状态指示器
+                        SyncStatusIconView()
                     }
                 }
                 ToolbarItem(placement: .navigationBarTrailing) {

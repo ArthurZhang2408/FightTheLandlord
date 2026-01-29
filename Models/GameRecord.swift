@@ -82,4 +82,88 @@ struct GameRecord: Codable, Identifiable {
         self.scoreC = gameSetting.C
         self.firstBidder = firstBidder
     }
+
+    // MARK: - Cache Support
+
+    /// 从本地缓存创建GameRecord（使用私有初始化器）
+    static func fromCache(
+        id: String?,
+        matchId: String,
+        gameIndex: Int,
+        playedAt: Date,
+        playerAId: String,
+        playerBId: String,
+        playerCId: String,
+        playerAName: String,
+        playerBName: String,
+        playerCName: String,
+        bombs: Int,
+        apoint: Int,
+        bpoint: Int,
+        cpoint: Int,
+        adouble: Bool,
+        bdouble: Bool,
+        cdouble: Bool,
+        spring: Bool?,
+        landlordResult: Bool,
+        landlord: Int,
+        scoreA: Int,
+        scoreB: Int,
+        scoreC: Int,
+        firstBidder: Int?
+    ) -> GameRecord {
+        var record = GameRecord()
+        record.id = id
+        record.matchId = matchId
+        record.gameIndex = gameIndex
+        record.playedAt = playedAt
+        record.playerAId = playerAId
+        record.playerBId = playerBId
+        record.playerCId = playerCId
+        record.playerAName = playerAName
+        record.playerBName = playerBName
+        record.playerCName = playerCName
+        record.bombs = bombs
+        record.apoint = apoint
+        record.bpoint = bpoint
+        record.cpoint = cpoint
+        record.adouble = adouble
+        record.bdouble = bdouble
+        record.cdouble = cdouble
+        record.spring = spring
+        record.landlordResult = landlordResult
+        record.landlord = landlord
+        record.scoreA = scoreA
+        record.scoreB = scoreB
+        record.scoreC = scoreC
+        record.firstBidder = firstBidder
+        return record
+    }
+
+    /// 内部使用的空初始化器
+    private init() {
+        self.matchId = ""
+        self.gameIndex = 0
+        self.playedAt = Date()
+        self.playerAId = ""
+        self.playerBId = ""
+        self.playerCId = ""
+        self.playerAName = ""
+        self.playerBName = ""
+        self.playerCName = ""
+        self.bombs = 0
+        self.apoint = 0
+        self.bpoint = 0
+        self.cpoint = 0
+        self.adouble = false
+        self.bdouble = false
+        self.cdouble = false
+        self.spring = nil
+        self.landlordResult = false
+        self.landlord = 1
+        self.scoreA = 0
+        self.scoreB = 0
+        self.scoreC = 0
+        self.firstBidder = nil
+    }
 }
