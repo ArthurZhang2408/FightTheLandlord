@@ -1,11 +1,11 @@
 //
 //  FirebaseService.swift
-//  FightTheLandloard
+//  FightTheLandlord
 //
 //  Created by Arthur Zhang on 2024-10-20.
 //
-//  重构版本：集成本地缓存和离线同步系统
-//  采用 Local-First 架构，数据优先存储在本地，后台同步到云端
+//  Refactored: Integrated with local cache and offline sync system
+//  Uses Local-First architecture - data is stored locally first, synced to cloud in background
 //
 
 import Foundation
@@ -16,17 +16,17 @@ class FirebaseService: ObservableObject {
     static let shared = FirebaseService()
     private let db = Firestore.firestore()
 
-    // 使用 SyncManager 作为数据源
+    // Use SyncManager as data source
     private let syncManager = SyncManager.shared
     private var cancellables = Set<AnyCancellable>()
 
-    // 发布的数据（从 SyncManager 同步）
+    // Published data (synced from SyncManager)
     @Published var players: [Player] = []
     @Published var matches: [MatchRecord] = []
     @Published var isLoading: Bool = false
     @Published var isLoadingMatches: Bool = false
 
-    // 同步状态（暴露给 UI）
+    // Sync status (exposed to UI)
     @Published var syncStatus: SyncStatus = .idle
     @Published var isOnline: Bool = true
     @Published var pendingOperationsCount: Int = 0
@@ -38,34 +38,34 @@ class FirebaseService: ObservableObject {
 
     // MARK: - Initialization
 
-    /// 设置与 SyncManager 的数据绑定
+    /// Setup data bindings with SyncManager
     private func setupBindings() {
-        // 绑定 players
+        // Bind players
         syncManager.$players
             .receive(on: DispatchQueue.main)
             .assign(to: &$players)
 
-        // 绑定 matches
+        // Bind matches
         syncManager.$matches
             .receive(on: DispatchQueue.main)
             .assign(to: &$matches)
 
-        // 绑定同步状态
+        // Bind sync status
         syncManager.$syncStatus
             .receive(on: DispatchQueue.main)
             .assign(to: &$syncStatus)
 
-        // 绑定待处理操作计数
+        // Bind pending operations count
         syncManager.$pendingOperationsCount
             .receive(on: DispatchQueue.main)
             .assign(to: &$pendingOperationsCount)
 
-        // 绑定网络状态
+        // Bind network status
         NetworkMonitor.shared.$isConnected
             .receive(on: DispatchQueue.main)
             .assign(to: &$isOnline)
 
-        // 绑定加载状态
+        // Bind loading status
         syncManager.$isSyncing
             .receive(on: DispatchQueue.main)
             .sink { [weak self] syncing in
@@ -75,37 +75,37 @@ class FirebaseService: ObservableObject {
             .store(in: &cancellables)
     }
 
-    /// 初始化同步系统
+    /// Initialize sync system
     private func initializeSyncSystem() {
         syncManager.initialize()
     }
 
-    // MARK: - Players (保持原有 API)
+    // MARK: - Players (maintaining original API)
 
     func loadPlayers() {
-        // 现在由 SyncManager 自动处理
-        // 保留此方法以保持 API 兼容性
+        // Now handled automatically by SyncManager
+        // Kept for API compatibility
     }
 
     func addPlayer(name: String, color: PlayerColor? = nil, completion: @escaping (Result<Player, Error>) -> Void) {
-        // 检查重复名称
+        // Check for duplicate name
         if players.contains(where: { $0.name == name }) {
-            completion(.failure(NSError(domain: "", code: -1, userInfo: [NSLocalizedDescriptionKey: "玩家名称已存在"])))
+            completion(.failure(NSError(domain: "", code: -1, userInfo: [NSLocalizedDescriptionKey: "Player name already exists"])))
             return
         }
 
         var player = Player(name: name, playerColor: color ?? .blue)
-        player.id = UUID().uuidString  // 生成本地 ID
+        player.id = UUID().uuidString  // Generate local ID
 
-        // 本地优先：先添加到本地
+        // Local-first: add to local first
         var updatedPlayers = players
         updatedPlayers.append(player)
         updatedPlayers.sort { $0.name < $1.name }
 
-        // 更新本地缓存
+        // Update local cache
         LocalCacheManager.shared.cachePlayers(updatedPlayers)
 
-        // 如果在线，直接上传
+        // If online, upload directly
         if NetworkMonitor.shared.isConnected {
             do {
                 let ref = try db.collection("players").addDocument(from: player)
@@ -113,12 +113,12 @@ class FirebaseService: ObservableObject {
                 newPlayer.id = ref.documentID
                 completion(.success(newPlayer))
             } catch {
-                // 上传失败，加入队列
+                // Upload failed, queue for retry
                 PendingOperationQueue.shared.enqueueCreatePlayer(player)
                 completion(.success(player))
             }
         } else {
-            // 离线模式：加入待处理队列
+            // Offline mode: queue for later
             PendingOperationQueue.shared.enqueueCreatePlayer(player)
             completion(.success(player))
         }
@@ -126,18 +126,18 @@ class FirebaseService: ObservableObject {
 
     func updatePlayer(_ player: Player, completion: @escaping (Result<Void, Error>) -> Void) {
         guard let playerId = player.id else {
-            completion(.failure(NSError(domain: "", code: -1, userInfo: [NSLocalizedDescriptionKey: "玩家ID无效"])))
+            completion(.failure(NSError(domain: "", code: -1, userInfo: [NSLocalizedDescriptionKey: "Invalid player ID"])))
             return
         }
 
-        // 更新本地缓存
+        // Update local cache
         var updatedPlayers = players
         if let index = updatedPlayers.firstIndex(where: { $0.id == playerId }) {
             updatedPlayers[index] = player
             LocalCacheManager.shared.cachePlayers(updatedPlayers)
         }
 
-        // 同步到远程
+        // Sync to remote
         if NetworkMonitor.shared.isConnected {
             do {
                 try db.collection("players").document(playerId).setData(from: player)
@@ -153,16 +153,16 @@ class FirebaseService: ObservableObject {
     }
 
     func deletePlayer(id: String, completion: @escaping (Result<Void, Error>) -> Void) {
-        // 从本地缓存删除
+        // Delete from local cache
         var updatedPlayers = players
         updatedPlayers.removeAll { $0.id == id }
         LocalCacheManager.shared.cachePlayers(updatedPlayers)
 
-        // 同步到远程
+        // Sync to remote
         if NetworkMonitor.shared.isConnected {
             db.collection("players").document(id).delete { error in
                 if let error = error {
-                    // 删除失败，加入队列
+                    // Delete failed, queue for retry
                     PendingOperationQueue.shared.enqueueDeletePlayer(playerId: id)
                     completion(.failure(error))
                 } else {
@@ -175,11 +175,11 @@ class FirebaseService: ObservableObject {
         }
     }
 
-    // MARK: - Matches (对局)
+    // MARK: - Matches
 
     func loadAllMatches() {
-        // 现在由 SyncManager 自动处理
-        // 保留此方法以保持 API 兼容性
+        // Now handled automatically by SyncManager
+        // Kept for API compatibility
     }
 
     func loadGameRecords(forMatch matchId: String, completion: @escaping (Result<[GameRecord], Error>) -> Void) {
@@ -199,7 +199,7 @@ class FirebaseService: ObservableObject {
     }
 
     func updateGameRecords(_ records: [GameRecord], matchId: String, completion: @escaping (Result<Void, Error>) -> Void) {
-        // 获取当前match并更新
+        // Get current match and update
         if let match = matches.first(where: { $0.id == matchId }) {
             syncManager.updateMatch(match, gameRecords: records)
         }
@@ -218,8 +218,8 @@ class FirebaseService: ObservableObject {
         }
     }
 
-    /// 同步保存对局（返回 matchId）
-    /// 本地优先：立即保存到本地，后台同步到云端
+    /// Save match synchronously (returns matchId)
+    /// Local-first: saves to local immediately, syncs to cloud in background
     func saveMatchSync(_ match: MatchRecord) throws -> String {
         print("[FirebaseService] Saving match synchronously...")
         let localId = match.id ?? UUID().uuidString
@@ -227,17 +227,17 @@ class FirebaseService: ObservableObject {
         var matchToSave = match
         matchToSave.id = localId
 
-        // 立即保存到本地
+        // Save to local immediately
         var currentMatches = syncManager.matches
         currentMatches.insert(matchToSave, at: 0)
         LocalCacheManager.shared.cacheMatches(currentMatches)
 
-        // 返回本地 ID（不等待网络）
+        // Return local ID (don't wait for network)
         print("[FirebaseService] Match saved locally with ID: \(localId)")
         return localId
     }
 
-    /// 后台保存单局记录
+    /// Save game records in background
     func saveGameRecordsBackground(_ records: [GameRecord], matchId: String) {
         guard !records.isEmpty else {
             print("[FirebaseService] No records to save")
@@ -246,14 +246,14 @@ class FirebaseService: ObservableObject {
 
         print("[FirebaseService] Saving \(records.count) game records in background...")
 
-        // 保存到本地缓存
+        // Save to local cache
         LocalCacheManager.shared.cacheGameRecords(records, forMatchId: matchId)
 
-        // 获取match并通过SyncManager保存
+        // Get match and save through SyncManager
         if let match = syncManager.matches.first(where: { $0.id == matchId }) {
             syncManager.saveMatch(match, gameRecords: records, completion: nil)
         } else {
-            // 如果match不存在，创建待处理操作
+            // If match doesn't exist, create pending operation
             if NetworkMonitor.shared.isConnected {
                 let batch = db.batch()
                 for var record in records {
@@ -278,13 +278,13 @@ class FirebaseService: ObservableObject {
     }
 
     func loadMatch(matchId: String, completion: @escaping (Result<MatchRecord, Error>) -> Void) {
-        // 先从本地查找
+        // Look up in local first
         if let match = matches.first(where: { $0.id == matchId }) {
             completion(.success(match))
             return
         }
 
-        // 本地没有，从 Firebase 加载
+        // Not in local, load from Firebase
         if NetworkMonitor.shared.isConnected {
             db.collection("matches").document(matchId).getDocument { snapshot, error in
                 DispatchQueue.main.async {
@@ -317,14 +317,14 @@ class FirebaseService: ObservableObject {
             return
         }
 
-        // 获取当前的 game records
+        // Get current game records
         let gameRecords = LocalCacheManager.shared.loadCachedGameRecords(forMatchId: matchId)
         syncManager.updateMatch(match, gameRecords: gameRecords)
         completion(.success(()))
     }
 
     func loadMatches(forPlayer playerId: String, completion: @escaping (Result<[MatchRecord], Error>) -> Void) {
-        // 从本地缓存过滤
+        // Filter from local cache
         let playerMatches = matches.filter { match in
             match.playerAId == playerId ||
             match.playerBId == playerId ||
@@ -343,10 +343,10 @@ class FirebaseService: ObservableObject {
             return
         }
 
-        // 保存到本地
+        // Save to local
         LocalCacheManager.shared.cacheGameRecords(records, forMatchId: matchId)
 
-        // 同步到远程
+        // Sync to remote
         if NetworkMonitor.shared.isConnected {
             let batch = db.batch()
 
@@ -369,7 +369,7 @@ class FirebaseService: ObservableObject {
                 }
             }
         } else {
-            // 离线模式下，标记为待处理
+            // Offline mode: mark as pending
             if let match = matches.first(where: { $0.id == matchId }) {
                 PendingOperationQueue.shared.enqueueCreateMatch(match, gameRecords: records)
             }
@@ -378,19 +378,30 @@ class FirebaseService: ObservableObject {
     }
 
     func loadGameRecords(forPlayer playerId: String, completion: @escaping (Result<[GameRecord], Error>) -> Void) {
-        // 如果离线，从本地缓存加载
-        guard NetworkMonitor.shared.isConnected else {
-            let allRecords = LocalCacheManager.shared.loadAllCachedGameRecords()
-            let playerRecords = allRecords.filter { record in
-                record.playerAId == playerId ||
-                record.playerBId == playerId ||
-                record.playerCId == playerId
-            }.sorted { $0.playedAt > $1.playedAt }
+        // Load from local cache first (fast path)
+        let allRecords = LocalCacheManager.shared.loadAllCachedGameRecords()
+        let playerRecords = allRecords.filter { record in
+            record.playerAId == playerId ||
+            record.playerBId == playerId ||
+            record.playerCId == playerId
+        }.sorted { $0.playedAt > $1.playedAt }
+
+        // If we have cached records and game records are synced, use them
+        if !playerRecords.isEmpty && syncManager.isGameRecordsSynced {
+            print("[FirebaseService] Using \(playerRecords.count) cached game records for player")
             completion(.success(playerRecords))
             return
         }
 
-        // 在线时，从 Firebase 加载完整数据
+        // If offline, return what we have
+        guard NetworkMonitor.shared.isConnected else {
+            completion(.success(playerRecords))
+            return
+        }
+
+        // Online and cache might be incomplete - load from Firebase
+        print("[FirebaseService] Loading game records from Firebase for player: \(playerId)")
+
         let group = DispatchGroup()
         var allRemoteRecords: [GameRecord] = []
         var queryError: Error?
@@ -417,9 +428,15 @@ class FirebaseService: ObservableObject {
 
         group.notify(queue: .main) {
             if let error = queryError {
-                completion(.failure(error))
+                // If we have cached records, return them despite error
+                if !playerRecords.isEmpty {
+                    completion(.success(playerRecords))
+                } else {
+                    completion(.failure(error))
+                }
             } else {
                 let sortedRecords = allRemoteRecords.sorted { $0.playedAt > $1.playedAt }
+                print("[FirebaseService] Loaded \(sortedRecords.count) game records from Firebase")
                 completion(.success(sortedRecords))
             }
         }
@@ -613,12 +630,12 @@ class FirebaseService: ObservableObject {
 
     // MARK: - Sync Control
 
-    /// 手动触发同步
+    /// Force sync manually
     func forceSync() {
         syncManager.forceSync()
     }
 
-    /// 重置并重新同步所有数据
+    /// Reset and re-sync all data
     func resetAndSync() {
         syncManager.resetAndSync()
     }

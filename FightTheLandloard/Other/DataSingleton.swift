@@ -4,8 +4,8 @@
 //
 //  Created by Arthur Zhang on 2024-10-11.
 //
-//  重构版本：集成本地缓存和离线同步系统
-//  支持离线保存对局，网络恢复后自动同步
+//  Refactored version: Integrates local cache and offline sync system
+//  Supports offline match saving, auto-syncs when network is restored
 //
 
 import FirebaseAuth
@@ -28,7 +28,7 @@ class DataSingleton: ObservableObject {
     @Published var scores: [ScoreTriple] = []
 
     // Tab selection
-    @Published var selectedTab: Int = 0  // 0 = 对局, 1 = 历史, 2 = 统计
+    @Published var selectedTab: Int = 0  // 0 = Match, 1 = History, 2 = Statistics
     @Published var navigateToMatchId: String?  // When set, History tab will navigate to this match
     @Published var highlightGameIndex: Int?  // When set, highlight this game row in match detail
 
@@ -40,7 +40,7 @@ class DataSingleton: ObservableObject {
     @Published var isSavingMatch: Bool = false
     @Published var saveMatchError: String?
 
-    // 当前对局缓存key
+    // Current match cache key
     private let currentMatchCacheKey = "current_match_state"
 
     private init() {
@@ -50,10 +50,10 @@ class DataSingleton: ObservableObject {
 
     // MARK: - Current Match State Persistence
 
-    /// 保存当前对局状态到本地（用于app被杀死后恢复）
+    /// Save current match state locally (for recovery after app is terminated)
     private func saveCurrentMatchState() {
         guard !games.isEmpty || playerA != nil || playerB != nil || playerC != nil else {
-            // 清除保存的状态
+            // Clear saved state
             UserDefaults.standard.removeObject(forKey: currentMatchCacheKey)
             return
         }
@@ -77,14 +77,14 @@ class DataSingleton: ObservableObject {
         }
     }
 
-    /// 从本地加载当前对局状态
+    /// Load current match state from local storage
     private func loadCurrentMatchState() {
         guard let data = UserDefaults.standard.data(forKey: currentMatchCacheKey),
               let state = try? JSONDecoder().decode(CurrentMatchState.self, from: data) else {
             return
         }
 
-        // 恢复状态
+        // Restore state
         gameNum = state.gameNum
         games = state.games
         scores = state.scores
@@ -93,8 +93,8 @@ class DataSingleton: ObservableObject {
         cRe = state.cRe
         room.starter = state.roomStarter
 
-        // 玩家需要在FirebaseService加载完成后恢复
-        // 使用延迟加载来确保players已加载
+        // Players need to be restored after FirebaseService finishes loading
+        // Use delayed loading to ensure players are loaded
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) { [weak self] in
             guard let self = self else { return }
             let players = FirebaseService.shared.players
@@ -117,7 +117,7 @@ class DataSingleton: ObservableObject {
         }
     }
 
-    /// 清除当前对局状态缓存
+    /// Clear current match state cache
     private func clearCurrentMatchState() {
         UserDefaults.standard.removeObject(forKey: currentMatchCacheKey)
     }
@@ -335,7 +335,7 @@ class DataSingleton: ObservableObject {
 
 // MARK: - Current Match State Model
 
-/// 用于持久化当前对局状态的模型
+/// Model for persisting current match state
 private struct CurrentMatchState: Codable {
     let gameNum: Int
     let games: [GameSetting]
