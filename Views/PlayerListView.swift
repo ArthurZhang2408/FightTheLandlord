@@ -235,16 +235,31 @@ struct PlayerDetailView: View {
         .navigationBarTitleDisplayMode(.large)
         .toolbar {
             ToolbarItem(placement: .navigationBarTrailing) {
-                Button {
-                    showingColorPicker = true
-                } label: {
-                    Circle()
-                        .fill(currentPlayerColor)
-                        .frame(width: 24, height: 24)
-                        .overlay(
-                            Circle()
-                                .stroke(Color.secondary.opacity(0.3), lineWidth: 1)
+                HStack(spacing: 16) {
+                    // Share button
+                    if #available(iOS 16.0, *), let stats = statistics {
+                        PlayerStatsShareButton(
+                            stats: stats,
+                            playerColor: currentPlayerColor,
+                            gameRecords: gameRecords,
+                            matchRecords: matchRecords,
+                            playerId: player.id ?? ""
                         )
+                        .disabled(isLoading)
+                    }
+                    
+                    // Color picker button
+                    Button {
+                        showingColorPicker = true
+                    } label: {
+                        Circle()
+                            .fill(currentPlayerColor)
+                            .frame(width: 24, height: 24)
+                            .overlay(
+                                Circle()
+                                    .stroke(Color.secondary.opacity(0.3), lineWidth: 1)
+                            )
+                    }
                 }
             }
         }
@@ -432,6 +447,72 @@ struct StatisticsView: View {
         return scores
     }
     
+    // Generate metadata for game chart points
+    private var gameMetadata: [ChartPointMetadata] {
+        var metadata: [ChartPointMetadata] = []
+        var cumulative = 0
+        // First point (index 0) is starting point with no game
+        metadata.append(ChartPointMetadata(
+            matchId: nil,
+            gameIndex: nil,
+            timestamp: nil,
+            score: 0,
+            index: 0,
+            playerName: playerName,
+            dayGameNumber: nil
+        ))
+        // Each subsequent point corresponds to a game record
+        for (idx, record) in gameRecords.enumerated() {
+            let position = getPlayerPosition(playerId: playerId, record: record)
+            let score = getPlayerScore(position: position, record: record)
+            cumulative += score
+            // dayGameNumber is gameIndex + 1 (1-indexed within the match)
+            let dayGameNum = record.gameIndex + 1
+            metadata.append(ChartPointMetadata(
+                matchId: record.matchId,
+                gameIndex: record.gameIndex,
+                timestamp: record.playedAt,
+                score: cumulative,
+                index: idx + 1,
+                playerName: playerName,
+                dayGameNumber: dayGameNum
+            ))
+        }
+        return metadata
+    }
+    
+    // Generate metadata for match chart points
+    private var matchMetadata: [ChartPointMetadata] {
+        var metadata: [ChartPointMetadata] = []
+        var cumulative = 0
+        // First point (index 0) is starting point with no match
+        metadata.append(ChartPointMetadata(
+            matchId: nil,
+            gameIndex: nil,
+            timestamp: nil,
+            score: 0,
+            index: 0,
+            playerName: playerName,
+            dayGameNumber: nil
+        ))
+        // Each subsequent point corresponds to a match record
+        for (idx, match) in matchRecords.enumerated() {
+            let position = getPlayerPositionInMatch(playerId: playerId, match: match)
+            let finalScore = getPlayerFinalScore(position: position, match: match)
+            cumulative += finalScore
+            metadata.append(ChartPointMetadata(
+                matchId: match.id,
+                gameIndex: nil,  // For match-level navigation, no specific game
+                timestamp: match.startedAt,
+                score: cumulative,
+                index: idx + 1,
+                playerName: playerName,
+                dayGameNumber: nil  // No day game number for match level
+            ))
+        }
+        return metadata
+    }
+    
     private func getPlayerPosition(playerId: String, record: GameRecord) -> Int {
         if record.playerAId == playerId { return 1 }
         if record.playerBId == playerId { return 2 }
@@ -608,14 +689,26 @@ struct StatisticsView: View {
                 Text("对局统计")
             }
             
-            // Score Records
+            // Score Records - with game index info
             Section {
                 StatRow(label: "单局最高得分", value: "\(stats.bestGameScore)", valueColor: .green, icon: "arrow.up.circle.fill", iconColor: .green)
                 StatRow(label: "单局最低得分", value: "\(stats.worstGameScore)", valueColor: .red, icon: "arrow.down.circle.fill", iconColor: .red)
-                StatRow(label: "对局最高得分", value: "\(stats.bestMatchScore)", valueColor: .green, icon: "arrow.up.forward.circle.fill", iconColor: .green)
-                StatRow(label: "对局最低得分", value: "\(stats.worstMatchScore)", valueColor: .red, icon: "arrow.down.backward.circle.fill", iconColor: .red)
+                StatRow(label: "单场最高得分", value: "\(stats.bestMatchScore)", valueColor: .green, icon: "arrow.up.forward.circle.fill", iconColor: .green)
+                StatRow(label: "单场最低得分", value: "\(stats.worstMatchScore)", valueColor: .red, icon: "arrow.down.backward.circle.fill", iconColor: .red)
             } header: {
                 Text("得分记录")
+            }
+            
+            // Cumulative Score Milestones
+            Section {
+                StatRow(label: "总最高分", value: "\(stats.totalHighScore) (第\(stats.totalHighGameIndex + 1)局)", valueColor: .green, icon: "chart.line.uptrend.xyaxis", iconColor: .green)
+                StatRow(label: "总最低分", value: "\(stats.totalLowScore) (第\(stats.totalLowGameIndex + 1)局)", valueColor: .red, icon: "chart.line.downtrend.xyaxis", iconColor: .red)
+                StatRow(label: "场内巅峰", value: "\(stats.bestSnapshot)", valueColor: .orange, icon: "star.fill", iconColor: .orange)
+                StatRow(label: "场内谷底", value: "\(stats.worstSnapshot)", valueColor: .purple, icon: "star.leadinghalf.filled", iconColor: .purple)
+            } header: {
+                Text("累计分数里程碑")
+            } footer: {
+                Text("总最高/最低：历史累计分数的最高/最低点\n场内巅峰/谷底：单场内累计分数的最高/最低")
             }
         }
         .listStyle(.insetGrouped)
@@ -626,7 +719,9 @@ struct StatisticsView: View {
                     matchScores: matchScoreHistory,
                     playerName: playerName,
                     playerColor: playerColor,
-                    initialShowGameChart: showGameChart
+                    initialShowGameChart: showGameChart,
+                    gameMetadata: gameMetadata,
+                    matchMetadata: matchMetadata
                 )
             }
         }

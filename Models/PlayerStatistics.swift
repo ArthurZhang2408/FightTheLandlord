@@ -46,6 +46,14 @@ struct PlayerStatistics {
     var worstMatchScore: Int = 0     // Lowest match final score
     var bestSnapshot: Int = 0        // Highest cumulative score within any match
     var worstSnapshot: Int = 0       // Lowest cumulative score within any match
+    var totalHighScore: Int = 0      // Highest overall cumulative score (prefix sum max)
+    var totalLowScore: Int = 0       // Lowest overall cumulative score (prefix sum min)
+    var totalHighGameIndex: Int = 0  // Game index where totalHighScore occurred
+    var totalLowGameIndex: Int = 0   // Game index where totalLowScore occurred
+    var bestSnapshotGameIndex: Int = 0  // Game index where bestSnapshot occurred
+    var worstSnapshotGameIndex: Int = 0 // Game index where worstSnapshot occurred
+    var bestGameScoreIndex: Int = 0  // Game index where bestGameScore occurred
+    var worstGameScoreIndex: Int = 0 // Game index where worstGameScore occurred
     
     // Streak statistics
     var currentWinStreak: Int = 0    // Current consecutive wins

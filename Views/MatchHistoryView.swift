@@ -502,6 +502,14 @@ struct MatchDetailView: View {
     @State private var playerBColor: Color = .green
     @State private var playerCColor: Color = .orange
     
+    // Highlighted game index for navigation from chart
+    @State private var highlightedGameIndex: Int? = nil
+    @State private var pendingHighlightIndex: Int? = nil  // Stored until data loads
+    
+    // Timing constants for highlight animations
+    private static let highlightScrollDelay: TimeInterval = 0.3  // Delay before scrolling to allow UI to settle
+    private static let highlightDuration: TimeInterval = 3.0     // How long highlight stays visible
+    
     private var displayScoreA: Int {
         games.isEmpty ? match.finalScoreA : aRe
     }
@@ -533,55 +541,59 @@ struct MatchDetailView: View {
             if isLoading {
                 SkeletonMatchDetailView()
             } else {
-                List {
-                    Section {
-                        VStack(spacing: 12) {
-                            Text(dateFormatter.string(from: match.startedAt))
-                                .font(.subheadline)
-                                .foregroundColor(.secondary)
-                            
-                            HStack(spacing: 20) {
-                                VStack {
-                                    Text(match.playerAName)
-                                        .font(.headline)
-                                    Text("\(displayScoreA)")
-                                        .font(.title2)
-                                        .fontWeight(.bold)
-                                        .foregroundColor(scoreColor(displayScoreA))
-                                }
-                                VStack {
-                                    Text(match.playerBName)
-                                        .font(.headline)
-                                    Text("\(displayScoreB)")
-                                        .font(.title2)
-                                        .fontWeight(.bold)
-                                        .foregroundColor(scoreColor(displayScoreB))
-                                }
-                                VStack {
-                                    Text(match.playerCName)
-                                        .font(.headline)
-                                    Text("\(displayScoreC)")
-                                        .font(.title2)
-                                        .fontWeight(.bold)
-                                        .foregroundColor(scoreColor(displayScoreC))
+                ScrollViewReader { scrollProxy in
+                    List {
+                        Section {
+                            VStack(spacing: 12) {
+                                Text(dateFormatter.string(from: match.startedAt))
+                                    .font(.subheadline)
+                                    .foregroundColor(.secondary)
+                                
+                                HStack(spacing: 20) {
+                                    VStack {
+                                        Text(match.playerAName)
+                                            .font(.headline)
+                                        Text("\(displayScoreA)")
+                                            .font(.title2)
+                                            .fontWeight(.bold)
+                                            .foregroundColor(scoreColor(displayScoreA))
+                                    }
+                                    VStack {
+                                        Text(match.playerBName)
+                                            .font(.headline)
+                                        Text("\(displayScoreB)")
+                                            .font(.title2)
+                                            .fontWeight(.bold)
+                                            .foregroundColor(scoreColor(displayScoreB))
+                                    }
+                                    VStack {
+                                        Text(match.playerCName)
+                                            .font(.headline)
+                                        Text("\(displayScoreC)")
+                                            .font(.title2)
+                                            .fontWeight(.bold)
+                                            .foregroundColor(scoreColor(displayScoreC))
+                                    }
                                 }
                             }
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 8)
                         }
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 8)
-                    }
-                    
-                    Section {
-                        if games.isEmpty {
-                            Text("暂无详细记录")
-                                .foregroundColor(.secondary)
+                        
+                        Section {
+                            if games.isEmpty {
+                                Text("暂无详细记录")
+                                    .foregroundColor(.secondary)
                         } else {
                             ForEach(games.indices, id: \.self) { idx in
                                 GameRecordRow(
                                     gameNumber: idx + 1,
                                     game: games[idx],
-                                    playerNames: (match.playerAName, match.playerBName, match.playerCName)
+                                    playerNames: (match.playerAName, match.playerBName, match.playerCName),
+                                    cumulativeScore: idx < scores.count ? scores[idx] : nil,
+                                    isHighlighted: highlightedGameIndex == idx
                                 )
+                                .id("game-\(idx)")
                                 .swipeActions(allowsFullSwipe: false) {
                                     Button {
                                         // Use item-based sheet to ensure proper index binding
@@ -603,7 +615,10 @@ struct MatchDetailView: View {
                             ScoreLineChart(
                                 scores: scores,
                                 playerNames: (match.playerAName, match.playerBName, match.playerCName),
-                                playerColors: (playerAColor, playerBColor, playerCColor)
+                                playerColors: (playerAColor, playerBColor, playerCColor),
+                                onGameSelected: { gameIndex in
+                                    applyHighlight(gameIndex: gameIndex)
+                                }
                             )
                             .frame(height: 200)
                         } header: {
@@ -631,21 +646,52 @@ struct MatchDetailView: View {
                     }
                 }
                 .listStyle(.insetGrouped)
+                .onChange(of: highlightedGameIndex) { newIndex in
+                    if let index = newIndex {
+                        withAnimation {
+                            scrollProxy.scrollTo("game-\(index)", anchor: .center)
+                        }
+                    }
+                }
+                }
             }
         }
         .navigationTitle("对局详情")
         .toolbar {
             ToolbarItem(placement: .navigationBarTrailing) {
-                if let matchId = match.id {
-                    NavigationLink(destination: FullMatchStatsView(matchId: matchId)) {
-                        Image(systemName: "chart.bar")
+                HStack(spacing: 16) {
+                    // Share button
+                    if #available(iOS 16.0, *) {
+                        MatchShareButton(
+                            match: match,
+                            games: games,
+                            scores: scores,
+                            playerAColor: playerAColor,
+                            playerBColor: playerBColor,
+                            playerCColor: playerCColor
+                        )
+                        .disabled(isLoading)
+                        .opacity(isLoading ? 0.5 : 1.0)
                     }
-                    .disabled(isLoading)
-                    .opacity(isLoading ? 0.5 : 1.0)
+                    
+                    // Stats button
+                    if let matchId = match.id {
+                        NavigationLink(destination: FullMatchStatsView(matchId: matchId)) {
+                            Image(systemName: "chart.bar")
+                        }
+                        .disabled(isLoading)
+                        .opacity(isLoading ? 0.5 : 1.0)
+                    }
                 }
             }
         }
         .onAppear {
+            // Check if we need to highlight a specific game from chart navigation
+            // Store it and apply after data loads
+            if let gameIndex = dataSingleton.highlightGameIndex {
+                pendingHighlightIndex = gameIndex
+                dataSingleton.highlightGameIndex = nil
+            }
             loadGameRecords()
         }
         .sheet(item: $editingGame) { editItem in
@@ -704,6 +750,12 @@ struct MatchDetailView: View {
                     return setting
                 }
                 updateScores()
+                
+                // Apply pending highlight after data loads
+                if let pending = pendingHighlightIndex {
+                    pendingHighlightIndex = nil
+                    applyHighlight(gameIndex: pending, withDelay: true)
+                }
             case .failure(let error):
                 print("Error loading game records: \(error.localizedDescription)")
             }
@@ -733,6 +785,25 @@ struct MatchDetailView: View {
             bRe += game.B
             cRe += game.C
             scores.append(ScoreTriple(A: aRe, B: bRe, C: cRe))
+        }
+    }
+    
+    /// Apply highlight to a game row with auto-clear after duration
+    private func applyHighlight(gameIndex: Int, withDelay: Bool = false) {
+        let applyBlock = {
+            highlightedGameIndex = gameIndex
+            // Auto-clear highlight after duration
+            DispatchQueue.main.asyncAfter(deadline: .now() + Self.highlightDuration) {
+                withAnimation {
+                    highlightedGameIndex = nil
+                }
+            }
+        }
+        
+        if withDelay {
+            DispatchQueue.main.asyncAfter(deadline: .now() + Self.highlightScrollDelay, execute: applyBlock)
+        } else {
+            applyBlock()
         }
     }
 }
@@ -828,7 +899,14 @@ struct GameRecordRow: View {
     let gameNumber: Int
     let game: GameSetting
     let playerNames: (String, String, String)
+    var cumulativeScore: ScoreTriple?  // Optional cumulative scores for display
+    var isHighlighted: Bool = false
     @ObservedObject private var dataSingleton = DataSingleton.instance
+    
+    // Display scores based on scorePerGame setting
+    private var displayScoreA: Int { dataSingleton.scorePerGame ? game.A : (cumulativeScore?.A ?? game.A) }
+    private var displayScoreB: Int { dataSingleton.scorePerGame ? game.B : (cumulativeScore?.B ?? game.B) }
+    private var displayScoreC: Int { dataSingleton.scorePerGame ? game.C : (cumulativeScore?.C ?? game.C) }
     
     private func scoreColor(for colorString: String) -> Color {
         return colorString.color
@@ -841,15 +919,18 @@ struct GameRecordRow: View {
                 .fontWeight(.medium)
                 .foregroundColor(.white)
                 .frame(width: 24, height: 24)
-                .background(Circle().fill(Color.accentColor.opacity(0.8)))
+                .background(Circle().fill(isHighlighted ? Color.orange : Color.accentColor.opacity(0.8)))
             
             HStack(spacing: 0) {
-                GameScoreItem(name: playerNames.0, score: game.A, isLandlord: game.landlord == 1, color: scoreColor(for: game.aC))
-                GameScoreItem(name: playerNames.1, score: game.B, isLandlord: game.landlord == 2, color: scoreColor(for: game.bC))
-                GameScoreItem(name: playerNames.2, score: game.C, isLandlord: game.landlord == 3, color: scoreColor(for: game.cC))
+                GameScoreItem(name: playerNames.0, score: displayScoreA, isLandlord: game.landlord == 1, color: scoreColor(for: game.aC))
+                GameScoreItem(name: playerNames.1, score: displayScoreB, isLandlord: game.landlord == 2, color: scoreColor(for: game.bC))
+                GameScoreItem(name: playerNames.2, score: displayScoreC, isLandlord: game.landlord == 3, color: scoreColor(for: game.cC))
             }
         }
         .padding(.vertical, 4)
+        .background(isHighlighted ? Color.orange.opacity(0.15) : Color.clear)
+        .cornerRadius(8)
+        .animation(.easeInOut(duration: 0.3), value: isHighlighted)
     }
 }
 
@@ -1462,14 +1543,16 @@ struct ScoreLineChart: View {
     let playerNames: (String, String, String)
     let playerColors: (Color, Color, Color)
     var showExpandButton: Bool = true
+    var onGameSelected: ((Int) -> Void)?  // Callback when a game point is selected (0-indexed game index)
     @State private var showFullscreen = false
     
-    init(scores: [ScoreTriple], playerNames: (String, String, String), playerColors: (Color, Color, Color)? = nil, showExpandButton: Bool = true) {
+    init(scores: [ScoreTriple], playerNames: (String, String, String), playerColors: (Color, Color, Color)? = nil, showExpandButton: Bool = true, onGameSelected: ((Int) -> Void)? = nil) {
         self.scores = scores
         self.playerNames = playerNames
         // Default colors if not provided
         self.playerColors = playerColors ?? (.blue, .green, .orange)
         self.showExpandButton = showExpandButton
+        self.onGameSelected = onGameSelected
     }
     
     private var playerData: [(name: String, scores: [Int], color: Color)] {
@@ -1500,10 +1583,17 @@ struct ScoreLineChart: View {
                 )
             }
             .fullScreenCover(isPresented: $showFullscreen) {
-                FullscreenMultiPlayerChartView(
+                FullscreenMatchChartView(
                     playerData: playerData,
                     xAxisLabel: "局数",
-                    title: "得分走势"
+                    title: "得分走势",
+                    onGameSelected: { gameIndex in
+                        showFullscreen = false
+                        // Delay to allow dismiss animation
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                            onGameSelected?(gameIndex)
+                        }
+                    }
                 )
             }
         } else {

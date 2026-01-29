@@ -173,12 +173,20 @@ struct PlayerCompareView: View {
     @State private var selectedPlayers: Set<String> = []
     @State private var chartMode: ChartMode = .games
     @State private var showFullscreen = false
-    @State private var playerDataCache: [String: (gameScores: [Int], matchScores: [Int])] = [:]
+    @State private var playerDataCache: [String: PlayerCompareData] = [:]
     @State private var isLoading = true
     
     enum ChartMode: String, CaseIterable {
         case games = "小局走势"
         case matches = "大局走势"
+    }
+    
+    /// Cache structure to store both scores and records for metadata generation
+    struct PlayerCompareData {
+        let gameScores: [Int]
+        let matchScores: [Int]
+        let gameRecords: [GameRecord]
+        let matchRecords: [MatchRecord]
     }
     
     init(players: [Player]) {
@@ -193,6 +201,96 @@ struct PlayerCompareView: View {
                   let cache = playerDataCache[playerId] else { return nil }
             let scores = chartMode == .games ? cache.gameScores : cache.matchScores
             return (name: player.name, scores: scores, color: player.displayColor)
+        }
+    }
+    
+    /// Generate metadata for chart navigation - keyed by player name
+    private var selectedPlayerMetadata: [String: [ChartPointMetadata]] {
+        var result: [String: [ChartPointMetadata]] = [:]
+        
+        for player in players where selectedPlayers.contains(player.id ?? "") {
+            guard let playerId = player.id,
+                  let cache = playerDataCache[playerId] else { continue }
+            
+            var metadata: [ChartPointMetadata] = []
+            
+            if chartMode == .games {
+                // Generate game-level metadata
+                var cumulative = 0
+                metadata.append(ChartPointMetadata(
+                    matchId: nil, gameIndex: nil, timestamp: nil,
+                    score: 0, index: 0, playerName: player.name, dayGameNumber: nil
+                ))
+                for (idx, record) in cache.gameRecords.enumerated() {
+                    let position = getPlayerPosition(playerId: playerId, record: record)
+                    let score = getPlayerScore(position: position, record: record)
+                    cumulative += score
+                    let dayGameNum = record.gameIndex + 1
+                    metadata.append(ChartPointMetadata(
+                        matchId: record.matchId,
+                        gameIndex: record.gameIndex,
+                        timestamp: record.playedAt,
+                        score: cumulative,
+                        index: idx + 1,
+                        playerName: player.name,
+                        dayGameNumber: dayGameNum
+                    ))
+                }
+            } else {
+                // Generate match-level metadata
+                var cumulative = 0
+                metadata.append(ChartPointMetadata(
+                    matchId: nil, gameIndex: nil, timestamp: nil,
+                    score: 0, index: 0, playerName: player.name, dayGameNumber: nil
+                ))
+                for (idx, match) in cache.matchRecords.enumerated() {
+                    let position = getPlayerPositionInMatch(playerId: playerId, match: match)
+                    let score = getPlayerFinalScore(position: position, match: match)
+                    cumulative += score
+                    metadata.append(ChartPointMetadata(
+                        matchId: match.id,
+                        gameIndex: nil,
+                        timestamp: match.startedAt,
+                        score: cumulative,
+                        index: idx + 1,
+                        playerName: player.name,
+                        dayGameNumber: nil
+                    ))
+                }
+            }
+            
+            result[player.name] = metadata
+        }
+        
+        return result
+    }
+    
+    // Helper functions for position/score lookup
+    private func getPlayerPosition(playerId: String, record: GameRecord) -> Int {
+        if record.playerAId == playerId { return 1 }
+        if record.playerBId == playerId { return 2 }
+        return 3
+    }
+    
+    private func getPlayerScore(position: Int, record: GameRecord) -> Int {
+        switch position {
+        case 1: return record.scoreA
+        case 2: return record.scoreB
+        default: return record.scoreC
+        }
+    }
+    
+    private func getPlayerPositionInMatch(playerId: String, match: MatchRecord) -> Int {
+        if match.playerAId == playerId { return 1 }
+        if match.playerBId == playerId { return 2 }
+        return 3
+    }
+    
+    private func getPlayerFinalScore(position: Int, match: MatchRecord) -> Int {
+        switch position {
+        case 1: return match.finalScoreA
+        case 2: return match.finalScoreB
+        default: return match.finalScoreC
         }
     }
     
@@ -249,7 +347,12 @@ struct PlayerCompareView: View {
                                 FullscreenMultiPlayerChartView(
                                     playerData: selectedPlayerData,
                                     xAxisLabel: chartMode == .games ? "小局" : "大局",
-                                    title: "玩家对比 - \(chartMode.rawValue)"
+                                    title: "玩家对比 - \(chartMode.rawValue)",
+                                    metadataByPlayer: selectedPlayerMetadata,
+                                    onNavigate: {
+                                        // Dismiss the PlayerCompareView when navigation happens
+                                        dismiss()
+                                    }
                                 )
                             }
                         } else {
@@ -295,9 +398,11 @@ struct PlayerCompareView: View {
             
             group.enter()
             
-            // Load game records
+            // Load game records and match records
             var gameScores: [Int] = [0]
             var matchScores: [Int] = [0]
+            var loadedGameRecords: [GameRecord] = []
+            var loadedMatchRecords: [MatchRecord] = []
             
             let innerGroup = DispatchGroup()
             
@@ -307,6 +412,7 @@ struct PlayerCompareView: View {
                 if case .success(let records) = result {
                     var cumulative = 0
                     let sorted = records.sorted { $0.playedAt < $1.playedAt }
+                    loadedGameRecords = sorted  // Store sorted records for metadata
                     for record in sorted {
                         let position: Int
                         if record.playerAId == playerId { position = 1 }
@@ -331,6 +437,7 @@ struct PlayerCompareView: View {
                 if case .success(let matches) = result {
                     var cumulative = 0
                     let sorted = matches.sorted { $0.startedAt < $1.startedAt }
+                    loadedMatchRecords = sorted  // Store sorted records for metadata
                     for match in sorted {
                         let position: Int
                         if match.playerAId == playerId { position = 1 }
@@ -350,7 +457,12 @@ struct PlayerCompareView: View {
             }
             
             innerGroup.notify(queue: .main) {
-                playerDataCache[playerId] = (gameScores: gameScores, matchScores: matchScores)
+                playerDataCache[playerId] = PlayerCompareData(
+                    gameScores: gameScores,
+                    matchScores: matchScores,
+                    gameRecords: loadedGameRecords,
+                    matchRecords: loadedMatchRecords
+                )
                 group.leave()
             }
         }

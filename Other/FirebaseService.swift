@@ -485,11 +485,12 @@ class FirebaseService: ObservableObject {
             let sortedGameRecords = gameRecords.sorted { $0.playedAt < $1.playedAt }
             var currentWinStreak = 0
             var currentLossStreak = 0
+            var cumulativeScore = 0  // Track cumulative score across all games
             
             // Calculate game statistics
             stats.totalGames = gameRecords.count
             
-            for record in sortedGameRecords {
+            for (gameIndex, record) in sortedGameRecords.enumerated() {
                 let position = self.getPlayerPosition(playerId: playerId, record: record)
                 let isLandlord = record.landlord == position
                 let score = self.getPlayerScore(position: position, record: record)
@@ -560,8 +561,27 @@ class FirebaseService: ObservableObject {
                 
                 // Score stats
                 stats.totalScore += score
-                stats.bestGameScore = max(stats.bestGameScore, score)
-                stats.worstGameScore = min(stats.worstGameScore, score)
+                cumulativeScore += score  // Track running total
+                
+                // Track best/worst game score with index
+                if score > stats.bestGameScore {
+                    stats.bestGameScore = score
+                    stats.bestGameScoreIndex = gameIndex
+                }
+                if score < stats.worstGameScore {
+                    stats.worstGameScore = score
+                    stats.worstGameScoreIndex = gameIndex
+                }
+                
+                // Track overall cumulative high/low with index
+                if cumulativeScore > stats.totalHighScore {
+                    stats.totalHighScore = cumulativeScore
+                    stats.totalHighGameIndex = gameIndex
+                }
+                if cumulativeScore < stats.totalLowScore {
+                    stats.totalLowScore = cumulativeScore
+                    stats.totalLowGameIndex = gameIndex
+                }
             }
             
             // Store current streaks
