@@ -15,62 +15,29 @@ struct ListingView: View {
         NavigationStack {
             ScrollView {
                 VStack(spacing: 20) {
-                    // MARK: - Score Summary Card
+                    // MARK: - Score Summary Card with integrated Player Pickers
                     ScoreSummaryCard(
-                        playerA: viewModel.instance.room.aName.isEmpty ? "玩家A" : viewModel.instance.room.aName,
-                        playerB: viewModel.instance.room.bName.isEmpty ? "玩家B" : viewModel.instance.room.bName,
-                        playerC: viewModel.instance.room.cName.isEmpty ? "玩家C" : viewModel.instance.room.cName,
+                        playerA: Binding(
+                            get: { viewModel.instance.playerA },
+                            set: { viewModel.instance.playerA = $0 }
+                        ),
+                        playerB: Binding(
+                            get: { viewModel.instance.playerB },
+                            set: { viewModel.instance.playerB = $0 }
+                        ),
+                        playerC: Binding(
+                            get: { viewModel.instance.playerC },
+                            set: { viewModel.instance.playerC = $0 }
+                        ),
                         scoreA: viewModel.instance.aRe,
                         scoreB: viewModel.instance.bRe,
                         scoreC: viewModel.instance.cRe,
-                        gamesPlayed: viewModel.instance.games.count
+                        gamesPlayed: viewModel.instance.games.count,
+                        onPlayerChange: {
+                            viewModel.instance.syncPlayerNames()
+                        }
                     )
                     .padding(.horizontal)
-                    
-                    // MARK: - Player Selection Section
-                    VStack(alignment: .leading, spacing: 12) {
-                        Text("选择玩家")
-                            .font(.headline)
-                            .foregroundColor(.secondary)
-                            .padding(.horizontal)
-                        
-                        HStack(spacing: 12) {
-                            PlayerPickerView(
-                                selectedPlayer: Binding(
-                                    get: { viewModel.instance.playerA },
-                                    set: { player in
-                                        viewModel.instance.playerA = player
-                                        viewModel.instance.syncPlayerNames()
-                                    }
-                                ),
-                                excludePlayers: [viewModel.instance.playerB, viewModel.instance.playerC].compactMap { $0 },
-                                position: "A"
-                            )
-                            PlayerPickerView(
-                                selectedPlayer: Binding(
-                                    get: { viewModel.instance.playerB },
-                                    set: { player in
-                                        viewModel.instance.playerB = player
-                                        viewModel.instance.syncPlayerNames()
-                                    }
-                                ),
-                                excludePlayers: [viewModel.instance.playerA, viewModel.instance.playerC].compactMap { $0 },
-                                position: "B"
-                            )
-                            PlayerPickerView(
-                                selectedPlayer: Binding(
-                                    get: { viewModel.instance.playerC },
-                                    set: { player in
-                                        viewModel.instance.playerC = player
-                                        viewModel.instance.syncPlayerNames()
-                                    }
-                                ),
-                                excludePlayers: [viewModel.instance.playerA, viewModel.instance.playerB].compactMap { $0 },
-                                position: "C"
-                            )
-                        }
-                        .padding(.horizontal)
-                    }
                     
                     // MARK: - Games List Section
                     VStack(alignment: .leading, spacing: 12) {
@@ -111,6 +78,33 @@ struct ListingView: View {
                                     )
                                 }
                             }
+                            .padding(.horizontal)
+                        }
+                    }
+                    
+                    // MARK: - Score Trend Chart Section
+                    if viewModel.instance.games.count >= 2 {
+                        VStack(alignment: .leading, spacing: 12) {
+                            Text("得分走势")
+                                .font(.headline)
+                                .foregroundColor(.secondary)
+                                .padding(.horizontal)
+                            
+                            ScoreLineChart(
+                                scores: viewModel.instance.scores,
+                                playerNames: (
+                                    viewModel.instance.room.aName.isEmpty ? "A" : viewModel.instance.room.aName,
+                                    viewModel.instance.room.bName.isEmpty ? "B" : viewModel.instance.room.bName,
+                                    viewModel.instance.room.cName.isEmpty ? "C" : viewModel.instance.room.cName
+                                ),
+                                playerColors: (
+                                    viewModel.instance.playerA?.displayColor ?? .blue,
+                                    viewModel.instance.playerB?.displayColor ?? .green,
+                                    viewModel.instance.playerC?.displayColor ?? .orange
+                                ),
+                                showExpandButton: true
+                            )
+                            .frame(height: 200)
                             .padding(.horizontal)
                         }
                     }
@@ -200,16 +194,17 @@ struct ListingView: View {
     }
 }
 
-// MARK: - Score Summary Card
+// MARK: - Score Summary Card with Player Pickers
 
 struct ScoreSummaryCard: View {
-    let playerA: String
-    let playerB: String
-    let playerC: String
+    @Binding var playerA: Player?
+    @Binding var playerB: Player?
+    @Binding var playerC: Player?
     let scoreA: Int
     let scoreB: Int
     let scoreC: Int
     let gamesPlayed: Int
+    let onPlayerChange: () -> Void  // Callback when player selection changes
     
     @EnvironmentObject var instance: DataSingleton
     
@@ -238,13 +233,34 @@ struct ScoreSummaryCard: View {
             }
             
             HStack(spacing: 0) {
-                ScoreColumn(name: playerA, score: scoreA, color: scoreColor(scoreA))
+                ScoreColumnWithPicker(
+                    selectedPlayer: $playerA,
+                    excludePlayers: [playerB, playerC].compactMap { $0 },
+                    position: "A",
+                    score: scoreA,
+                    color: scoreColor(scoreA),
+                    onPlayerChange: onPlayerChange
+                )
                 Divider()
-                    .frame(height: 60)
-                ScoreColumn(name: playerB, score: scoreB, color: scoreColor(scoreB))
+                    .frame(height: 80)
+                ScoreColumnWithPicker(
+                    selectedPlayer: $playerB,
+                    excludePlayers: [playerA, playerC].compactMap { $0 },
+                    position: "B",
+                    score: scoreB,
+                    color: scoreColor(scoreB),
+                    onPlayerChange: onPlayerChange
+                )
                 Divider()
-                    .frame(height: 60)
-                ScoreColumn(name: playerC, score: scoreC, color: scoreColor(scoreC))
+                    .frame(height: 80)
+                ScoreColumnWithPicker(
+                    selectedPlayer: $playerC,
+                    excludePlayers: [playerA, playerB].compactMap { $0 },
+                    position: "C",
+                    score: scoreC,
+                    color: scoreColor(scoreC),
+                    onPlayerChange: onPlayerChange
+                )
             }
         }
         .padding()
@@ -253,6 +269,87 @@ struct ScoreSummaryCard: View {
     }
 }
 
+/// Score column with integrated player picker
+struct ScoreColumnWithPicker: View {
+    @Binding var selectedPlayer: Player?
+    let excludePlayers: [Player]
+    let position: String
+    let score: Int
+    let color: Color
+    let onPlayerChange: () -> Void
+    
+    @StateObject private var firebaseService = FirebaseService.shared
+    @State private var showingAddPlayer = false
+    
+    var availablePlayers: [Player] {
+        firebaseService.players.filter { player in
+            !excludePlayers.contains(where: { $0.id == player.id })
+        }
+    }
+    
+    var body: some View {
+        Menu {
+            ForEach(availablePlayers) { player in
+                Button {
+                    selectedPlayer = player
+                    onPlayerChange()
+                } label: {
+                    HStack {
+                        Text(player.name)
+                        if selectedPlayer?.id == player.id {
+                            Image(systemName: "checkmark")
+                        }
+                    }
+                }
+            }
+            
+            Divider()
+            
+            Button {
+                showingAddPlayer = true
+            } label: {
+                Label("添加新玩家", systemImage: "plus.circle")
+            }
+        } label: {
+            VStack(spacing: 6) {
+                // Player avatar/initial circle
+                ZStack {
+                    Circle()
+                        .fill(selectedPlayer?.displayColor.opacity(0.15) ?? Color(.tertiarySystemFill))
+                        .frame(width: 36, height: 36)
+                    
+                    if let player = selectedPlayer {
+                        Text(String(player.name.prefix(1)))
+                            .font(.headline)
+                            .fontWeight(.medium)
+                            .foregroundColor(player.displayColor)
+                    } else {
+                        Image(systemName: "person.badge.plus")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                }
+                
+                // Player name
+                Text(selectedPlayer?.name ?? "玩家\(position)")
+                    .font(.caption)
+                    .foregroundColor(selectedPlayer != nil ? Color(.label) : .secondary)
+                    .lineLimit(1)
+                
+                // Score display
+                Text(score >= 0 ? "+\(score)" : "\(score)")
+                    .font(.system(size: 24, weight: .bold, design: .rounded))
+                    .foregroundColor(color)
+            }
+            .frame(maxWidth: .infinity)
+        }
+        .sheet(isPresented: $showingAddPlayer) {
+            AddPlayerView(isPresented: $showingAddPlayer)
+        }
+    }
+}
+
+// Keep original ScoreColumn for backward compatibility if needed elsewhere
 struct ScoreColumn: View {
     let name: String
     let score: Int
