@@ -93,12 +93,15 @@ struct SettingView: View {
                     Text("设置下一局由哪位玩家先开始叫分。叫分顺序会按A→B→C循环。")
                 }
                 
+                // MARK: - 数据同步
+                SyncSettingsView()
+
                 // MARK: - 关于
                 Section {
                     HStack {
                         Text("版本")
                         Spacer()
-                        Text("2.0")
+                        Text("2.1")
                             .foregroundColor(.secondary)
                     }
                 } header: {
