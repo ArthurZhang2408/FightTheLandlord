@@ -378,25 +378,19 @@ class FirebaseService: ObservableObject {
     }
 
     func loadGameRecords(forPlayer playerId: String, completion: @escaping (Result<[GameRecord], Error>) -> Void) {
-        // 从本地缓存加载所有记录并过滤
-        let allRecords = LocalCacheManager.shared.loadAllCachedGameRecords()
-        let playerRecords = allRecords.filter { record in
-            record.playerAId == playerId ||
-            record.playerBId == playerId ||
-            record.playerCId == playerId
-        }.sorted { $0.playedAt > $1.playedAt }
-
-        if !playerRecords.isEmpty {
+        // 如果离线，从本地缓存加载
+        guard NetworkMonitor.shared.isConnected else {
+            let allRecords = LocalCacheManager.shared.loadAllCachedGameRecords()
+            let playerRecords = allRecords.filter { record in
+                record.playerAId == playerId ||
+                record.playerBId == playerId ||
+                record.playerCId == playerId
+            }.sorted { $0.playedAt > $1.playedAt }
             completion(.success(playerRecords))
             return
         }
 
-        // 如果本地没有，从 Firebase 加载
-        guard NetworkMonitor.shared.isConnected else {
-            completion(.success([]))
-            return
-        }
-
+        // 在线时，从 Firebase 加载完整数据
         let group = DispatchGroup()
         var allRemoteRecords: [GameRecord] = []
         var queryError: Error?
@@ -425,7 +419,8 @@ class FirebaseService: ObservableObject {
             if let error = queryError {
                 completion(.failure(error))
             } else {
-                completion(.success(allRemoteRecords.sorted { $0.playedAt > $1.playedAt }))
+                let sortedRecords = allRemoteRecords.sorted { $0.playedAt > $1.playedAt }
+                completion(.success(sortedRecords))
             }
         }
     }
