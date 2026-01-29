@@ -2,12 +2,12 @@
 //  SyncStatusView.swift
 //  FightTheLandlord
 //
-//  同步状态指示器 - 显示网络连接状态和待同步操作
+//  Sync Status Indicator - Displays network connection status and pending sync operations
 //
 
 import SwiftUI
 
-/// 同步状态指示器视图
+/// Sync status indicator view
 struct SyncStatusView: View {
     @ObservedObject private var firebaseService = FirebaseService.shared
     @ObservedObject private var networkMonitor = NetworkMonitor.shared
@@ -49,22 +49,22 @@ struct SyncStatusView: View {
         switch firebaseService.syncStatus {
         case .idle:
             if firebaseService.pendingOperationsCount > 0 {
-                Text("\(firebaseService.pendingOperationsCount) 待同步")
+                Text("\(firebaseService.pendingOperationsCount) pending")
             } else if networkMonitor.isConnected {
-                Text("已同步")
+                Text("Synced")
             } else {
-                Text("离线")
+                Text("Offline")
             }
         case .syncing:
-            Text("同步中...")
+            Text("Syncing...")
         case .offline:
             if firebaseService.pendingOperationsCount > 0 {
-                Text("离线 (\(firebaseService.pendingOperationsCount) 待同步)")
+                Text("Offline (\(firebaseService.pendingOperationsCount) pending)")
             } else {
-                Text("离线模式")
+                Text("Offline Mode")
             }
         case .error(let message):
-            Text("同步错误")
+            Text("Sync Error")
                 .help(message)
         }
     }
@@ -96,7 +96,7 @@ struct SyncStatusView: View {
     }
 }
 
-/// 紧凑型同步状态指示器（仅图标）
+/// Compact sync status indicator (icon only)
 struct SyncStatusIconView: View {
     @ObservedObject private var firebaseService = FirebaseService.shared
     @ObservedObject private var networkMonitor = NetworkMonitor.shared
@@ -129,7 +129,7 @@ struct SyncStatusIconView: View {
     }
 }
 
-/// 同步状态横幅（离线时显示）
+/// Sync status banner (displayed when offline)
 struct OfflineBannerView: View {
     @ObservedObject private var firebaseService = FirebaseService.shared
     @ObservedObject private var networkMonitor = NetworkMonitor.shared
@@ -138,10 +138,10 @@ struct OfflineBannerView: View {
         if !networkMonitor.isConnected {
             HStack {
                 Image(systemName: "wifi.slash")
-                Text("离线模式")
+                Text("Offline Mode")
                 Spacer()
                 if firebaseService.pendingOperationsCount > 0 {
-                    Text("\(firebaseService.pendingOperationsCount) 项待同步")
+                    Text("\(firebaseService.pendingOperationsCount) pending")
                         .font(.caption)
                 }
             }
@@ -154,84 +154,84 @@ struct OfflineBannerView: View {
     }
 }
 
-/// 同步设置视图（用于设置页面）
+/// Sync settings view (for settings page)
 struct SyncSettingsView: View {
     @ObservedObject private var firebaseService = FirebaseService.shared
     @ObservedObject private var networkMonitor = NetworkMonitor.shared
     @State private var showResetConfirmation = false
 
     var body: some View {
-        Section("数据同步") {
-            // 同步状态
+        Section("Data Sync") {
+            // Sync status
             HStack {
-                Text("同步状态")
+                Text("Sync Status")
                 Spacer()
                 SyncStatusView()
             }
 
-            // 网络状态
+            // Network status
             HStack {
-                Text("网络连接")
+                Text("Network")
                 Spacer()
-                Text(networkMonitor.isConnected ? networkMonitor.connectionTypeDescription : "未连接")
+                Text(networkMonitor.isConnected ? networkMonitor.connectionTypeDescription : "Disconnected")
                     .foregroundColor(.secondary)
             }
 
-            // 待同步操作
+            // Pending sync operations
             if firebaseService.pendingOperationsCount > 0 {
                 HStack {
-                    Text("待同步操作")
+                    Text("Pending Operations")
                     Spacer()
-                    Text("\(firebaseService.pendingOperationsCount) 项")
+                    Text("\(firebaseService.pendingOperationsCount)")
                         .foregroundColor(.orange)
                 }
             }
 
-            // 上次同步时间
+            // Last sync time
             if let lastSync = SyncManager.shared.lastSyncTime {
                 HStack {
-                    Text("上次同步")
+                    Text("Last Sync")
                     Spacer()
                     Text(lastSync, style: .relative)
                         .foregroundColor(.secondary)
                 }
             }
 
-            // 本地缓存大小
+            // Local cache size
             HStack {
-                Text("本地缓存")
+                Text("Local Cache")
                 Spacer()
                 Text(formatCacheSize(LocalCacheManager.shared.cacheSize))
                     .foregroundColor(.secondary)
             }
 
-            // 手动同步按钮
+            // Manual sync button
             Button {
                 firebaseService.forceSync()
             } label: {
                 HStack {
                     Image(systemName: "arrow.triangle.2.circlepath")
-                    Text("立即同步")
+                    Text("Sync Now")
                 }
             }
             .disabled(!networkMonitor.isConnected || firebaseService.syncStatus == .syncing)
 
-            // 重置同步按钮
+            // Reset sync button
             Button(role: .destructive) {
                 showResetConfirmation = true
             } label: {
                 HStack {
                     Image(systemName: "arrow.counterclockwise")
-                    Text("重置并重新同步")
+                    Text("Reset and Resync")
                 }
             }
-            .confirmationDialog("确定要重置所有本地数据吗？", isPresented: $showResetConfirmation, titleVisibility: .visible) {
-                Button("重置", role: .destructive) {
+            .confirmationDialog("Reset all local data?", isPresented: $showResetConfirmation, titleVisibility: .visible) {
+                Button("Reset", role: .destructive) {
                     firebaseService.resetAndSync()
                 }
-                Button("取消", role: .cancel) {}
+                Button("Cancel", role: .cancel) {}
             } message: {
-                Text("这将清除本地缓存并从服务器重新下载所有数据。未同步的数据将丢失。")
+                Text("This will clear local cache and re-download all data from the server. Unsynced data will be lost.")
             }
         }
     }

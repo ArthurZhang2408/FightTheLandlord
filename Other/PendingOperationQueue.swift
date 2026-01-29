@@ -2,34 +2,34 @@
 //  PendingOperationQueue.swift
 //  FightTheLandlord
 //
-//  待处理操作队列 - 存储离线时产生的操作，等待网络恢复后执行
-//  采用操作日志模式，确保所有本地操作最终同步到云端
+//  Pending Operation Queue - Stores operations generated while offline
+//  Uses operation log pattern to ensure all local operations eventually sync to cloud
 //
 
 import Foundation
 
-/// 操作类型
+/// Operation type
 enum PendingOperationType: String, Codable {
-    case createMatch        // 创建新对局
-    case updateMatch        // 更新对局
-    case deleteMatch        // 删除对局
-    case createPlayer       // 创建玩家
-    case updatePlayer       // 更新玩家
-    case deletePlayer       // 删除玩家
-    case createGameRecords  // 创建单局记录（批量）
-    case updateGameRecords  // 更新单局记录
-    case deleteGameRecords  // 删除单局记录
+    case createMatch        // Create new match
+    case updateMatch        // Update match
+    case deleteMatch        // Delete match
+    case createPlayer       // Create player
+    case updatePlayer       // Update player
+    case deletePlayer       // Delete player
+    case createGameRecords  // Create game records (batch)
+    case updateGameRecords  // Update game records
+    case deleteGameRecords  // Delete game records
 }
 
-/// 操作状态
+/// Operation status
 enum PendingOperationStatus: String, Codable {
-    case pending    // 等待执行
-    case inProgress // 执行中
-    case failed     // 执行失败（将重试）
-    case completed  // 已完成
+    case pending    // Waiting to execute
+    case inProgress // In progress
+    case failed     // Failed (will retry)
+    case completed  // Completed
 }
 
-/// 待处理操作
+/// Pending operation
 struct PendingOperation: Codable, Identifiable {
     let id: String
     let type: PendingOperationType
@@ -39,13 +39,13 @@ struct PendingOperation: Codable, Identifiable {
     var lastError: String?
     var lastAttemptAt: Date?
 
-    // 操作数据（JSON编码）
+    // Operation data (JSON encoded)
     let payload: Data
 
-    // 用于关联的临时ID（离线创建的对象可能没有真正的ID）
+    // Temporary ID for association (offline-created objects may not have a real ID)
     let localId: String?
 
-    // 依赖的操作ID（必须先完成的操作）
+    // Dependent operation IDs (operations that must complete first)
     let dependsOn: [String]?
 
     init(
@@ -67,26 +67,26 @@ struct PendingOperation: Codable, Identifiable {
     }
 }
 
-/// 待处理操作队列管理器
+/// Pending operation queue manager
 class PendingOperationQueue {
     static let shared = PendingOperationQueue()
 
-    // 最大重试次数
+    // Maximum retry count
     private let maxRetryCount = 5
 
-    // 重试延迟（指数退避）
+    // Retry delay (exponential backoff)
     private func retryDelay(for retryCount: Int) -> TimeInterval {
-        return min(pow(2.0, Double(retryCount)), 60.0) // 最大60秒
+        return min(pow(2.0, Double(retryCount)), 60.0) // Max 60 seconds
     }
 
-    // 文件管理
+    // File manager
     private let fileManager = FileManager.default
     private var queueFilePath: URL {
         let paths = fileManager.urls(for: .documentDirectory, in: .userDomainMask)
         return paths[0].appendingPathComponent("SyncCache/pending_operations.json")
     }
 
-    // JSON编解码器
+    // JSON encoder/decoder
     private let encoder: JSONEncoder = {
         let encoder = JSONEncoder()
         encoder.dateEncodingStrategy = .iso8601
@@ -99,10 +99,10 @@ class PendingOperationQueue {
         return decoder
     }()
 
-    // 内存中的操作队列
+    // In-memory operation queue
     private var operations: [PendingOperation] = []
 
-    // 线程安全锁
+    // Thread-safe lock
     private let lock = NSLock()
 
     private init() {
@@ -129,7 +129,7 @@ class PendingOperationQueue {
 
     private func saveToDisk() {
         do {
-            // 确保目录存在
+            // Ensure directory exists
             let directory = queueFilePath.deletingLastPathComponent()
             if !fileManager.fileExists(atPath: directory.path) {
                 try fileManager.createDirectory(at: directory, withIntermediateDirectories: true)
@@ -144,7 +144,7 @@ class PendingOperationQueue {
 
     // MARK: - Queue Operations
 
-    /// 添加操作到队列
+    /// Add operation to queue
     func enqueue(_ operation: PendingOperation) {
         lock.lock()
         defer { lock.unlock() }
@@ -154,24 +154,24 @@ class PendingOperationQueue {
         print("[PendingQueue] Enqueued operation: \(operation.type.rawValue) (id: \(operation.id))")
     }
 
-    /// 获取下一个待处理的操作
+    /// Get next pending operation
     func dequeue() -> PendingOperation? {
         lock.lock()
         defer { lock.unlock() }
 
-        // 找到第一个可以执行的操作（status=pending 且依赖已完成）
+        // Find the first operation that can be executed (status=pending and dependencies completed)
         let completedIds = Set(operations.filter { $0.status == .completed }.map { $0.id })
 
         for index in operations.indices {
             let op = operations[index]
             guard op.status == .pending || op.status == .failed else { continue }
 
-            // 检查重试次数
+            // Check retry count
             if op.retryCount >= maxRetryCount {
                 continue
             }
 
-            // 检查重试延迟
+            // Check retry delay
             if let lastAttempt = op.lastAttemptAt {
                 let delay = retryDelay(for: op.retryCount)
                 if Date().timeIntervalSince(lastAttempt) < delay {
@@ -179,7 +179,7 @@ class PendingOperationQueue {
                 }
             }
 
-            // 检查依赖
+            // Check dependencies
             if let deps = op.dependsOn {
                 let allDepsCompleted = deps.allSatisfy { completedIds.contains($0) }
                 if !allDepsCompleted {
@@ -187,7 +187,7 @@ class PendingOperationQueue {
                 }
             }
 
-            // 标记为进行中
+            // Mark as in progress
             operations[index].status = .inProgress
             operations[index].lastAttemptAt = Date()
             saveToDisk()
@@ -197,7 +197,7 @@ class PendingOperationQueue {
         return nil
     }
 
-    /// 标记操作完成
+    /// Mark operation as completed
     func markCompleted(_ operationId: String) {
         lock.lock()
         defer { lock.unlock() }
@@ -209,7 +209,7 @@ class PendingOperationQueue {
         }
     }
 
-    /// 标记操作失败
+    /// Mark operation as failed
     func markFailed(_ operationId: String, error: String) {
         lock.lock()
         defer { lock.unlock() }
@@ -223,7 +223,7 @@ class PendingOperationQueue {
         }
     }
 
-    /// 移除已完成的操作
+    /// Remove completed operations
     func removeCompleted() {
         lock.lock()
         defer { lock.unlock() }
@@ -238,26 +238,26 @@ class PendingOperationQueue {
         }
     }
 
-    /// 获取所有待处理操作数量
+    /// Get count of all pending operations
     var pendingCount: Int {
         lock.lock()
         defer { lock.unlock() }
         return operations.filter { $0.status == .pending || $0.status == .failed }.count
     }
 
-    /// 获取所有失败操作数量
+    /// Get count of all failed operations
     var failedCount: Int {
         lock.lock()
         defer { lock.unlock() }
         return operations.filter { $0.status == .failed && $0.retryCount >= maxRetryCount }.count
     }
 
-    /// 是否有待处理操作
+    /// Check if there are pending operations
     var hasPendingOperations: Bool {
         return pendingCount > 0
     }
 
-    /// 清空所有操作
+    /// Clear all operations
     func clearAll() {
         lock.lock()
         defer { lock.unlock() }
@@ -266,7 +266,7 @@ class PendingOperationQueue {
         print("[PendingQueue] Cleared all operations")
     }
 
-    /// 获取所有操作（用于调试）
+    /// Get all operations (for debugging)
     var allOperations: [PendingOperation] {
         lock.lock()
         defer { lock.unlock() }
@@ -275,9 +275,9 @@ class PendingOperationQueue {
 
     // MARK: - Convenience Methods for Creating Operations
 
-    /// 创建保存Match的操作
+    /// Create a save Match operation
     func enqueueCreateMatch(_ match: MatchRecord, gameRecords: [GameRecord]) {
-        // 创建Match操作的payload
+        // Create Match operation payload
         struct CreateMatchPayload: Codable {
             let match: CacheableMatch
             let gameRecords: [CacheableGameRecord]
@@ -301,7 +301,7 @@ class PendingOperationQueue {
         }
     }
 
-    /// 创建更新Match的操作
+    /// Create an update Match operation
     func enqueueUpdateMatch(_ match: MatchRecord, gameRecords: [GameRecord]) {
         struct UpdateMatchPayload: Codable {
             let match: CacheableMatch
@@ -326,7 +326,7 @@ class PendingOperationQueue {
         }
     }
 
-    /// 创建删除Match的操作
+    /// Create a delete Match operation
     func enqueueDeleteMatch(matchId: String) {
         struct DeleteMatchPayload: Codable {
             let matchId: String
@@ -347,7 +347,7 @@ class PendingOperationQueue {
         }
     }
 
-    /// 创建添加Player的操作
+    /// Create an add Player operation
     func enqueueCreatePlayer(_ player: Player) {
         let payload = CacheablePlayer(from: player)
 
@@ -364,7 +364,7 @@ class PendingOperationQueue {
         }
     }
 
-    /// 创建更新Player的操作
+    /// Create an update Player operation
     func enqueueUpdatePlayer(_ player: Player) {
         let payload = CacheablePlayer(from: player)
 
@@ -381,7 +381,7 @@ class PendingOperationQueue {
         }
     }
 
-    /// 创建删除Player的操作
+    /// Create a delete Player operation
     func enqueueDeletePlayer(playerId: String) {
         struct DeletePlayerPayload: Codable {
             let playerId: String

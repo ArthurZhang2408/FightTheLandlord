@@ -2,41 +2,41 @@
 //  NetworkMonitor.swift
 //  FightTheLandlord
 //
-//  网络状态监控器 - 监控设备的网络连接状态
-//  当网络状态改变时通知相关组件
+//  Network Status Monitor - Monitors device network connection status
+//  Notifies relevant components when network status changes
 //
 
 import Foundation
 import Network
 import Combine
 
-/// 网络状态
+/// Network status
 enum NetworkStatus {
-    case connected      // 已连接
-    case disconnected   // 已断开
-    case unknown        // 未知
+    case connected      // Connected
+    case disconnected   // Disconnected
+    case unknown        // Unknown
 }
 
-/// 网络监控器 - 单例模式
+/// Network monitor - Singleton pattern
 class NetworkMonitor: ObservableObject {
     static let shared = NetworkMonitor()
 
-    // 网络路径监控器
+    // Network path monitor
     private let monitor = NWPathMonitor()
     private let queue = DispatchQueue(label: "NetworkMonitor")
 
-    // 发布的状态
+    // Published status
     @Published private(set) var status: NetworkStatus = .unknown
     @Published private(set) var isConnected: Bool = false
     @Published private(set) var connectionType: NWInterface.InterfaceType?
 
-    // 状态变化通知
+    // Status change notification
     let statusChanged = PassthroughSubject<NetworkStatus, Never>()
 
-    // 网络恢复通知（用于触发同步）
+    // Network restored notification (used to trigger sync)
     let networkRestored = PassthroughSubject<Void, Never>()
 
-    // 上一次的连接状态
+    // Previous connection status
     private var wasConnected: Bool = false
 
     private init() {
@@ -49,7 +49,7 @@ class NetworkMonitor: ObservableObject {
 
     // MARK: - Monitoring
 
-    /// 开始监控网络状态
+    /// Start monitoring network status
     func startMonitoring() {
         monitor.pathUpdateHandler = { [weak self] path in
             DispatchQueue.main.async {
@@ -60,13 +60,13 @@ class NetworkMonitor: ObservableObject {
         print("[NetworkMonitor] Started monitoring")
     }
 
-    /// 停止监控
+    /// Stop monitoring
     func stopMonitoring() {
         monitor.cancel()
         print("[NetworkMonitor] Stopped monitoring")
     }
 
-    /// 处理路径更新
+    /// Handle path update
     private func handlePathUpdate(_ path: NWPath) {
         let newStatus: NetworkStatus
         let newIsConnected: Bool
@@ -86,7 +86,7 @@ class NetworkMonitor: ObservableObject {
             newIsConnected = false
         }
 
-        // 更新连接类型
+        // Update connection type
         if path.usesInterfaceType(.wifi) {
             connectionType = .wifi
         } else if path.usesInterfaceType(.cellular) {
@@ -97,10 +97,10 @@ class NetworkMonitor: ObservableObject {
             connectionType = nil
         }
 
-        // 检测网络恢复
+        // Detect network restoration
         let didRestore = !wasConnected && newIsConnected
 
-        // 更新状态
+        // Update status
         if status != newStatus {
             status = newStatus
             statusChanged.send(newStatus)
@@ -109,7 +109,7 @@ class NetworkMonitor: ObservableObject {
 
         isConnected = newIsConnected
 
-        // 如果网络从断开恢复到连接，发送通知
+        // If network restored from disconnected to connected, send notification
         if didRestore {
             print("[NetworkMonitor] Network restored, notifying...")
             networkRestored.send()
@@ -120,29 +120,29 @@ class NetworkMonitor: ObservableObject {
 
     // MARK: - Convenience
 
-    /// 获取连接类型的描述
+    /// Get connection type description
     var connectionTypeDescription: String {
         switch connectionType {
         case .wifi:
             return "WiFi"
         case .cellular:
-            return "蜂窝网络"
+            return "Cellular"
         case .wiredEthernet:
-            return "有线网络"
+            return "Wired"
         default:
-            return "未知"
+            return "Unknown"
         }
     }
 
-    /// 获取状态描述
+    /// Get status description
     var statusDescription: String {
         switch status {
         case .connected:
-            return "已连接"
+            return "Connected"
         case .disconnected:
-            return "未连接"
+            return "Disconnected"
         case .unknown:
-            return "未知"
+            return "Unknown"
         }
     }
 }

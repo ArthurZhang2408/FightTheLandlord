@@ -2,14 +2,14 @@
 //  LocalCacheManager.swift
 //  FightTheLandlord
 //
-//  本地缓存管理器 - 负责数据的本地持久化存储
-//  采用 Local-First 架构，数据优先存储在本地，后台同步到云端
+//  Local Cache Manager - Handles local data persistence
+//  Uses Local-First architecture - data is stored locally first, synced to cloud in background
 //
 
 import Foundation
 
-/// 本地缓存管理器 - 单例模式
-/// 职责：管理所有本地数据的持久化存储
+/// Local Cache Manager - Singleton pattern
+/// Responsibility: Manage all local data persistence
 class LocalCacheManager {
     static let shared = LocalCacheManager()
 
@@ -22,19 +22,19 @@ class LocalCacheManager {
         case cacheVersion = "cache_version"
     }
 
-    // 缓存版本，用于处理数据结构升级
+    // Cache version for handling data structure upgrades
     private let currentCacheVersion = 1
 
-    // 文件管理器
+    // File manager
     private let fileManager = FileManager.default
 
-    // 缓存目录
+    // Cache directory
     private var cacheDirectory: URL {
         let paths = fileManager.urls(for: .documentDirectory, in: .userDomainMask)
         return paths[0].appendingPathComponent("SyncCache", isDirectory: true)
     }
 
-    // JSON编解码器
+    // JSON encoder/decoder
     private let encoder: JSONEncoder = {
         let encoder = JSONEncoder()
         encoder.dateEncodingStrategy = .iso8601
@@ -69,7 +69,7 @@ class LocalCacheManager {
     private func migrateIfNeeded() {
         let savedVersion = UserDefaults.standard.integer(forKey: CacheKey.cacheVersion.rawValue)
         if savedVersion < currentCacheVersion {
-            // 执行迁移逻辑
+            // Perform migration logic
             print("[LocalCache] Migrating cache from version \(savedVersion) to \(currentCacheVersion)")
             UserDefaults.standard.set(currentCacheVersion, forKey: CacheKey.cacheVersion.rawValue)
         }
@@ -101,7 +101,7 @@ class LocalCacheManager {
 
     // MARK: - Players Cache
 
-    /// 缓存玩家列表
+    /// Cache players list
     func cachePlayers(_ players: [Player]) {
         do {
             let cacheable = players.map { CacheablePlayer(from: $0) }
@@ -111,7 +111,7 @@ class LocalCacheManager {
         }
     }
 
-    /// 加载缓存的玩家列表
+    /// Load cached players list
     func loadCachedPlayers() -> [Player] {
         do {
             if let cached: [CacheablePlayer] = try load([CacheablePlayer].self, from: .players) {
@@ -126,7 +126,7 @@ class LocalCacheManager {
 
     // MARK: - Matches Cache
 
-    /// 缓存对局列表
+    /// Cache matches list
     func cacheMatches(_ matches: [MatchRecord]) {
         do {
             let cacheable = matches.map { CacheableMatch(from: $0) }
@@ -136,7 +136,7 @@ class LocalCacheManager {
         }
     }
 
-    /// 加载缓存的对局列表
+    /// Load cached matches list
     func loadCachedMatches() -> [MatchRecord] {
         do {
             if let cached: [CacheableMatch] = try load([CacheableMatch].self, from: .matches) {
@@ -151,14 +151,14 @@ class LocalCacheManager {
 
     // MARK: - Game Records Cache
 
-    /// 缓存单局记录（按matchId分组存储）
+    /// Cache game records (stored grouped by matchId)
     func cacheGameRecords(_ records: [GameRecord], forMatchId matchId: String) {
         var allRecords = loadAllCachedGameRecords()
 
-        // 移除该match的旧记录
+        // Remove old records for this match
         allRecords.removeAll { $0.matchId == matchId }
 
-        // 添加新记录
+        // Add new records
         allRecords.append(contentsOf: records)
 
         do {
@@ -169,13 +169,13 @@ class LocalCacheManager {
         }
     }
 
-    /// 加载特定对局的单局记录
+    /// Load cached game records for a specific match
     func loadCachedGameRecords(forMatchId matchId: String) -> [GameRecord] {
         let allRecords = loadAllCachedGameRecords()
         return allRecords.filter { $0.matchId == matchId }.sorted { $0.gameIndex < $1.gameIndex }
     }
 
-    /// 加载所有缓存的单局记录
+    /// Load all cached game records
     func loadAllCachedGameRecords() -> [GameRecord] {
         do {
             if let cached: [CacheableGameRecord] = try load([CacheableGameRecord].self, from: .gameRecords) {
@@ -187,7 +187,7 @@ class LocalCacheManager {
         return []
     }
 
-    /// 删除特定对局的缓存记录
+    /// Delete cached records for a specific match
     func deleteCachedGameRecords(forMatchId matchId: String) {
         var allRecords = loadAllCachedGameRecords()
         allRecords.removeAll { $0.matchId == matchId }
@@ -202,7 +202,7 @@ class LocalCacheManager {
 
     // MARK: - Sync Timestamp
 
-    /// 获取上次同步时间戳
+    /// Get/set last sync timestamp
     var lastSyncTimestamp: Date? {
         get {
             return UserDefaults.standard.object(forKey: CacheKey.lastSyncTimestamp.rawValue) as? Date
@@ -214,7 +214,7 @@ class LocalCacheManager {
 
     // MARK: - Cache Status
 
-    /// 检查是否有本地缓存
+    /// Check if local cache exists
     var hasCachedData: Bool {
         let playersPath = filePath(for: .players)
         let matchesPath = filePath(for: .matches)
@@ -222,7 +222,7 @@ class LocalCacheManager {
                fileManager.fileExists(atPath: matchesPath.path)
     }
 
-    /// 获取缓存大小（字节）
+    /// Get cache size in bytes
     var cacheSize: Int64 {
         var size: Int64 = 0
         if let enumerator = fileManager.enumerator(at: cacheDirectory, includingPropertiesForKeys: [.fileSizeKey]) {
@@ -235,7 +235,7 @@ class LocalCacheManager {
         return size
     }
 
-    /// 清空所有缓存
+    /// Clear all cache
     func clearAllCache() {
         do {
             if fileManager.fileExists(atPath: cacheDirectory.path) {
@@ -252,7 +252,7 @@ class LocalCacheManager {
 
 // MARK: - Cacheable Models
 
-/// 可缓存的Player模型（不依赖Firebase的@DocumentID）
+/// Cacheable Player model (independent of Firebase's @DocumentID)
 struct CacheablePlayer: Codable {
     let id: String?
     let name: String
@@ -273,7 +273,7 @@ struct CacheablePlayer: Codable {
     }
 }
 
-/// 可缓存的MatchRecord模型
+/// Cacheable MatchRecord model
 struct CacheableMatch: Codable {
     let id: String?
     let startedAt: Date
@@ -329,8 +329,8 @@ struct CacheableMatch: Codable {
             playerCName: playerCName,
             starter: initialStarter
         )
-        // 使用反射或直接赋值来设置私有属性
-        // 由于 MatchRecord 是结构体，我们需要一个特殊的初始化方法
+        // Use the fromCache factory method to properly initialize all properties
+        // Since MatchRecord is a struct, we need a special initialization method
         match = MatchRecord.fromCache(
             id: id,
             startedAt: startedAt,
@@ -357,7 +357,7 @@ struct CacheableMatch: Codable {
     }
 }
 
-/// 可缓存的GameRecord模型
+/// Cacheable GameRecord model
 struct CacheableGameRecord: Codable {
     let id: String?
     let matchId: String
