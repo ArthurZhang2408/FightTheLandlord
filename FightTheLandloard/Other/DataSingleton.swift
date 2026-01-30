@@ -8,6 +8,7 @@
 //  Supports offline match saving, auto-syncs when network is restored
 //
 
+import Combine
 import FirebaseAuth
 import FirebaseFirestore
 import Foundation
@@ -42,6 +43,12 @@ class DataSingleton: ObservableObject {
 
     // Current match cache key
     private let currentMatchCacheKey = "current_match_state"
+
+    // Combine cancellables for reactive subscriptions
+    private var cancellables = Set<AnyCancellable>()
+
+    // Pending player IDs to restore (used when waiting for players to load)
+    private var pendingPlayerRestore: (aId: String?, bId: String?, cId: String?)?
 
     private init() {
         room = RoomSetting(id: 1)
@@ -93,27 +100,46 @@ class DataSingleton: ObservableObject {
         cRe = state.cRe
         room.starter = state.roomStarter
 
-        // Players need to be restored after FirebaseService finishes loading
-        // Use delayed loading to ensure players are loaded
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) { [weak self] in
-            guard let self = self else { return }
-            let players = FirebaseService.shared.players
+        // Store pending player IDs
+        pendingPlayerRestore = (state.playerAId, state.playerBId, state.playerCId)
 
-            if let aId = state.playerAId {
-                self.playerA = players.first { $0.id == aId }
-            }
-            if let bId = state.playerBId {
-                self.playerB = players.first { $0.id == bId }
-            }
-            if let cId = state.playerCId {
-                self.playerC = players.first { $0.id == cId }
-            }
-            self.syncPlayerNames()
+        // Try to restore players immediately if already loaded
+        let players = FirebaseService.shared.players
+        if !players.isEmpty {
+            restorePendingPlayers(from: players)
+        } else {
+            // Subscribe to players changes and restore when loaded
+            FirebaseService.shared.$players
+                .dropFirst()  // Skip initial empty value
+                .first { !$0.isEmpty }  // Wait for non-empty players
+                .receive(on: DispatchQueue.main)
+                .sink { [weak self] players in
+                    self?.restorePendingPlayers(from: players)
+                }
+                .store(in: &cancellables)
+        }
+    }
 
-            if !self.games.isEmpty {
-                self.page = "main"
-                print("[DataSingleton] Restored current match with \(self.games.count) games")
-            }
+    /// Restore players from pending IDs when player list becomes available
+    private func restorePendingPlayers(from players: [Player]) {
+        guard let pending = pendingPlayerRestore else { return }
+
+        if let aId = pending.aId {
+            playerA = players.first { $0.id == aId }
+        }
+        if let bId = pending.bId {
+            playerB = players.first { $0.id == bId }
+        }
+        if let cId = pending.cId {
+            playerC = players.first { $0.id == cId }
+        }
+
+        syncPlayerNames()
+        pendingPlayerRestore = nil
+
+        if !games.isEmpty {
+            page = "main"
+            print("[DataSingleton] Restored current match with \(games.count) games")
         }
     }
 
