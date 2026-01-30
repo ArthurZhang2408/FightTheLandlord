@@ -23,6 +23,16 @@ enum SyncStatus: Equatable {
     case error(String)  // Error occurred
 }
 
+/// Game records sync state for UI feedback
+enum GameRecordsSyncState: Equatable {
+    case loading        // Loading from local cache
+    case localOnly      // Showing local data, not yet synced with server
+    case syncing        // Syncing with server in background
+    case synced         // Fully synced with server
+    case offline        // Offline, showing cached data
+    case error(String)  // Sync error occurred
+}
+
 /// Sync Manager - Singleton pattern
 class SyncManager: ObservableObject {
     static let shared = SyncManager()
@@ -40,6 +50,7 @@ class SyncManager: ObservableObject {
     @Published private(set) var pendingOperationsCount: Int = 0
     @Published private(set) var isSyncing: Bool = false
     @Published private(set) var isGameRecordsSynced: Bool = false
+    @Published private(set) var gameRecordsSyncState: GameRecordsSyncState = .loading
 
     // Synced data
     @Published var players: [Player] = []
@@ -126,12 +137,21 @@ class SyncManager: ObservableObject {
             print("[SyncManager] Loaded \(cachedMatches.count) matches from cache")
         }
 
-        // Note: Do NOT set isGameRecordsSynced here even if we have cached records
-        // The cache might only have partial data (from previously viewed matches)
-        // isGameRecordsSynced should only be true after preloadAllGameRecords() completes
+        // Check if we have completed a full sync before
         let cachedGameRecordsCount = localCache.loadAllCachedGameRecords().count
-        if cachedGameRecordsCount > 0 {
-            print("[SyncManager] Found \(cachedGameRecordsCount) cached game records (not marked as synced)")
+        if localCache.hasCompletedFullSync && cachedGameRecordsCount > 0 {
+            // Trust local cache - we've synced before
+            isGameRecordsSynced = true
+            gameRecordsSyncState = networkMonitor.isConnected ? .syncing : .offline
+            print("[SyncManager] hasCompletedFullSync=true, trusting \(cachedGameRecordsCount) cached game records")
+        } else if cachedGameRecordsCount > 0 {
+            // Have some cached data but never completed full sync
+            gameRecordsSyncState = .localOnly
+            print("[SyncManager] Found \(cachedGameRecordsCount) cached game records (never completed full sync)")
+        } else {
+            // No cached data
+            gameRecordsSyncState = .loading
+            print("[SyncManager] No cached game records")
         }
 
         lastSyncTime = localCache.lastSyncTimestamp
@@ -143,10 +163,19 @@ class SyncManager: ObservableObject {
     func preloadAllGameRecords() {
         guard networkMonitor.isConnected else {
             print("[SyncManager] Cannot preload game records: offline")
+            DispatchQueue.main.async {
+                self.gameRecordsSyncState = .offline
+            }
             return
         }
 
         print("[SyncManager] Preloading all game records...")
+        DispatchQueue.main.async {
+            // If we already have cached data, show as syncing; otherwise loading
+            if self.localCache.hasCompletedFullSync {
+                self.gameRecordsSyncState = .syncing
+            }
+        }
 
         db.collection("gameRecords")
             .order(by: "playedAt", descending: true)
@@ -155,6 +184,14 @@ class SyncManager: ObservableObject {
 
                 if let error = error {
                     print("[SyncManager] Failed to preload game records: \(error.localizedDescription)")
+                    DispatchQueue.main.async {
+                        // If we have previously synced data, still allow using it
+                        if self.localCache.hasCompletedFullSync {
+                            self.gameRecordsSyncState = .error("同步失败: \(error.localizedDescription)")
+                        } else {
+                            self.gameRecordsSyncState = .error("加载失败: \(error.localizedDescription)")
+                        }
+                    }
                     return
                 }
 
@@ -172,7 +209,11 @@ class SyncManager: ObservableObject {
 
                 DispatchQueue.main.async {
                     self.isGameRecordsSynced = true
-                    print("[SyncManager] Preloaded \(records.count) game records for \(groupedRecords.count) matches")
+                    self.gameRecordsSyncState = .synced
+                    self.localCache.hasCompletedFullSync = true
+                    self.localCache.lastSyncTimestamp = Date()
+                    self.lastSyncTime = Date()
+                    print("[SyncManager] Preloaded \(records.count) game records for \(groupedRecords.count) matches, marked hasCompletedFullSync=true")
                 }
             }
     }

@@ -30,6 +30,7 @@ class FirebaseService: ObservableObject {
     @Published var syncStatus: SyncStatus = .idle
     @Published var isOnline: Bool = true
     @Published var pendingOperationsCount: Int = 0
+    @Published var gameRecordsSyncState: GameRecordsSyncState = .loading
 
     private init() {
         setupBindings()
@@ -73,6 +74,11 @@ class FirebaseService: ObservableObject {
                 self?.isLoadingMatches = syncing
             }
             .store(in: &cancellables)
+
+        // Bind game records sync state
+        syncManager.$gameRecordsSyncState
+            .receive(on: DispatchQueue.main)
+            .assign(to: &$gameRecordsSyncState)
     }
 
     /// Initialize sync system
@@ -386,7 +392,15 @@ class FirebaseService: ObservableObject {
             record.playerCId == playerId
         }.sorted { $0.playedAt > $1.playedAt }
 
-        // If we have cached records and game records are synced, use them
+        // If we have completed a full sync before, trust local cache immediately
+        // This enables instant loading after app restart
+        if LocalCacheManager.shared.hasCompletedFullSync && !playerRecords.isEmpty {
+            print("[FirebaseService] hasCompletedFullSync=true, using \(playerRecords.count) cached game records for player (instant load)")
+            completion(.success(playerRecords))
+            return
+        }
+
+        // If we have cached records and game records are synced this session, use them
         if !playerRecords.isEmpty && syncManager.isGameRecordsSynced {
             print("[FirebaseService] Using \(playerRecords.count) cached game records for player")
             completion(.success(playerRecords))
@@ -395,6 +409,7 @@ class FirebaseService: ObservableObject {
 
         // If offline, return what we have
         guard NetworkMonitor.shared.isConnected else {
+            print("[FirebaseService] Offline, returning \(playerRecords.count) cached records")
             completion(.success(playerRecords))
             return
         }

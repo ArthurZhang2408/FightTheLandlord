@@ -20,6 +20,7 @@ class LocalCacheManager {
         case gameRecords = "cached_game_records"
         case lastSyncTimestamp = "last_sync_timestamp"
         case cacheVersion = "cache_version"
+        case hasCompletedFullSync = "has_completed_full_sync"
     }
 
     // Cache version for handling data structure upgrades
@@ -212,6 +213,18 @@ class LocalCacheManager {
         }
     }
 
+    /// Flag indicating whether a full sync has ever been completed
+    /// Once true, we can trust local cache and show data immediately on subsequent launches
+    var hasCompletedFullSync: Bool {
+        get {
+            return UserDefaults.standard.bool(forKey: CacheKey.hasCompletedFullSync.rawValue)
+        }
+        set {
+            UserDefaults.standard.set(newValue, forKey: CacheKey.hasCompletedFullSync.rawValue)
+            print("[LocalCache] hasCompletedFullSync set to: \(newValue)")
+        }
+    }
+
     // MARK: - Cache Status
 
     /// Check if local cache exists
@@ -244,6 +257,7 @@ class LocalCacheManager {
                 print("[LocalCache] Cleared all cache")
             }
             UserDefaults.standard.removeObject(forKey: CacheKey.lastSyncTimestamp.rawValue)
+            UserDefaults.standard.removeObject(forKey: CacheKey.hasCompletedFullSync.rawValue)
         } catch {
             print("[LocalCache] Failed to clear cache: \(error)")
         }
