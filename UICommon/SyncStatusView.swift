@@ -244,11 +244,122 @@ struct SyncSettingsView: View {
     }
 }
 
+/// Game records sync state indicator (for statistics view)
+struct GameRecordsSyncIndicator: View {
+    @ObservedObject private var firebaseService = FirebaseService.shared
+    @State private var showSyncedMessage = false
+
+    var body: some View {
+        Group {
+            switch firebaseService.gameRecordsSyncState {
+            case .loading:
+                HStack(spacing: 8) {
+                    ProgressView()
+                        .scaleEffect(0.8)
+                    Text("加载数据中...")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 6)
+                .background(Color(.systemGray6))
+                .cornerRadius(8)
+
+            case .localOnly:
+                HStack(spacing: 6) {
+                    Image(systemName: "exclamationmark.icloud")
+                        .foregroundColor(.orange)
+                    Text("显示本地数据，首次同步中...")
+                        .font(.caption)
+                        .foregroundColor(.orange)
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 6)
+                .background(Color.orange.opacity(0.1))
+                .cornerRadius(8)
+
+            case .syncing:
+                HStack(spacing: 6) {
+                    ProgressView()
+                        .scaleEffect(0.7)
+                    Text("同步中...")
+                        .font(.caption)
+                        .foregroundColor(.blue)
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 6)
+                .background(Color.blue.opacity(0.1))
+                .cornerRadius(8)
+
+            case .synced:
+                if showSyncedMessage {
+                    HStack(spacing: 6) {
+                        Image(systemName: "checkmark.icloud")
+                            .foregroundColor(.green)
+                        Text("已同步")
+                            .font(.caption)
+                            .foregroundColor(.green)
+                    }
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 6)
+                    .background(Color.green.opacity(0.1))
+                    .cornerRadius(8)
+                    .transition(.opacity)
+                    .onAppear {
+                        // Hide after 2 seconds
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+                            withAnimation {
+                                showSyncedMessage = false
+                            }
+                        }
+                    }
+                }
+
+            case .offline:
+                HStack(spacing: 6) {
+                    Image(systemName: "wifi.slash")
+                        .foregroundColor(.orange)
+                    Text("离线模式")
+                        .font(.caption)
+                        .foregroundColor(.orange)
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 6)
+                .background(Color.orange.opacity(0.1))
+                .cornerRadius(8)
+
+            case .error(let message):
+                HStack(spacing: 6) {
+                    Image(systemName: "exclamationmark.triangle")
+                        .foregroundColor(.red)
+                    Text(message)
+                        .font(.caption)
+                        .foregroundColor(.red)
+                        .lineLimit(1)
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 6)
+                .background(Color.red.opacity(0.1))
+                .cornerRadius(8)
+            }
+        }
+        .animation(.easeInOut(duration: 0.3), value: firebaseService.gameRecordsSyncState)
+        .onChange(of: firebaseService.gameRecordsSyncState) { newState in
+            if newState == .synced {
+                withAnimation {
+                    showSyncedMessage = true
+                }
+            }
+        }
+    }
+}
+
 #Preview("Sync Status") {
     VStack(spacing: 20) {
         SyncStatusView()
         SyncStatusIconView()
         OfflineBannerView()
+        GameRecordsSyncIndicator()
     }
     .padding()
 }

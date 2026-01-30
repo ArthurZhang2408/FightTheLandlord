@@ -193,6 +193,7 @@ struct AddPlayerView: View {
 
 struct PlayerDetailView: View {
     let player: Player
+    @ObservedObject private var firebaseService = FirebaseService.shared
     @State private var statistics: PlayerStatistics?
     @State private var gameRecords: [GameRecord] = []
     @State private var matchRecords: [MatchRecord] = []
@@ -201,34 +202,44 @@ struct PlayerDetailView: View {
     @State private var showingColorPicker = false
     @State private var selectedColor: PlayerColor
     @State private var currentPlayerColor: Color
-    
+
     init(player: Player) {
         self.player = player
         self._selectedColor = State(initialValue: player.playerColor ?? .blue)
         self._currentPlayerColor = State(initialValue: player.displayColor)
     }
-    
+
     var body: some View {
-        Group {
-            if isLoading {
-                SkeletonStatisticsView()
-            } else if let error = errorMessage {
-                VStack(spacing: 12) {
-                    Image(systemName: "exclamationmark.triangle")
-                        .font(.largeTitle)
-                        .foregroundColor(.orange)
-                    Text(error)
-                        .foregroundColor(.secondary)
+        VStack(spacing: 0) {
+            // Sync status indicator at top
+            if firebaseService.gameRecordsSyncState != .synced {
+                GameRecordsSyncIndicator()
+                    .padding(.horizontal)
+                    .padding(.vertical, 8)
+            }
+
+            // Main content
+            Group {
+                if isLoading {
+                    SkeletonStatisticsView()
+                } else if let error = errorMessage {
+                    VStack(spacing: 12) {
+                        Image(systemName: "exclamationmark.triangle")
+                            .font(.largeTitle)
+                            .foregroundColor(.orange)
+                        Text(error)
+                            .foregroundColor(.secondary)
+                    }
+                } else if let stats = statistics {
+                    StatisticsView(
+                        stats: stats,
+                        playerName: player.name,
+                        playerId: player.id ?? "",
+                        playerColor: currentPlayerColor,
+                        gameRecords: gameRecords,
+                        matchRecords: matchRecords
+                    )
                 }
-            } else if let stats = statistics {
-                StatisticsView(
-                    stats: stats, 
-                    playerName: player.name,
-                    playerId: player.id ?? "",
-                    playerColor: currentPlayerColor,
-                    gameRecords: gameRecords,
-                    matchRecords: matchRecords
-                )
             }
         }
         .navigationTitle(player.name)
@@ -276,8 +287,14 @@ struct PlayerDetailView: View {
         .onAppear {
             loadStatistics()
         }
+        .onChange(of: firebaseService.gameRecordsSyncState) { newState in
+            // Refresh statistics when sync completes
+            if newState == .synced && !isLoading {
+                loadStatistics()
+            }
+        }
     }
-    
+
     private func loadStatistics() {
         guard let playerId = player.id else {
             errorMessage = "玩家ID无效"
