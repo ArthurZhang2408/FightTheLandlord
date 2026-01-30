@@ -126,11 +126,11 @@ class NetworkMonitor: ObservableObject {
         case .wifi:
             return "WiFi"
         case .cellular:
-            return "Cellular"
+            return "蜂窝网络"
         case .wiredEthernet:
-            return "Wired"
+            return "有线网络"
         default:
-            return "Unknown"
+            return "未知"
         }
     }
 
@@ -138,11 +138,11 @@ class NetworkMonitor: ObservableObject {
     var statusDescription: String {
         switch status {
         case .connected:
-            return "Connected"
+            return "已连接"
         case .disconnected:
-            return "Disconnected"
+            return "未连接"
         case .unknown:
-            return "Unknown"
+            return "未知"
         }
     }
 }

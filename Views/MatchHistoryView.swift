@@ -354,13 +354,27 @@ struct SwipeableMatchRow: View {
     @State private var offset: CGFloat = 0
     @State private var isSwiped: Bool = false
 
-    private let deleteButtonWidth: CGFloat = 80
+    private let deleteButtonWidth: CGFloat = 75
 
     var body: some View {
-        ZStack(alignment: .trailing) {
-            // Delete button background
-            HStack {
-                Spacer()
+        GeometryReader { geometry in
+            HStack(spacing: 0) {
+                // Main content
+                MatchRowCompactView(match: match)
+                    .frame(width: geometry.size.width)
+                    .background(Color(.secondarySystemGroupedBackground))
+                    .onTapGesture {
+                        if isSwiped {
+                            withAnimation(.easeInOut(duration: 0.2)) {
+                                offset = 0
+                                isSwiped = false
+                            }
+                        } else {
+                            onTap()
+                        }
+                    }
+
+                // Delete button (positioned to the right, outside the visible area)
                 Button(action: {
                     withAnimation(.easeInOut(duration: 0.2)) {
                         offset = 0
@@ -368,52 +382,49 @@ struct SwipeableMatchRow: View {
                     }
                     onDelete()
                 }) {
-                    Image(systemName: "trash.fill")
-                        .foregroundColor(.white)
-                        .frame(width: deleteButtonWidth, height: 50)
-                }
-                .background(Color.red)
-            }
-
-            // Main content
-            MatchRowCompactView(match: match)
-                .background(Color(.secondarySystemGroupedBackground))
-                .offset(x: offset)
-                .gesture(
-                    DragGesture()
-                        .onChanged { gesture in
-                            let translation = gesture.translation.width
-                            if translation < 0 {
-                                // Swiping left
-                                offset = max(translation, -deleteButtonWidth)
-                            } else if isSwiped {
-                                // Swiping right when already swiped
-                                offset = min(-deleteButtonWidth + translation, 0)
-                            }
-                        }
-                        .onEnded { gesture in
-                            withAnimation(.easeInOut(duration: 0.2)) {
-                                if gesture.translation.width < -deleteButtonWidth / 2 {
-                                    offset = -deleteButtonWidth
-                                    isSwiped = true
-                                } else {
-                                    offset = 0
-                                    isSwiped = false
-                                }
-                            }
-                        }
-                )
-                .onTapGesture {
-                    if isSwiped {
-                        withAnimation(.easeInOut(duration: 0.2)) {
-                            offset = 0
-                            isSwiped = false
-                        }
-                    } else {
-                        onTap()
+                    VStack {
+                        Spacer()
+                        Image(systemName: "trash.fill")
+                            .font(.system(size: 20))
+                            .foregroundColor(.white)
+                        Text("删除")
+                            .font(.caption)
+                            .foregroundColor(.white)
+                        Spacer()
                     }
+                    .frame(width: deleteButtonWidth)
+                    .frame(maxHeight: .infinity)
+                    .background(Color.red)
                 }
+                .buttonStyle(.plain)
+            }
+            .offset(x: offset)
+            .gesture(
+                DragGesture()
+                    .onChanged { gesture in
+                        let translation = gesture.translation.width
+                        if translation < 0 {
+                            // Swiping left - reveal delete button
+                            offset = max(translation, -deleteButtonWidth)
+                        } else if isSwiped {
+                            // Swiping right when already swiped - hide delete button
+                            offset = min(-deleteButtonWidth + translation, 0)
+                        }
+                    }
+                    .onEnded { gesture in
+                        withAnimation(.easeInOut(duration: 0.2)) {
+                            if gesture.translation.width < -deleteButtonWidth / 2 {
+                                offset = -deleteButtonWidth
+                                isSwiped = true
+                            } else {
+                                offset = 0
+                                isSwiped = false
+                            }
+                        }
+                    }
+            )
         }
+        .frame(height: 60)
         .clipped()
     }
 }
