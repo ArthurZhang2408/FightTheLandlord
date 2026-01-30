@@ -471,29 +471,46 @@ class SyncManager: ObservableObject {
     }
 
     private func createMatchInFirebase(_ match: MatchRecord, gameRecords: [GameRecord], completion: @escaping (Bool, String?) -> Void) {
-        do {
-            let ref = try db.collection("matches").addDocument(from: match)
-            let matchId = ref.documentID
+        // Use the existing match ID instead of letting Firebase generate a new one
+        // This prevents duplicate records (one with local ID, one with Firebase ID)
+        guard let matchId = match.id else {
+            completion(false, "Match ID is missing")
+            return
+        }
 
-            // Save GameRecords
-            if !gameRecords.isEmpty {
-                let batch = db.batch()
-                for var record in gameRecords {
-                    record.matchId = matchId
-                    let recordRef = db.collection("gameRecords").document()
-                    try batch.setData(from: record, forDocument: recordRef)
+        do {
+            // Use setData with the existing ID instead of addDocument
+            try db.collection("matches").document(matchId).setData(from: match) { [weak self] error in
+                guard let self = self else { return }
+
+                if let error = error {
+                    completion(false, error.localizedDescription)
+                    return
                 }
-                batch.commit { error in
-                    if let error = error {
-                        completion(false, error.localizedDescription)
-                    } else {
-                        // Update local cache
-                        self.localCache.cacheGameRecords(gameRecords, forMatchId: matchId)
-                        completion(true, nil)
+
+                // Save GameRecords
+                if !gameRecords.isEmpty {
+                    let batch = self.db.batch()
+                    for var record in gameRecords {
+                        record.matchId = matchId
+                        let recordRef = self.db.collection("gameRecords").document()
+                        do {
+                            try batch.setData(from: record, forDocument: recordRef)
+                        } catch {
+                            completion(false, error.localizedDescription)
+                            return
+                        }
                     }
+                    batch.commit { error in
+                        if let error = error {
+                            completion(false, error.localizedDescription)
+                        } else {
+                            completion(true, nil)
+                        }
+                    }
+                } else {
+                    completion(true, nil)
                 }
-            } else {
-                completion(true, nil)
             }
         } catch {
             completion(false, error.localizedDescription)
