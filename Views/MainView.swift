@@ -1,6 +1,6 @@
 //
 //  MainView.swift
-//  FightTheLandloard
+//  FightTheLandlord
 //
 //  Created by Arthur Zhang on 2024-10-10.
 //
@@ -22,29 +22,29 @@ struct MainView: View {
     @ViewBuilder
     var mainTabView: some View {
         VStack(spacing: 0) {
-            // 离线横幅 - 当网络断开时显示
+            // Offline banner - shown when network is disconnected
             OfflineBannerView()
 
             TabView(selection: $instance.selectedTab) {
                 ListingView()
                     .tabItem {
-                        Label("对局", systemImage: "house.fill")
+                        Label("对局", systemImage: instance.selectedTab == 0 ? "gamecontroller.fill" : "gamecontroller")
                     }
                     .tag(0)
 
                 MatchHistoryView()
                     .tabItem {
-                        Label("历史", systemImage: "clock.arrow.circlepath")
+                        Label("历史", systemImage: instance.selectedTab == 1 ? "clock.fill" : "clock")
                     }
                     .tag(1)
 
                 StatView()
                     .tabItem {
-                        Label("统计", systemImage: "chart.bar.fill")
+                        Label("统计", systemImage: instance.selectedTab == 2 ? "chart.bar.fill" : "chart.bar")
                     }
                     .tag(2)
             }
-            .tint(.orange)
+            .tint(Color(hex: "FF6B35"))
         }
     }
 }
