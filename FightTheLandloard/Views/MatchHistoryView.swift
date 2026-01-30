@@ -46,6 +46,10 @@ struct MatchHistoryView: View {
                     }
                     matchToDelete = nil
                 }
+            } message: {
+                if let match = matchToDelete {
+                    Text("将删除\(match.playerAName)、\(match.playerBName)、\(match.playerCName)的\(match.totalGames)局对局记录，此操作不可撤销。")
+                }
             }
             .onChange(of: dataSingleton.navigateToMatchId) { newMatchId in
                 if let matchId = newMatchId {
@@ -310,25 +314,21 @@ struct MatchHistoryView: View {
     @ViewBuilder
     private func matchesList(year: Int, month: Int, day: Int) -> some View {
         let dayMatches = matches(forYear: year, month: month, day: day)
-        
+
         // Match rows in a card container - no leading padding
         VStack(spacing: 0) {
             ForEach(Array(dayMatches.enumerated()), id: \.element.id) { index, match in
-                Button {
-                    navigationPath.append(match)
-                } label: {
-                    MatchRowCompactView(match: match)
-                }
-                .buttonStyle(.plain)
-                .contextMenu {
-                    Button(role: .destructive) {
+                SwipeableMatchRow(
+                    match: match,
+                    onTap: {
+                        navigationPath.append(match)
+                    },
+                    onDelete: {
                         matchToDelete = match
                         showingDeleteConfirm = true
-                    } label: {
-                        Label("删除", systemImage: "trash")
                     }
-                }
-                
+                )
+
                 if index < dayMatches.count - 1 {
                     Divider()
                         .padding(.leading, 52)
@@ -341,6 +341,91 @@ struct MatchHistoryView: View {
         .clipShape(RoundedRectangle(cornerRadius: 10))
         .padding(.top, 4)
         .padding(.bottom, 8)
+    }
+}
+
+// MARK: - Swipeable Match Row
+
+struct SwipeableMatchRow: View {
+    let match: MatchRecord
+    let onTap: () -> Void
+    let onDelete: () -> Void
+
+    @State private var offset: CGFloat = 0
+    @State private var isSwiped: Bool = false
+
+    private let deleteButtonWidth: CGFloat = 75
+
+    var body: some View {
+        GeometryReader { geometry in
+            HStack(spacing: 0) {
+                // Main content
+                MatchRowCompactView(match: match)
+                    .frame(width: geometry.size.width)
+                    .background(Color(.secondarySystemGroupedBackground))
+                    .onTapGesture {
+                        if isSwiped {
+                            withAnimation(.easeInOut(duration: 0.2)) {
+                                offset = 0
+                                isSwiped = false
+                            }
+                        } else {
+                            onTap()
+                        }
+                    }
+
+                // Delete button (positioned to the right, outside the visible area)
+                Button(action: {
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        offset = 0
+                        isSwiped = false
+                    }
+                    onDelete()
+                }) {
+                    VStack {
+                        Spacer()
+                        Image(systemName: "trash.fill")
+                            .font(.system(size: 20))
+                            .foregroundColor(.white)
+                        Text("删除")
+                            .font(.caption)
+                            .foregroundColor(.white)
+                        Spacer()
+                    }
+                    .frame(width: deleteButtonWidth)
+                    .frame(maxHeight: .infinity)
+                    .background(Color.red)
+                }
+                .buttonStyle(.plain)
+            }
+            .offset(x: offset)
+            .gesture(
+                DragGesture()
+                    .onChanged { gesture in
+                        let translation = gesture.translation.width
+                        if translation < 0 {
+                            // Swiping left - reveal delete button
+                            offset = max(translation, -deleteButtonWidth)
+                        } else if isSwiped {
+                            // Swiping right when already swiped - hide delete button
+                            offset = min(-deleteButtonWidth + translation, 0)
+                        }
+                    }
+                    .onEnded { gesture in
+                        withAnimation(.easeInOut(duration: 0.2)) {
+                            if gesture.translation.width < -deleteButtonWidth / 2 {
+                                offset = -deleteButtonWidth
+                                isSwiped = true
+                            } else {
+                                offset = 0
+                                isSwiped = false
+                            }
+                        }
+                    }
+            )
+        }
+        .frame(height: 60)
+        .clipped()
     }
 }
 

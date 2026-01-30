@@ -1,456 +1,477 @@
 //
 //  FirebaseService.swift
-//  FightTheLandloard
+//  FightTheLandlord
 //
 //  Created by Arthur Zhang on 2024-10-20.
+//
+//  Refactored: Integrated with local cache and offline sync system
+//  Uses Local-First architecture - data is stored locally first, synced to cloud in background
 //
 
 import Foundation
 import FirebaseFirestore
+import Combine
 
 class FirebaseService: ObservableObject {
     static let shared = FirebaseService()
     private let db = Firestore.firestore()
-    
+
+    // Use SyncManager as data source
+    private let syncManager = SyncManager.shared
+    private var cancellables = Set<AnyCancellable>()
+
+    // Published data (synced from SyncManager)
     @Published var players: [Player] = []
     @Published var matches: [MatchRecord] = []
     @Published var isLoading: Bool = false
     @Published var isLoadingMatches: Bool = false
-    
+
+    // Sync status (exposed to UI)
+    @Published var syncStatus: SyncStatus = .idle
+    @Published var isOnline: Bool = true
+    @Published var pendingOperationsCount: Int = 0
+    @Published var gameRecordsSyncState: GameRecordsSyncState = .loading
+
     private init() {
-        loadPlayers()
-        loadAllMatches()
+        setupBindings()
+        initializeSyncSystem()
     }
-    
-    // MARK: - Players
-    
+
+    // MARK: - Initialization
+
+    /// Setup data bindings with SyncManager
+    private func setupBindings() {
+        // Bind players
+        syncManager.$players
+            .receive(on: DispatchQueue.main)
+            .assign(to: &$players)
+
+        // Bind matches
+        syncManager.$matches
+            .receive(on: DispatchQueue.main)
+            .assign(to: &$matches)
+
+        // Bind sync status
+        syncManager.$syncStatus
+            .receive(on: DispatchQueue.main)
+            .assign(to: &$syncStatus)
+
+        // Bind pending operations count
+        syncManager.$pendingOperationsCount
+            .receive(on: DispatchQueue.main)
+            .assign(to: &$pendingOperationsCount)
+
+        // Bind network status
+        NetworkMonitor.shared.$isConnected
+            .receive(on: DispatchQueue.main)
+            .assign(to: &$isOnline)
+
+        // Bind loading status
+        syncManager.$isSyncing
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] syncing in
+                self?.isLoading = syncing
+                self?.isLoadingMatches = syncing
+            }
+            .store(in: &cancellables)
+
+        // Bind game records sync state
+        syncManager.$gameRecordsSyncState
+            .receive(on: DispatchQueue.main)
+            .assign(to: &$gameRecordsSyncState)
+    }
+
+    /// Initialize sync system
+    private func initializeSyncSystem() {
+        syncManager.initialize()
+    }
+
+    // MARK: - Players (maintaining original API)
+
     func loadPlayers() {
-        isLoading = true
-        db.collection("players").order(by: "name").addSnapshotListener { [weak self] snapshot, error in
-            guard let self = self else { return }
-            self.isLoading = false
-            
-            if let error = error {
-                print("Error loading players: \(error.localizedDescription)")
-                return
-            }
-            
-            guard let documents = snapshot?.documents else { return }
-            
-            self.players = documents.compactMap { doc in
-                try? doc.data(as: Player.self)
-            }
-        }
+        // Now handled automatically by SyncManager
+        // Kept for API compatibility
     }
-    
+
     func addPlayer(name: String, color: PlayerColor? = nil, completion: @escaping (Result<Player, Error>) -> Void) {
-        // Check for duplicate names
+        // Check for duplicate name
         if players.contains(where: { $0.name == name }) {
-            completion(.failure(NSError(domain: "", code: -1, userInfo: [NSLocalizedDescriptionKey: "玩家名称已存在"])))
+            completion(.failure(NSError(domain: "", code: -1, userInfo: [NSLocalizedDescriptionKey: "Player name already exists"])))
             return
         }
-        
-        let player = Player(name: name, playerColor: color ?? .blue)
-        
-        do {
-            let ref = try db.collection("players").addDocument(from: player)
-            var newPlayer = player
-            newPlayer.id = ref.documentID
-            completion(.success(newPlayer))
-        } catch {
-            completion(.failure(error))
+
+        var player = Player(name: name, playerColor: color ?? .blue)
+        player.id = UUID().uuidString  // Generate local ID
+
+        // Local-first: add to local first
+        var updatedPlayers = players
+        updatedPlayers.append(player)
+        updatedPlayers.sort { $0.name < $1.name }
+
+        // Update local cache
+        LocalCacheManager.shared.cachePlayers(updatedPlayers)
+
+        // If online, upload directly
+        if NetworkMonitor.shared.isConnected {
+            do {
+                let ref = try db.collection("players").addDocument(from: player)
+                var newPlayer = player
+                newPlayer.id = ref.documentID
+                completion(.success(newPlayer))
+            } catch {
+                // Upload failed, queue for retry
+                PendingOperationQueue.shared.enqueueCreatePlayer(player)
+                completion(.success(player))
+            }
+        } else {
+            // Offline mode: queue for later
+            PendingOperationQueue.shared.enqueueCreatePlayer(player)
+            completion(.success(player))
         }
     }
-    
+
     func updatePlayer(_ player: Player, completion: @escaping (Result<Void, Error>) -> Void) {
         guard let playerId = player.id else {
-            completion(.failure(NSError(domain: "", code: -1, userInfo: [NSLocalizedDescriptionKey: "玩家ID无效"])))
+            completion(.failure(NSError(domain: "", code: -1, userInfo: [NSLocalizedDescriptionKey: "Invalid player ID"])))
             return
         }
-        
-        do {
-            try db.collection("players").document(playerId).setData(from: player)
-            completion(.success(()))
-        } catch {
-            completion(.failure(error))
+
+        // Update local cache
+        var updatedPlayers = players
+        if let index = updatedPlayers.firstIndex(where: { $0.id == playerId }) {
+            updatedPlayers[index] = player
+            LocalCacheManager.shared.cachePlayers(updatedPlayers)
         }
-    }
-    
-    func deletePlayer(id: String, completion: @escaping (Result<Void, Error>) -> Void) {
-        db.collection("players").document(id).delete { error in
-            if let error = error {
-                completion(.failure(error))
-            } else {
+
+        // Sync to remote
+        if NetworkMonitor.shared.isConnected {
+            do {
+                try db.collection("players").document(playerId).setData(from: player)
+                completion(.success(()))
+            } catch {
+                PendingOperationQueue.shared.enqueueUpdatePlayer(player)
                 completion(.success(()))
             }
+        } else {
+            PendingOperationQueue.shared.enqueueUpdatePlayer(player)
+            completion(.success(()))
         }
     }
-    
-    // MARK: - Matches (对局)
-    
+
+    func deletePlayer(id: String, completion: @escaping (Result<Void, Error>) -> Void) {
+        // Delete from local cache
+        var updatedPlayers = players
+        updatedPlayers.removeAll { $0.id == id }
+        LocalCacheManager.shared.cachePlayers(updatedPlayers)
+
+        // Sync to remote
+        if NetworkMonitor.shared.isConnected {
+            db.collection("players").document(id).delete { error in
+                if let error = error {
+                    // Delete failed, queue for retry
+                    PendingOperationQueue.shared.enqueueDeletePlayer(playerId: id)
+                    completion(.failure(error))
+                } else {
+                    completion(.success(()))
+                }
+            }
+        } else {
+            PendingOperationQueue.shared.enqueueDeletePlayer(playerId: id)
+            completion(.success(()))
+        }
+    }
+
+    // MARK: - Matches
+
     func loadAllMatches() {
-        isLoadingMatches = true
-        db.collection("matches").order(by: "startedAt", descending: true).addSnapshotListener { [weak self] snapshot, error in
-            guard let self = self else { return }
-            self.isLoadingMatches = false
-            
-            if let error = error {
-                print("Error loading matches: \(error.localizedDescription)")
-                return
-            }
-            
-            guard let documents = snapshot?.documents else { return }
-            
-            self.matches = documents.compactMap { doc in
-                try? doc.data(as: MatchRecord.self)
-            }
-        }
+        // Now handled automatically by SyncManager
+        // Kept for API compatibility
     }
-    
+
     func loadGameRecords(forMatch matchId: String, completion: @escaping (Result<[GameRecord], Error>) -> Void) {
         print("[FirebaseService] Loading game records for match: \(matchId)")
-        db.collection("gameRecords")
-            .whereField("matchId", isEqualTo: matchId)
-            .getDocuments { snapshot, error in
-                DispatchQueue.main.async {
-                    if let error = error {
-                        print("[FirebaseService] Error loading game records: \(error.localizedDescription)")
-                        completion(.failure(error))
-                        return
-                    }
-                    
-                    guard let documents = snapshot?.documents else {
-                        print("[FirebaseService] No documents found for match \(matchId)")
-                        completion(.success([]))
-                        return
-                    }
-                    
-                    print("[FirebaseService] Found \(documents.count) documents, attempting to decode...")
-                    
-                    var records: [GameRecord] = []
-                    for doc in documents {
-                        do {
-                            let record = try doc.data(as: GameRecord.self)
-                            records.append(record)
-                        } catch {
-                            print("[FirebaseService] Failed to decode document \(doc.documentID): \(error.localizedDescription)")
-                            // Log the actual data for debugging
-                            print("[FirebaseService] Document data: \(doc.data())")
-                        }
-                    }
-                    
-                    // Sort by gameIndex locally to avoid needing a composite index
-                    records.sort { $0.gameIndex < $1.gameIndex }
-                    
-                    print("[FirebaseService] Successfully loaded \(records.count) game records for match \(matchId)")
-                    completion(.success(records))
-                }
+
+        syncManager.loadGameRecords(forMatchId: matchId) { records in
+            DispatchQueue.main.async {
+                print("[FirebaseService] Loaded \(records.count) game records for match \(matchId)")
+                completion(.success(records))
             }
-    }
-    
-    func deleteMatch(matchId: String, completion: @escaping (Result<Void, Error>) -> Void) {
-        // First delete all game records for this match
-        db.collection("gameRecords")
-            .whereField("matchId", isEqualTo: matchId)
-            .getDocuments { [weak self] snapshot, error in
-                guard let self = self else { return }
-                
-                if let error = error {
-                    completion(.failure(error))
-                    return
-                }
-                
-                let batch = self.db.batch()
-                
-                // Delete all game records
-                snapshot?.documents.forEach { doc in
-                    batch.deleteDocument(doc.reference)
-                }
-                
-                // Delete the match itself
-                batch.deleteDocument(self.db.collection("matches").document(matchId))
-                
-                batch.commit { error in
-                    if let error = error {
-                        completion(.failure(error))
-                    } else {
-                        completion(.success(()))
-                    }
-                }
-            }
-    }
-    
-    func updateGameRecords(_ records: [GameRecord], matchId: String, completion: @escaping (Result<Void, Error>) -> Void) {
-        // First delete all existing game records for this match
-        db.collection("gameRecords")
-            .whereField("matchId", isEqualTo: matchId)
-            .getDocuments { [weak self] snapshot, error in
-                guard let self = self else { return }
-                
-                if let error = error {
-                    completion(.failure(error))
-                    return
-                }
-                
-                let batch = self.db.batch()
-                
-                // Delete old records
-                snapshot?.documents.forEach { doc in
-                    batch.deleteDocument(doc.reference)
-                }
-                
-                // Add new records
-                for record in records {
-                    let ref = self.db.collection("gameRecords").document()
-                    do {
-                        try batch.setData(from: record, forDocument: ref)
-                    } catch {
-                        completion(.failure(error))
-                        return
-                    }
-                }
-                
-                batch.commit { error in
-                    if let error = error {
-                        completion(.failure(error))
-                    } else {
-                        completion(.success(()))
-                    }
-                }
-            }
-    }
-    
-    func saveMatch(_ match: MatchRecord, completion: @escaping (Result<String, Error>) -> Void) {
-        print("[FirebaseService] Saving match...")
-        do {
-            // addDocument returns DocumentReference synchronously
-            // The document ID is available immediately
-            let ref = try db.collection("matches").addDocument(from: match)
-            print("[FirebaseService] Match saved with ID: \(ref.documentID)")
-            completion(.success(ref.documentID))
-        } catch {
-            print("[FirebaseService] Failed to encode/save match: \(error.localizedDescription)")
-            completion(.failure(error))
         }
     }
-    
-    /// Synchronous save that returns the document ID immediately
-    /// The actual network write happens in background
+
+    func deleteMatch(matchId: String, completion: @escaping (Result<Void, Error>) -> Void) {
+        syncManager.deleteMatch(matchId: matchId)
+        completion(.success(()))
+    }
+
+    func updateGameRecords(_ records: [GameRecord], matchId: String, completion: @escaping (Result<Void, Error>) -> Void) {
+        // Get current match and update
+        if let match = matches.first(where: { $0.id == matchId }) {
+            syncManager.updateMatch(match, gameRecords: records)
+        }
+        completion(.success(()))
+    }
+
+    func saveMatch(_ match: MatchRecord, completion: @escaping (Result<String, Error>) -> Void) {
+        print("[FirebaseService] Saving match...")
+        syncManager.saveMatch(match, gameRecords: []) { matchId in
+            if let id = matchId {
+                print("[FirebaseService] Match saved with ID: \(id)")
+                completion(.success(id))
+            } else {
+                completion(.failure(NSError(domain: "", code: -1, userInfo: [NSLocalizedDescriptionKey: "Failed to save match"])))
+            }
+        }
+    }
+
+    /// Save match synchronously (returns matchId)
+    /// Local-first: saves to local immediately, syncs to cloud in background
     func saveMatchSync(_ match: MatchRecord) throws -> String {
         print("[FirebaseService] Saving match synchronously...")
-        let ref = try db.collection("matches").addDocument(from: match)
-        print("[FirebaseService] Match saved with ID: \(ref.documentID)")
-        return ref.documentID
+        let localId = match.id ?? UUID().uuidString
+
+        var matchToSave = match
+        matchToSave.id = localId
+
+        // Save to local immediately
+        var currentMatches = syncManager.matches
+        currentMatches.insert(matchToSave, at: 0)
+        LocalCacheManager.shared.cacheMatches(currentMatches)
+
+        // Return local ID (don't wait for network)
+        print("[FirebaseService] Match saved locally with ID: \(localId)")
+        return localId
     }
-    
-    /// Fire-and-forget game records saving
-    /// Saves records in background without blocking or callbacks
+
+    /// Save game records in background
     func saveGameRecordsBackground(_ records: [GameRecord], matchId: String) {
         guard !records.isEmpty else {
             print("[FirebaseService] No records to save")
             return
         }
-        
-        let batch = db.batch()
-        
-        for record in records {
-            var recordWithMatchId = record
-            recordWithMatchId.matchId = matchId
-            
-            let ref = db.collection("gameRecords").document()
-            do {
-                try batch.setData(from: recordWithMatchId, forDocument: ref)
-            } catch {
-                print("[FirebaseService] Error encoding game record \(record.gameIndex): \(error.localizedDescription)")
-                return
-            }
-        }
-        
-        print("[FirebaseService] Committing batch with \(records.count) records in background...")
-        batch.commit { error in
-            if let error = error {
-                print("[FirebaseService] Background batch commit failed: \(error.localizedDescription)")
-            } else {
-                print("[FirebaseService] Background batch commit succeeded")
+
+        print("[FirebaseService] Saving \(records.count) game records in background...")
+
+        // Save to local cache
+        LocalCacheManager.shared.cacheGameRecords(records, forMatchId: matchId)
+
+        // Get match and save through SyncManager
+        if let match = syncManager.matches.first(where: { $0.id == matchId }) {
+            syncManager.saveMatch(match, gameRecords: records, completion: nil)
+        } else {
+            // If match doesn't exist, create pending operation
+            if NetworkMonitor.shared.isConnected {
+                let batch = db.batch()
+                for var record in records {
+                    record.matchId = matchId
+                    let ref = db.collection("gameRecords").document()
+                    do {
+                        try batch.setData(from: record, forDocument: ref)
+                    } catch {
+                        print("[FirebaseService] Error encoding game record: \(error)")
+                        return
+                    }
+                }
+                batch.commit { error in
+                    if let error = error {
+                        print("[FirebaseService] Batch commit failed: \(error)")
+                    } else {
+                        print("[FirebaseService] Batch commit succeeded")
+                    }
+                }
             }
         }
     }
-    
+
     func loadMatch(matchId: String, completion: @escaping (Result<MatchRecord, Error>) -> Void) {
-        db.collection("matches").document(matchId).getDocument { snapshot, error in
-            DispatchQueue.main.async {
-                if let error = error {
-                    completion(.failure(error))
-                    return
-                }
-                
-                guard let snapshot = snapshot, snapshot.exists else {
-                    completion(.failure(NSError(domain: "", code: -1, userInfo: [NSLocalizedDescriptionKey: "Match not found"])))
-                    return
-                }
-                
-                do {
-                    let match = try snapshot.data(as: MatchRecord.self)
-                    completion(.success(match))
-                } catch {
-                    completion(.failure(error))
+        // Look up in local first
+        if let match = matches.first(where: { $0.id == matchId }) {
+            completion(.success(match))
+            return
+        }
+
+        // Not in local, load from Firebase
+        if NetworkMonitor.shared.isConnected {
+            db.collection("matches").document(matchId).getDocument { snapshot, error in
+                DispatchQueue.main.async {
+                    if let error = error {
+                        completion(.failure(error))
+                        return
+                    }
+
+                    guard let snapshot = snapshot, snapshot.exists else {
+                        completion(.failure(NSError(domain: "", code: -1, userInfo: [NSLocalizedDescriptionKey: "Match not found"])))
+                        return
+                    }
+
+                    do {
+                        let match = try snapshot.data(as: MatchRecord.self)
+                        completion(.success(match))
+                    } catch {
+                        completion(.failure(error))
+                    }
                 }
             }
+        } else {
+            completion(.failure(NSError(domain: "", code: -1, userInfo: [NSLocalizedDescriptionKey: "Offline and match not in cache"])))
         }
     }
-    
+
     func updateMatch(_ match: MatchRecord, completion: @escaping (Result<Void, Error>) -> Void) {
         guard let matchId = match.id else {
             completion(.failure(NSError(domain: "", code: -1, userInfo: [NSLocalizedDescriptionKey: "Match ID is missing"])))
             return
         }
-        
-        do {
-            try db.collection("matches").document(matchId).setData(from: match) { error in
-                DispatchQueue.main.async {
-                    if let error = error {
-                        completion(.failure(error))
-                    } else {
-                        completion(.success(()))
-                    }
-                }
-            }
-        } catch {
-            DispatchQueue.main.async {
-                completion(.failure(error))
-            }
-        }
+
+        // Get current game records
+        let gameRecords = LocalCacheManager.shared.loadCachedGameRecords(forMatchId: matchId)
+        syncManager.updateMatch(match, gameRecords: gameRecords)
+        completion(.success(()))
     }
-    
+
     func loadMatches(forPlayer playerId: String, completion: @escaping (Result<[MatchRecord], Error>) -> Void) {
-        // Query matches where this player participated (as A, B, or C)
-        let group = DispatchGroup()
-        var allMatches: [MatchRecord] = []
-        var queryError: Error?
-        
-        for field in ["playerAId", "playerBId", "playerCId"] {
-            group.enter()
-            db.collection("matches")
-                .whereField(field, isEqualTo: playerId)
-                .getDocuments { snapshot, error in
-                    defer { group.leave() }
-                    
-                    if let error = error {
-                        queryError = error
-                        return
-                    }
-                    
-                    let matches = snapshot?.documents.compactMap { doc in
-                        try? doc.data(as: MatchRecord.self)
-                    } ?? []
-                    
-                    allMatches.append(contentsOf: matches)
-                }
-        }
-        
-        group.notify(queue: .main) {
-            if let error = queryError {
-                completion(.failure(error))
-            } else {
-                // Remove duplicates (in case player played in same match as different position)
-                var seenIds = Set<String>()
-                let uniqueMatches = allMatches.filter { match in
-                    guard let id = match.id, !seenIds.contains(id) else { return false }
-                    seenIds.insert(id)
-                    return true
-                }
-                completion(.success(uniqueMatches.sorted { ($0.startedAt) > ($1.startedAt) }))
-            }
-        }
+        // Filter from local cache
+        let playerMatches = matches.filter { match in
+            match.playerAId == playerId ||
+            match.playerBId == playerId ||
+            match.playerCId == playerId
+        }.sorted { $0.startedAt > $1.startedAt }
+
+        completion(.success(playerMatches))
     }
-    
+
     // MARK: - Game Records
-    
+
     func saveGameRecords(_ records: [GameRecord], matchId: String, completion: @escaping (Result<Void, Error>) -> Void) {
         guard !records.isEmpty else {
             print("[FirebaseService] No records to save")
             completion(.success(()))
             return
         }
-        
-        let batch = db.batch()
-        
-        for record in records {
-            var recordWithMatchId = record
-            recordWithMatchId.matchId = matchId
-            
-            let ref = db.collection("gameRecords").document()
-            do {
-                try batch.setData(from: recordWithMatchId, forDocument: ref)
-                print("[FirebaseService] Added game record \(record.gameIndex) to batch")
-            } catch {
-                print("[FirebaseService] Error encoding game record \(record.gameIndex): \(error.localizedDescription)")
-                completion(.failure(error))
-                return
+
+        // Save to local
+        LocalCacheManager.shared.cacheGameRecords(records, forMatchId: matchId)
+
+        // Sync to remote
+        if NetworkMonitor.shared.isConnected {
+            let batch = db.batch()
+
+            for var record in records {
+                record.matchId = matchId
+                let ref = db.collection("gameRecords").document()
+                do {
+                    try batch.setData(from: record, forDocument: ref)
+                } catch {
+                    completion(.failure(error))
+                    return
+                }
             }
-        }
-        
-        print("[FirebaseService] Committing batch with \(records.count) records...")
-        batch.commit { error in
-            if let error = error {
-                print("[FirebaseService] Batch commit failed: \(error.localizedDescription)")
-                completion(.failure(error))
-            } else {
-                print("[FirebaseService] Batch commit succeeded")
-                completion(.success(()))
+
+            batch.commit { error in
+                if let error = error {
+                    completion(.failure(error))
+                } else {
+                    completion(.success(()))
+                }
             }
+        } else {
+            // Offline mode: mark as pending
+            if let match = matches.first(where: { $0.id == matchId }) {
+                PendingOperationQueue.shared.enqueueCreateMatch(match, gameRecords: records)
+            }
+            completion(.success(()))
         }
     }
-    
+
     func loadGameRecords(forPlayer playerId: String, completion: @escaping (Result<[GameRecord], Error>) -> Void) {
+        // Load from local cache first (fast path)
+        let allRecords = LocalCacheManager.shared.loadAllCachedGameRecords()
+        let playerRecords = allRecords.filter { record in
+            record.playerAId == playerId ||
+            record.playerBId == playerId ||
+            record.playerCId == playerId
+        }.sorted { $0.playedAt > $1.playedAt }
+
+        // If we have completed a full sync before, trust local cache immediately
+        // This enables instant loading after app restart
+        if LocalCacheManager.shared.hasCompletedFullSync && !playerRecords.isEmpty {
+            print("[FirebaseService] hasCompletedFullSync=true, using \(playerRecords.count) cached game records for player (instant load)")
+            completion(.success(playerRecords))
+            return
+        }
+
+        // If we have cached records and game records are synced this session, use them
+        if !playerRecords.isEmpty && syncManager.isGameRecordsSynced {
+            print("[FirebaseService] Using \(playerRecords.count) cached game records for player")
+            completion(.success(playerRecords))
+            return
+        }
+
+        // If offline, return what we have
+        guard NetworkMonitor.shared.isConnected else {
+            print("[FirebaseService] Offline, returning \(playerRecords.count) cached records")
+            completion(.success(playerRecords))
+            return
+        }
+
+        // Online and cache might be incomplete - load from Firebase
+        print("[FirebaseService] Loading game records from Firebase for player: \(playerId)")
+
         let group = DispatchGroup()
-        var allRecords: [GameRecord] = []
+        var allRemoteRecords: [GameRecord] = []
         var queryError: Error?
-        
+
         for field in ["playerAId", "playerBId", "playerCId"] {
             group.enter()
             db.collection("gameRecords")
                 .whereField(field, isEqualTo: playerId)
                 .getDocuments { snapshot, error in
                     defer { group.leave() }
-                    
+
                     if let error = error {
                         queryError = error
                         return
                     }
-                    
+
                     let records = snapshot?.documents.compactMap { doc in
                         try? doc.data(as: GameRecord.self)
                     } ?? []
-                    
-                    allRecords.append(contentsOf: records)
+
+                    allRemoteRecords.append(contentsOf: records)
                 }
         }
-        
+
         group.notify(queue: .main) {
             if let error = queryError {
-                completion(.failure(error))
+                // If we have cached records, return them despite error
+                if !playerRecords.isEmpty {
+                    completion(.success(playerRecords))
+                } else {
+                    completion(.failure(error))
+                }
             } else {
-                completion(.success(allRecords.sorted { $0.playedAt > $1.playedAt }))
+                let sortedRecords = allRemoteRecords.sorted { $0.playedAt > $1.playedAt }
+                print("[FirebaseService] Loaded \(sortedRecords.count) game records from Firebase")
+                completion(.success(sortedRecords))
             }
         }
     }
-    
+
     // MARK: - Statistics Calculation
-    
+
     func calculateStatistics(forPlayer playerId: String, completion: @escaping (Result<PlayerStatistics, Error>) -> Void) {
         guard let player = players.first(where: { $0.id == playerId }) else {
             completion(.failure(NSError(domain: "", code: -1, userInfo: [NSLocalizedDescriptionKey: "Player not found"])))
             return
         }
-        
+
         var stats = PlayerStatistics(playerId: playerId, playerName: player.name)
-        
+
         let group = DispatchGroup()
         var gameRecords: [GameRecord] = []
         var matchRecords: [MatchRecord] = []
         var loadError: Error?
-        
+
         // Load game records
         group.enter()
         loadGameRecords(forPlayer: playerId) { result in
@@ -462,7 +483,7 @@ class FirebaseService: ObservableObject {
                 loadError = error
             }
         }
-        
+
         // Load match records
         group.enter()
         loadMatches(forPlayer: playerId) { result in
@@ -474,29 +495,29 @@ class FirebaseService: ObservableObject {
                 loadError = error
             }
         }
-        
+
         group.notify(queue: .main) {
             if let error = loadError {
                 completion(.failure(error))
                 return
             }
-            
+
             // Sort game records by date for streak calculation
             let sortedGameRecords = gameRecords.sorted { $0.playedAt < $1.playedAt }
             var currentWinStreak = 0
             var currentLossStreak = 0
-            var cumulativeScore = 0  // Track cumulative score across all games
-            
+            var cumulativeScore = 0
+
             // Calculate game statistics
             stats.totalGames = gameRecords.count
-            
+
             for (gameIndex, record) in sortedGameRecords.enumerated() {
                 let position = self.getPlayerPosition(playerId: playerId, record: record)
                 let isLandlord = record.landlord == position
                 let score = self.getPlayerScore(position: position, record: record)
                 let won = score > 0
                 let doubled = self.getPlayerDoubled(position: position, record: record)
-                
+
                 // Win/Loss count and streaks
                 if won {
                     stats.gamesWon += 1
@@ -509,7 +530,7 @@ class FirebaseService: ObservableObject {
                     currentWinStreak = 0
                     stats.maxLossStreak = max(stats.maxLossStreak, currentLossStreak)
                 }
-                
+
                 // Role breakdown
                 if isLandlord {
                     stats.gamesAsLandlord += 1
@@ -518,7 +539,6 @@ class FirebaseService: ObservableObject {
                     } else {
                         stats.landlordLosses += 1
                     }
-                    // Spring count (landlord wins with spring)
                     if record.isSpring && record.landlordResult {
                         stats.springCount += 1
                     }
@@ -529,12 +549,11 @@ class FirebaseService: ObservableObject {
                     } else {
                         stats.farmerLosses += 1
                     }
-                    // Spring against count (landlord wins with spring, player is farmer)
                     if record.isSpring && record.landlordResult {
                         stats.springAgainstCount += 1
                     }
                 }
-                
+
                 // Doubled game statistics
                 if doubled {
                     stats.doubledGames += 1
@@ -544,9 +563,8 @@ class FirebaseService: ObservableObject {
                         stats.doubledLosses += 1
                     }
                 }
-                
+
                 // Bid distribution when first bidder
-                // firstBidderIndex uses 0-indexed (0=A, 1=B, 2=C), position uses 1-indexed (1=A, 2=B, 3=C)
                 if record.firstBidderIndex == position - 1 {
                     stats.firstBidderGames += 1
                     let bid = self.getPlayerBid(position: position, record: record)
@@ -558,12 +576,11 @@ class FirebaseService: ObservableObject {
                     default: break
                     }
                 }
-                
+
                 // Score stats
                 stats.totalScore += score
-                cumulativeScore += score  // Track running total
-                
-                // Track best/worst game score with index
+                cumulativeScore += score
+
                 if score > stats.bestGameScore {
                     stats.bestGameScore = score
                     stats.bestGameScoreIndex = gameIndex
@@ -572,8 +589,7 @@ class FirebaseService: ObservableObject {
                     stats.worstGameScore = score
                     stats.worstGameScoreIndex = gameIndex
                 }
-                
-                // Track overall cumulative high/low with index
+
                 if cumulativeScore > stats.totalHighScore {
                     stats.totalHighScore = cumulativeScore
                     stats.totalHighGameIndex = gameIndex
@@ -583,25 +599,23 @@ class FirebaseService: ObservableObject {
                     stats.totalLowGameIndex = gameIndex
                 }
             }
-            
-            // Store current streaks
+
             stats.currentWinStreak = currentWinStreak
             stats.currentLossStreak = currentLossStreak
-            
-            // Sort matches by date for streak calculation
+
+            // Match statistics
             let sortedMatches = matchRecords.sorted { $0.startedAt < $1.startedAt }
             var currentMatchWinStreak = 0
             var currentMatchLossStreak = 0
-            
-            // Calculate match statistics
+
             stats.totalMatches = matchRecords.count
-            
+
             for match in sortedMatches {
                 let position = self.getPlayerPositionInMatch(playerId: playerId, match: match)
                 let finalScore = self.getPlayerFinalScore(position: position, match: match)
                 let maxSnapshot = self.getPlayerMaxSnapshot(position: position, match: match)
                 let minSnapshot = self.getPlayerMinSnapshot(position: position, match: match)
-                
+
                 if finalScore > 0 {
                     stats.matchesWon += 1
                     currentMatchWinStreak += 1
@@ -615,29 +629,40 @@ class FirebaseService: ObservableObject {
                 } else {
                     stats.matchesTied += 1
                 }
-                
+
                 stats.bestMatchScore = max(stats.bestMatchScore, finalScore)
                 stats.worstMatchScore = min(stats.worstMatchScore, finalScore)
                 stats.bestSnapshot = max(stats.bestSnapshot, maxSnapshot)
                 stats.worstSnapshot = min(stats.worstSnapshot, minSnapshot)
             }
-            
-            // Store current match streaks
+
             stats.currentMatchWinStreak = currentMatchWinStreak
             stats.currentMatchLossStreak = currentMatchLossStreak
-            
+
             completion(.success(stats))
         }
     }
-    
+
+    // MARK: - Sync Control
+
+    /// Force sync manually
+    func forceSync() {
+        syncManager.forceSync()
+    }
+
+    /// Reset and re-sync all data
+    func resetAndSync() {
+        syncManager.resetAndSync()
+    }
+
     // MARK: - Helper Methods
-    
+
     private func getPlayerPosition(playerId: String, record: GameRecord) -> Int {
         if record.playerAId == playerId { return 1 }
         if record.playerBId == playerId { return 2 }
         return 3
     }
-    
+
     private func getPlayerScore(position: Int, record: GameRecord) -> Int {
         switch position {
         case 1: return record.scoreA
@@ -645,7 +670,7 @@ class FirebaseService: ObservableObject {
         default: return record.scoreC
         }
     }
-    
+
     private func getPlayerDoubled(position: Int, record: GameRecord) -> Bool {
         switch position {
         case 1: return record.adouble
@@ -653,7 +678,7 @@ class FirebaseService: ObservableObject {
         default: return record.cdouble
         }
     }
-    
+
     private func getPlayerBid(position: Int, record: GameRecord) -> Int {
         switch position {
         case 1: return record.apoint
@@ -661,13 +686,13 @@ class FirebaseService: ObservableObject {
         default: return record.cpoint
         }
     }
-    
+
     private func getPlayerPositionInMatch(playerId: String, match: MatchRecord) -> Int {
         if match.playerAId == playerId { return 1 }
         if match.playerBId == playerId { return 2 }
         return 3
     }
-    
+
     private func getPlayerFinalScore(position: Int, match: MatchRecord) -> Int {
         switch position {
         case 1: return match.finalScoreA
@@ -675,7 +700,7 @@ class FirebaseService: ObservableObject {
         default: return match.finalScoreC
         }
     }
-    
+
     private func getPlayerMaxSnapshot(position: Int, match: MatchRecord) -> Int {
         switch position {
         case 1: return match.maxSnapshotA
@@ -683,7 +708,7 @@ class FirebaseService: ObservableObject {
         default: return match.maxSnapshotC
         }
     }
-    
+
     private func getPlayerMinSnapshot(position: Int, match: MatchRecord) -> Int {
         switch position {
         case 1: return match.minSnapshotA
