@@ -138,25 +138,32 @@ struct ListingView: View {
                 }
             }
             .overlay(alignment: .bottom) {
-                // Floating Add Button
+                // Floating Add Button with gradient
                 Button {
                     viewModel.gameIdx = -1
                     viewModel.showingNewItemView = true
                 } label: {
-                    HStack {
-                        Image(systemName: "plus.circle.fill")
-                            .font(.title2)
+                    HStack(spacing: 10) {
+                        Image(systemName: "plus")
+                            .font(.system(size: 16, weight: .bold))
                         Text("添加新局")
-                            .fontWeight(.semibold)
+                            .font(.system(size: 16, weight: .semibold))
                     }
-                    .padding(.horizontal, 24)
-                    .padding(.vertical, 14)
-                    .background(Color.accentColor)
+                    .padding(.horizontal, 28)
+                    .padding(.vertical, 16)
+                    .background(
+                        LinearGradient(
+                            colors: [Color(hex: "FF6B35"), Color(hex: "F7931E")],
+                            startPoint: .leading,
+                            endPoint: .trailing
+                        )
+                    )
                     .foregroundColor(.white)
                     .clipShape(Capsule())
-                    .shadow(color: .accentColor.opacity(0.3), radius: 10, y: 5)
+                    .shadow(color: Color(hex: "FF6B35").opacity(0.35), radius: 12, y: 6)
                 }
-                .padding(.bottom, 16)
+                .buttonStyle(ScaleButtonStyle())
+                .padding(.bottom, 20)
             }
             .sheet(isPresented: $viewModel.showingNewItemView) {
                 AddColumn(
@@ -208,10 +215,10 @@ struct ScoreSummaryCard: View {
     let scoreB: Int
     let scoreC: Int
     let gamesPlayed: Int
-    let onPlayerChange: () -> Void  // Callback when player selection changes
-    
+    let onPlayerChange: () -> Void
+
     @EnvironmentObject var instance: DataSingleton
-    
+
     private func scoreColor(_ score: Int) -> Color {
         if score == 0 { return Color(.secondaryLabel) }
         let isPositive = score > 0
@@ -221,21 +228,35 @@ struct ScoreSummaryCard: View {
             return isPositive ? .red : .green
         }
     }
-    
+
     var body: some View {
-        VStack(spacing: 16) {
+        VStack(spacing: 0) {
+            // Header with gradient accent
             HStack {
-                Text("总分")
-                    .font(.headline)
-                    .foregroundColor(.secondary)
+                HStack(spacing: 8) {
+                    Image(systemName: "trophy.fill")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundColor(Color(hex: "FF6B35"))
+                    Text("总分")
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundColor(.primary)
+                }
                 Spacer()
                 if gamesPlayed > 0 {
-                    Text("已进行 \(gamesPlayed) 局")
-                        .font(.caption)
+                    Text("第 \(gamesPlayed) 局")
+                        .font(.system(size: 13, weight: .medium))
                         .foregroundColor(.secondary)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 4)
+                        .background(Color(.tertiarySystemFill))
+                        .clipShape(Capsule())
                 }
             }
-            
+            .padding(.horizontal, 16)
+            .padding(.top, 14)
+            .padding(.bottom, 12)
+
+            // Score columns
             HStack(spacing: 0) {
                 ScoreColumnWithPicker(
                     selectedPlayer: $playerA,
@@ -245,8 +266,12 @@ struct ScoreSummaryCard: View {
                     color: scoreColor(scoreA),
                     onPlayerChange: onPlayerChange
                 )
-                Divider()
-                    .frame(height: 80)
+
+                // Vertical divider
+                Rectangle()
+                    .fill(Color(.separator).opacity(0.5))
+                    .frame(width: 1, height: 90)
+
                 ScoreColumnWithPicker(
                     selectedPlayer: $playerB,
                     excludePlayers: [playerA, playerC].compactMap { $0 },
@@ -255,8 +280,12 @@ struct ScoreSummaryCard: View {
                     color: scoreColor(scoreB),
                     onPlayerChange: onPlayerChange
                 )
-                Divider()
-                    .frame(height: 80)
+
+                // Vertical divider
+                Rectangle()
+                    .fill(Color(.separator).opacity(0.5))
+                    .frame(width: 1, height: 90)
+
                 ScoreColumnWithPicker(
                     selectedPlayer: $playerC,
                     excludePlayers: [playerA, playerB].compactMap { $0 },
@@ -266,10 +295,17 @@ struct ScoreSummaryCard: View {
                     onPlayerChange: onPlayerChange
                 )
             }
+            .padding(.bottom, 16)
         }
-        .padding()
-        .background(Color(.secondarySystemGroupedBackground))
-        .clipShape(RoundedRectangle(cornerRadius: 16))
+        .background(
+            RoundedRectangle(cornerRadius: 20)
+                .fill(Color(.secondarySystemGroupedBackground))
+                .shadow(color: Color.black.opacity(0.06), radius: 12, y: 4)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 20)
+                .stroke(Color(.separator).opacity(0.2), lineWidth: 1)
+        )
     }
 }
 
@@ -281,16 +317,16 @@ struct ScoreColumnWithPicker: View {
     let score: Int
     let color: Color
     let onPlayerChange: () -> Void
-    
+
     @StateObject private var firebaseService = FirebaseService.shared
     @State private var showingAddPlayer = false
-    
+
     var availablePlayers: [Player] {
         firebaseService.players.filter { player in
             !excludePlayers.contains(where: { $0.id == player.id })
         }
     }
-    
+
     var body: some View {
         Menu {
             ForEach(availablePlayers) { player in
@@ -299,53 +335,76 @@ struct ScoreColumnWithPicker: View {
                     onPlayerChange()
                 } label: {
                     HStack {
+                        Circle()
+                            .fill(player.displayColor)
+                            .frame(width: 10, height: 10)
                         Text(player.name)
+                        Spacer()
                         if selectedPlayer?.id == player.id {
                             Image(systemName: "checkmark")
+                                .foregroundColor(.accentColor)
                         }
                     }
                 }
             }
-            
+
             Divider()
-            
+
             Button {
                 showingAddPlayer = true
             } label: {
                 Label("添加新玩家", systemImage: "plus.circle")
             }
         } label: {
-            VStack(spacing: 6) {
-                // Player avatar/initial circle
+            VStack(spacing: 8) {
+                // Player avatar with ring indicator
                 ZStack {
+                    // Outer ring for selected state
+                    Circle()
+                        .stroke(
+                            selectedPlayer != nil
+                                ? selectedPlayer!.displayColor.opacity(0.3)
+                                : Color(.separator).opacity(0.3),
+                            lineWidth: 2
+                        )
+                        .frame(width: 46, height: 46)
+
+                    // Inner circle
                     Circle()
                         .fill(selectedPlayer?.displayColor.opacity(0.15) ?? Color(.tertiarySystemFill))
-                        .frame(width: 36, height: 36)
-                    
+                        .frame(width: 40, height: 40)
+
                     if let player = selectedPlayer {
                         Text(String(player.name.prefix(1)))
-                            .font(.headline)
-                            .fontWeight(.medium)
+                            .font(.system(size: 18, weight: .semibold))
                             .foregroundColor(player.displayColor)
                     } else {
                         Image(systemName: "person.badge.plus")
-                            .font(.caption)
+                            .font(.system(size: 14))
                             .foregroundColor(.secondary)
                     }
                 }
-                
-                // Player name
-                Text(selectedPlayer?.name ?? "玩家\(position)")
-                    .font(.caption)
-                    .foregroundColor(selectedPlayer != nil ? Color(.label) : .secondary)
-                    .lineLimit(1)
-                
-                // Score display
+
+                // Player name with dropdown indicator
+                HStack(spacing: 4) {
+                    Text(selectedPlayer?.name ?? "选择玩家")
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundColor(selectedPlayer != nil ? Color(.label) : .secondary)
+                        .lineLimit(1)
+
+                    Image(systemName: "chevron.down")
+                        .font(.system(size: 9, weight: .semibold))
+                        .foregroundColor(.secondary)
+                }
+
+                // Score display with emphasis
                 Text(score >= 0 ? "+\(score)" : "\(score)")
-                    .font(.system(size: 24, weight: .bold, design: .rounded))
+                    .font(.system(size: 26, weight: .bold, design: .rounded))
                     .foregroundColor(color)
+                    .contentTransition(.numericText())
             }
             .frame(maxWidth: .infinity)
+            .padding(.vertical, 4)
         }
         .sheet(isPresented: $showingAddPlayer) {
             AddPlayerView(isPresented: $showingAddPlayer)
@@ -382,71 +441,97 @@ struct GameRowCard: View {
     let playerNames: (String, String, String)
     let onEdit: () -> Void
     let onDelete: () -> Void
-    
+
     @EnvironmentObject var instance: DataSingleton
-    
+
     private var displayScoreA: Int { cumulativeScore?.A ?? game.A }
     private var displayScoreB: Int { cumulativeScore?.B ?? game.B }
     private var displayScoreC: Int { cumulativeScore?.C ?? game.C }
-    
+
     private func scoreColor(for colorString: String) -> Color {
         return colorString.color
     }
-    
+
+    /// Determine winner for this game (highest score)
+    private var winnerPosition: Int {
+        let scores = [displayScoreA, displayScoreB, displayScoreC]
+        if let maxScore = scores.max(), maxScore > 0 {
+            return scores.firstIndex(of: maxScore)! + 1
+        }
+        return 0
+    }
+
     var body: some View {
         HStack(spacing: 12) {
-            // Game number badge
-            Text("\(gameNumber)")
-                .font(.caption)
-                .fontWeight(.medium)
-                .foregroundColor(.white)
-                .frame(width: 28, height: 28)
-                .background(Circle().fill(Color.accentColor.opacity(0.8)))
-            
-            // Scores
-            HStack(spacing: 0) {
+            // Game number badge with gradient
+            ZStack {
+                Circle()
+                    .fill(
+                        LinearGradient(
+                            colors: [Color(hex: "FF6B35").opacity(0.9), Color(hex: "F7931E").opacity(0.9)],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+                    .frame(width: 30, height: 30)
+
+                Text("\(gameNumber)")
+                    .font(.system(size: 13, weight: .bold, design: .rounded))
+                    .foregroundColor(.white)
+            }
+
+            // Scores with improved layout
+            HStack(spacing: 4) {
                 GameScoreCell(
                     name: playerNames.0,
                     score: displayScoreA,
                     isLandlord: game.landlord == 1,
-                    color: scoreColor(for: game.aC)
+                    color: scoreColor(for: game.aC),
+                    isWinner: winnerPosition == 1
                 )
                 GameScoreCell(
                     name: playerNames.1,
                     score: displayScoreB,
                     isLandlord: game.landlord == 2,
-                    color: scoreColor(for: game.bC)
+                    color: scoreColor(for: game.bC),
+                    isWinner: winnerPosition == 2
                 )
                 GameScoreCell(
                     name: playerNames.2,
                     score: displayScoreC,
                     isLandlord: game.landlord == 3,
-                    color: scoreColor(for: game.cC)
+                    color: scoreColor(for: game.cC),
+                    isWinner: winnerPosition == 3
                 )
             }
-            
-            // Action buttons
+
+            // Action menu with cleaner styling
             Menu {
                 Button {
                     onEdit()
                 } label: {
                     Label("编辑", systemImage: "pencil")
                 }
+                Divider()
                 Button(role: .destructive) {
                     onDelete()
                 } label: {
                     Label("删除", systemImage: "trash")
                 }
             } label: {
-                Image(systemName: "ellipsis.circle")
-                    .font(.title3)
+                Image(systemName: "ellipsis")
+                    .font(.system(size: 14, weight: .medium))
                     .foregroundColor(.secondary)
+                    .frame(width: 32, height: 32)
+                    .background(Color(.tertiarySystemFill))
+                    .clipShape(Circle())
             }
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 10)
+        .padding(.horizontal, 14)
+        .padding(.vertical, 12)
         .background(Color(.secondarySystemGroupedBackground))
-        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .clipShape(RoundedRectangle(cornerRadius: 14))
+        .shadow(color: Color.black.opacity(0.03), radius: 4, y: 2)
     }
 }
 
@@ -455,22 +540,28 @@ struct GameScoreCell: View {
     let score: Int
     let isLandlord: Bool
     let color: Color
-    
+    var isWinner: Bool = false
+
     var body: some View {
-        VStack(spacing: 2) {
-            HStack(spacing: 2) {
+        VStack(spacing: 3) {
+            // Player name with landlord indicator
+            HStack(spacing: 3) {
                 if isLandlord {
-                    Text("👑")
-                        .font(.caption2)
+                    Image(systemName: "crown.fill")
+                        .font(.system(size: 9))
+                        .foregroundColor(Color(hex: "F7931E"))
                 }
                 Text(name)
-                    .font(.caption2)
+                    .font(.system(size: 11, weight: .medium))
                     .foregroundColor(.secondary)
                     .lineLimit(1)
             }
+
+            // Score with emphasis on winner
             Text(score >= 0 ? "+\(score)" : "\(score)")
-                .font(.system(size: 16, weight: .semibold, design: .rounded))
+                .font(.system(size: 17, weight: .bold, design: .rounded))
                 .foregroundColor(color)
+                .opacity(isWinner ? 1 : 0.85)
         }
         .frame(maxWidth: .infinity)
     }
@@ -480,21 +571,47 @@ struct GameScoreCell: View {
 
 struct EmptyGamesView: View {
     var body: some View {
-        VStack(spacing: 12) {
-            Image(systemName: "rectangle.stack.badge.plus")
-                .font(.system(size: 48))
-                .foregroundColor(.secondary.opacity(0.5))
-            Text("还没有记录")
-                .font(.headline)
-                .foregroundColor(.secondary)
-            Text("点击下方按钮添加第一局")
-                .font(.subheadline)
-                .foregroundColor(.secondary.opacity(0.7))
+        VStack(spacing: 16) {
+            // Decorative icon with gradient background
+            ZStack {
+                Circle()
+                    .fill(
+                        LinearGradient(
+                            colors: [Color(hex: "FF6B35").opacity(0.1), Color(hex: "F7931E").opacity(0.05)],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+                    .frame(width: 80, height: 80)
+
+                Image(systemName: "rectangle.stack.badge.plus")
+                    .font(.system(size: 32, weight: .medium))
+                    .foregroundStyle(
+                        LinearGradient(
+                            colors: [Color(hex: "FF6B35"), Color(hex: "F7931E")],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+            }
+
+            VStack(spacing: 6) {
+                Text("开始记录你的牌局")
+                    .font(.system(size: 17, weight: .semibold))
+                    .foregroundColor(.primary)
+
+                Text("点击下方按钮添加第一局比赛")
+                    .font(.system(size: 14))
+                    .foregroundColor(.secondary)
+            }
         }
         .frame(maxWidth: .infinity)
-        .padding(.vertical, 40)
-        .background(Color(.secondarySystemGroupedBackground))
-        .clipShape(RoundedRectangle(cornerRadius: 16))
+        .padding(.vertical, 48)
+        .background(
+            RoundedRectangle(cornerRadius: 20)
+                .fill(Color(.secondarySystemGroupedBackground))
+                .shadow(color: Color.black.opacity(0.04), radius: 8, y: 2)
+        )
     }
 }
 

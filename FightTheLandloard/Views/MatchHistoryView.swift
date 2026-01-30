@@ -80,15 +80,38 @@ struct MatchHistoryView: View {
     
     private var emptyStateView: some View {
         VStack(spacing: 20) {
-            Image(systemName: "clock.arrow.circlepath")
-                .font(.system(size: 60))
-                .foregroundColor(.secondary.opacity(0.5))
-            Text("暂无历史对局")
-                .font(.title2)
-                .fontWeight(.medium)
-            Text("结束一场对局后会在这里显示")
-                .font(.subheadline)
-                .foregroundColor(.secondary)
+            // Decorative icon with gradient background
+            ZStack {
+                Circle()
+                    .fill(
+                        LinearGradient(
+                            colors: [Color(hex: "FF6B35").opacity(0.1), Color(hex: "F7931E").opacity(0.05)],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+                    .frame(width: 100, height: 100)
+
+                Image(systemName: "clock.badge.checkmark")
+                    .font(.system(size: 40, weight: .medium))
+                    .foregroundStyle(
+                        LinearGradient(
+                            colors: [Color(hex: "FF6B35"), Color(hex: "F7931E")],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+            }
+
+            VStack(spacing: 8) {
+                Text("暂无历史对局")
+                    .font(.system(size: 20, weight: .semibold))
+                    .foregroundColor(.primary)
+
+                Text("结束一场对局后会在这里显示")
+                    .font(.system(size: 15))
+                    .foregroundColor(.secondary)
+            }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color(.systemGroupedBackground))
@@ -198,7 +221,7 @@ struct MatchHistoryView: View {
     
     @ViewBuilder
     private func yearSection(year: Int) -> some View {
-        // Year header - LARGE title, no indent
+        // Year header - prominent title with accent color
         Button {
             withAnimation(.easeInOut(duration: 0.2)) {
                 if expandedYears.contains(year) {
@@ -208,26 +231,39 @@ struct MatchHistoryView: View {
                 }
             }
         } label: {
-            HStack {
+            HStack(spacing: 10) {
+                // Year text with gradient accent
                 Text("\(String(year))年")
-                    .font(.system(size: 28, weight: .bold))
+                    .font(.system(size: 26, weight: .bold, design: .rounded))
                     .foregroundColor(Color(.label))
+
                 Image(systemName: expandedYears.contains(year) ? "chevron.down" : "chevron.right")
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundColor(.secondary)
+                    .font(.system(size: 12, weight: .bold))
+                    .foregroundColor(Color(hex: "FF6B35"))
+                    .rotationEffect(.degrees(expandedYears.contains(year) ? 0 : 0))
+
                 Spacer()
-                Text("\(matchCount(forYear: year))场")
-                    .font(.subheadline)
-                    .foregroundColor(.secondary)
+
+                // Match count badge
+                HStack(spacing: 4) {
+                    Image(systemName: "rectangle.stack.fill")
+                        .font(.system(size: 11))
+                    Text("\(matchCount(forYear: year))场")
+                        .font(.system(size: 13, weight: .medium))
+                }
+                .foregroundColor(.secondary)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 5)
+                .background(Color(.tertiarySystemFill))
+                .clipShape(Capsule())
             }
-            .padding(.vertical, 12)
+            .padding(.vertical, 14)
             .padding(.horizontal, 4)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        
+
         if expandedYears.contains(year) {
-            // Always show all months
             ForEach(uniqueMonths(forYear: year), id: \.self) { month in
                 monthSection(year: year, month: month)
             }
@@ -237,8 +273,8 @@ struct MatchHistoryView: View {
     @ViewBuilder
     private func monthSection(year: Int, month: Int) -> some View {
         let monthKey = "\(year)-\(month)"
-        
-        // Month header - no indent, medium size
+
+        // Month header - clean design
         Button {
             withAnimation(.easeInOut(duration: 0.2)) {
                 if expandedMonths.contains(monthKey) {
@@ -248,26 +284,34 @@ struct MatchHistoryView: View {
                 }
             }
         } label: {
-            HStack {
+            HStack(spacing: 8) {
+                // Month indicator dot
+                Circle()
+                    .fill(Color(hex: "FF6B35").opacity(0.6))
+                    .frame(width: 6, height: 6)
+
                 Text("\(month)月")
-                    .font(.system(size: 20, weight: .semibold))
+                    .font(.system(size: 18, weight: .semibold))
                     .foregroundColor(Color(.label))
+
                 Image(systemName: expandedMonths.contains(monthKey) ? "chevron.down" : "chevron.right")
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundColor(.secondary)
+
+                Spacer()
+
+                Text("\(matchCount(forYear: year, month: month))场")
                     .font(.system(size: 12, weight: .medium))
                     .foregroundColor(.secondary)
-                Spacer()
-                Text("\(matchCount(forYear: year, month: month))场")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
             }
-            .padding(.vertical, 8)
+            .padding(.vertical, 10)
             .padding(.horizontal, 4)
+            .padding(.leading, 8)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        
+
         if expandedMonths.contains(monthKey) {
-            // Always show all days
             ForEach(uniqueDays(forYear: year, month: month), id: \.self) { day in
                 daySection(year: year, month: month, day: day)
             }
@@ -277,8 +321,8 @@ struct MatchHistoryView: View {
     @ViewBuilder
     private func daySection(year: Int, month: Int, day: Int) -> some View {
         let dayKey = "\(year)-\(month)-\(day)"
-        
-        // Day header - no indent, smaller size
+
+        // Day header - subtle design
         Button {
             withAnimation(.easeInOut(duration: 0.2)) {
                 if expandedDays.contains(dayKey) {
@@ -288,24 +332,33 @@ struct MatchHistoryView: View {
                 }
             }
         } label: {
-            HStack {
+            HStack(spacing: 8) {
+                // Day indicator line
+                RoundedRectangle(cornerRadius: 1)
+                    .fill(Color(.separator))
+                    .frame(width: 2, height: 12)
+
                 Text("\(day)日")
-                    .font(.system(size: 16, weight: .regular))
+                    .font(.system(size: 15, weight: .medium))
                     .foregroundColor(Color(.label))
+
                 Image(systemName: expandedDays.contains(dayKey) ? "chevron.down" : "chevron.right")
-                    .font(.system(size: 10, weight: .medium))
+                    .font(.system(size: 9, weight: .semibold))
                     .foregroundColor(.secondary)
+
                 Spacer()
+
                 Text("\(matchCount(forYear: year, month: month, day: day))场")
-                    .font(.caption2)
+                    .font(.system(size: 11, weight: .medium))
                     .foregroundColor(.secondary)
             }
-            .padding(.vertical, 6)
+            .padding(.vertical, 8)
             .padding(.horizontal, 4)
+            .padding(.leading, 20)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        
+
         if expandedDays.contains(dayKey) {
             matchesList(year: year, month: month, day: day)
         }
@@ -315,7 +368,7 @@ struct MatchHistoryView: View {
     private func matchesList(year: Int, month: Int, day: Int) -> some View {
         let dayMatches = matches(forYear: year, month: month, day: day)
 
-        // Match rows in a card container - no leading padding
+        // Match rows in a card container
         VStack(spacing: 0) {
             ForEach(Array(dayMatches.enumerated()), id: \.element.id) { index, match in
                 SwipeableMatchRow(
@@ -331,16 +384,18 @@ struct MatchHistoryView: View {
 
                 if index < dayMatches.count - 1 {
                     Divider()
-                        .padding(.leading, 52)
+                        .padding(.leading, 56)
                 }
             }
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 8)
+        .padding(.horizontal, 14)
+        .padding(.vertical, 10)
         .background(Color(.secondarySystemGroupedBackground))
-        .clipShape(RoundedRectangle(cornerRadius: 10))
-        .padding(.top, 4)
-        .padding(.bottom, 8)
+        .clipShape(RoundedRectangle(cornerRadius: 14))
+        .shadow(color: Color.black.opacity(0.03), radius: 4, y: 2)
+        .padding(.top, 6)
+        .padding(.bottom, 10)
+        .padding(.leading, 24)
     }
 }
 

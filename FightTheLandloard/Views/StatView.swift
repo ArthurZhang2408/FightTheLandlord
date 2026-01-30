@@ -33,19 +33,28 @@ struct StatView: View {
                     Button {
                         showingCompareView = true
                     } label: {
-                        HStack {
+                        HStack(spacing: 8) {
                             Image(systemName: "chart.line.uptrend.xyaxis")
+                                .font(.system(size: 14, weight: .semibold))
                             Text("对比")
+                                .font(.system(size: 15, weight: .semibold))
                         }
-                        .padding(.horizontal, 16)
-                        .padding(.vertical, 10)
-                        .background(Color.accentColor)
+                        .padding(.horizontal, 20)
+                        .padding(.vertical, 12)
+                        .background(
+                            LinearGradient(
+                                colors: [Color(hex: "FF6B35"), Color(hex: "F7931E")],
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            )
+                        )
                         .foregroundColor(.white)
-                        .cornerRadius(20)
-                        .shadow(radius: 4)
+                        .clipShape(Capsule())
+                        .shadow(color: Color(hex: "FF6B35").opacity(0.35), radius: 10, y: 5)
                     }
+                    .buttonStyle(ScaleButtonStyle())
                     .padding(.trailing, 20)
-                    .padding(.bottom, 20)
+                    .padding(.bottom, 24)
                 }
             }
             .navigationTitle("玩家统计")
@@ -85,31 +94,63 @@ struct StatView: View {
     }
     
     private var emptyStateView: some View {
-        VStack(spacing: 20) {
-            Image(systemName: "person.3.fill")
-                .font(.system(size: 60))
-                .foregroundColor(.secondary.opacity(0.5))
-            
-            Text("暂无玩家")
-                .font(.title2)
-                .fontWeight(.medium)
-            
-            Text("添加玩家来记录比赛统计")
-                .font(.subheadline)
-                .foregroundColor(.secondary)
-            
+        VStack(spacing: 24) {
+            // Decorative icon with gradient background
+            ZStack {
+                Circle()
+                    .fill(
+                        LinearGradient(
+                            colors: [Color(hex: "FF6B35").opacity(0.1), Color(hex: "F7931E").opacity(0.05)],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+                    .frame(width: 100, height: 100)
+
+                Image(systemName: "person.3.fill")
+                    .font(.system(size: 40, weight: .medium))
+                    .foregroundStyle(
+                        LinearGradient(
+                            colors: [Color(hex: "FF6B35"), Color(hex: "F7931E")],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+            }
+
+            VStack(spacing: 8) {
+                Text("暂无玩家")
+                    .font(.system(size: 20, weight: .semibold))
+                    .foregroundColor(.primary)
+
+                Text("添加玩家来记录比赛统计")
+                    .font(.system(size: 15))
+                    .foregroundColor(.secondary)
+            }
+
             Button {
                 showingAddPlayer = true
             } label: {
-                HStack {
-                    Image(systemName: "plus.circle.fill")
+                HStack(spacing: 8) {
+                    Image(systemName: "plus")
+                        .font(.system(size: 14, weight: .bold))
                     Text("添加玩家")
+                        .font(.system(size: 15, weight: .semibold))
                 }
-                .padding(.horizontal, 24)
-                .padding(.vertical, 12)
+                .padding(.horizontal, 28)
+                .padding(.vertical, 14)
+                .background(
+                    LinearGradient(
+                        colors: [Color(hex: "FF6B35"), Color(hex: "F7931E")],
+                        startPoint: .leading,
+                        endPoint: .trailing
+                    )
+                )
+                .foregroundColor(.white)
+                .clipShape(Capsule())
+                .shadow(color: Color(hex: "FF6B35").opacity(0.3), radius: 8, y: 4)
             }
-            .buttonStyle(.borderedProminent)
-            .padding(.top, 8)
+            .buttonStyle(ScaleButtonStyle())
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color(.systemGroupedBackground))
@@ -121,34 +162,47 @@ struct StatView: View {
                 Button {
                     navigationPath.append(player)
                 } label: {
-                    HStack(spacing: 12) {
-                        // Avatar with player color
+                    HStack(spacing: 14) {
+                        // Avatar with player color and ring
                         ZStack {
+                            // Outer ring
                             Circle()
-                                .fill(player.displayColor.opacity(0.15))
+                                .stroke(player.displayColor.opacity(0.3), lineWidth: 2)
+                                .frame(width: 50, height: 50)
+
+                            // Inner circle
+                            Circle()
+                                .fill(player.displayColor.opacity(0.12))
                                 .frame(width: 44, height: 44)
+
                             Text(String(player.name.prefix(1)))
-                                .font(.headline)
+                                .font(.system(size: 18, weight: .semibold))
                                 .foregroundColor(player.displayColor)
                         }
-                        
-                        // Name
-                        Text(player.name)
-                            .font(.body)
-                            .foregroundColor(Color(.label))
-                        
+
+                        // Name and color
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(player.name)
+                                .font(.system(size: 16, weight: .medium))
+                                .foregroundColor(Color(.label))
+
+                            HStack(spacing: 6) {
+                                Circle()
+                                    .fill(player.displayColor)
+                                    .frame(width: 8, height: 8)
+                                Text(player.playerColor?.displayName ?? "默认颜色")
+                                    .font(.system(size: 12))
+                                    .foregroundColor(.secondary)
+                            }
+                        }
+
                         Spacer()
-                        
-                        // Color indicator
-                        Circle()
-                            .fill(player.displayColor)
-                            .frame(width: 10, height: 10)
-                        
+
                         Image(systemName: "chevron.right")
-                            .font(.caption)
+                            .font(.system(size: 12, weight: .semibold))
                             .foregroundColor(.secondary)
                     }
-                    .padding(.vertical, 4)
+                    .padding(.vertical, 6)
                 }
                 .swipeActions(edge: .trailing, allowsFullSwipe: false) {
                     Button {

@@ -1,11 +1,65 @@
 //
 //  UIExtension.swift
-//  ExpenseTracker
+//  FightTheLandlord
 //
 //  Created by Arthur Zhang on 2024-06-30.
 //
 
 import SwiftUI
+
+// MARK: - Design System Constants
+
+/// App theme colors and gradients for consistent visual design
+enum AppTheme {
+    // Primary brand colors
+    static let accentGradient = LinearGradient(
+        colors: [Color(hex: "FF6B35"), Color(hex: "F7931E")],
+        startPoint: .topLeading,
+        endPoint: .bottomTrailing
+    )
+
+    static let landlordGradient = LinearGradient(
+        colors: [Color(hex: "FFB347"), Color(hex: "FFCC33")],
+        startPoint: .topLeading,
+        endPoint: .bottomTrailing
+    )
+
+    static let farmerGradient = LinearGradient(
+        colors: [Color(hex: "56AB2F"), Color(hex: "A8E063")],
+        startPoint: .topLeading,
+        endPoint: .bottomTrailing
+    )
+
+    static let welcomeGradient = LinearGradient(
+        colors: [Color(hex: "1A1A2E"), Color(hex: "16213E"), Color(hex: "0F3460")],
+        startPoint: .top,
+        endPoint: .bottom
+    )
+
+    static let cardGradient = LinearGradient(
+        colors: [Color(hex: "E74C3C"), Color(hex: "C0392B")],
+        startPoint: .topLeading,
+        endPoint: .bottomTrailing
+    )
+
+    // Semantic colors
+    static let winColor = Color(hex: "27AE60")
+    static let loseColor = Color(hex: "E74C3C")
+    static let landlordColor = Color(hex: "F39C12")
+    static let farmerColor = Color(hex: "27AE60")
+
+    // Card styling
+    static let cardCornerRadius: CGFloat = 16
+    static let cardShadowRadius: CGFloat = 8
+    static let cardShadowY: CGFloat = 4
+
+    // Spacing
+    static let smallSpacing: CGFloat = 8
+    static let mediumSpacing: CGFloat = 16
+    static let largeSpacing: CGFloat = 24
+}
+
+// MARK: - Custom Font
 
 enum Inter: String {
     case regular = "Inter-Regular"
@@ -15,12 +69,12 @@ enum Inter: String {
 }
 
 extension Font {
-    
     static func customfont(_ font: Inter, fontSize: CGFloat) -> Font {
         custom(font.rawValue, size: fontSize)
     }
-    
 }
+
+// MARK: - String Extension
 
 extension String {
     var color: Color {
@@ -32,52 +86,52 @@ extension String {
     }
 }
 
+// MARK: - CGFloat Extension
+
 extension CGFloat {
-    
     static var screenWidth: Double {
         return UIScreen.main.bounds.size.width
     }
-    
+
     static var screenHeight: Double {
         return UIScreen.main.bounds.size.height
     }
-    
+
     static func widthPer(per: Double) -> Double {
         return screenWidth * per
     }
-    
+
     static func heightPer(per: Double) -> Double {
         return screenHeight * per
     }
-    
+
     static var topInsets: Double {
         if let KeyWindow = UIApplication.shared.keyWindow {
             return KeyWindow.safeAreaInsets.top
         }
         return 0.0
     }
-    
+
     static var bottomInsets: Double {
         if let KeyWindow = UIApplication.shared.keyWindow {
             return KeyWindow.safeAreaInsets.bottom
         }
         return 0.0
     }
-    
+
     static var horizontalInsets: Double {
         if let KeyWindow = UIApplication.shared.keyWindow {
             return KeyWindow.safeAreaInsets.left + KeyWindow.safeAreaInsets.left
         }
         return 0.0
     }
-    
+
     static var verticalInsets: Double {
         if let KeyWindow = UIApplication.shared.keyWindow {
             return KeyWindow.safeAreaInsets.top + KeyWindow.safeAreaInsets.bottom
         }
         return 0.0
     }
-    
 }
 
 extension Color {
