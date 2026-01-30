@@ -8,75 +8,89 @@
 import SwiftUI
 
 struct WelcomeView: View {
+    @State private var animateBackground = false
     @State private var animateCards = false
     @State private var animateLogo = false
-    @State private var animateButtons = false
+    @State private var animateTitle = false
+    @State private var animateButton = false
+    @State private var pulseGlow = false
+    @State private var shineOffset: CGFloat = -200
     @EnvironmentObject var instance: DataSingleton
 
     var body: some View {
         ZStack {
-            // Background gradient with animated overlay
-            AppTheme.welcomeGradient
-                .ignoresSafeArea()
+            // Animated gradient background
+            LinearGradient(
+                colors: [
+                    Color(hex: "0F0F1A"),
+                    Color(hex: "1A1A2E"),
+                    Color(hex: "16213E")
+                ],
+                startPoint: animateBackground ? .topLeading : .top,
+                endPoint: animateBackground ? .bottomTrailing : .bottom
+            )
+            .ignoresSafeArea()
+            .animation(.easeInOut(duration: 8).repeatForever(autoreverses: true), value: animateBackground)
 
-            // Decorative floating cards
+            // Floating poker cards background
             GeometryReader { geo in
-                // Top left card
-                FloatingCardView(symbol: "♠️", rotation: -15)
-                    .offset(
-                        x: animateCards ? 30 : 20,
-                        y: animateCards ? 80 : 100
-                    )
-                    .opacity(animateCards ? 0.3 : 0)
-
-                // Top right card
-                FloatingCardView(symbol: "♥️", rotation: 20)
-                    .offset(
-                        x: geo.size.width - 90,
-                        y: animateCards ? 120 : 140
+                ForEach(0..<6, id: \.self) { index in
+                    FloatingPokerCard(
+                        suit: ["♠️", "♥️", "♦️", "♣️", "🃏", "👑"][index],
+                        size: [45, 50, 40, 55, 48, 42][index],
+                        initialX: [0.1, 0.85, 0.15, 0.9, 0.05, 0.8][index] * geo.size.width,
+                        initialY: [0.15, 0.2, 0.7, 0.75, 0.45, 0.5][index] * geo.size.height,
+                        rotation: [-15, 20, 10, -25, 15, -10][index],
+                        delay: Double(index) * 0.15
                     )
                     .opacity(animateCards ? 0.25 : 0)
-
-                // Bottom left card
-                FloatingCardView(symbol: "♦️", rotation: 10)
-                    .offset(
-                        x: animateCards ? 50 : 40,
-                        y: geo.size.height - 280
-                    )
-                    .opacity(animateCards ? 0.2 : 0)
-
-                // Bottom right card
-                FloatingCardView(symbol: "♣️", rotation: -25)
-                    .offset(
-                        x: geo.size.width - 100,
-                        y: geo.size.height - 320
-                    )
-                    .opacity(animateCards ? 0.25 : 0)
+                }
             }
 
+            // Main content
             VStack(spacing: 0) {
                 Spacer()
 
                 // Logo Section
-                VStack(spacing: 24) {
-                    // Animated logo with glow effect
+                VStack(spacing: 32) {
+                    // Animated logo with multiple layers
                     ZStack {
-                        // Outer glow
+                        // Pulsing outer glow
                         Circle()
                             .fill(
                                 RadialGradient(
                                     colors: [
-                                        Color.orange.opacity(0.4),
-                                        Color.orange.opacity(0.1),
+                                        Color(hex: "FF6B35").opacity(0.35),
+                                        Color(hex: "FF6B35").opacity(0.1),
                                         Color.clear
                                     ],
                                     center: .center,
-                                    startRadius: 50,
-                                    endRadius: 100
+                                    startRadius: 60,
+                                    endRadius: 130
                                 )
                             )
-                            .frame(width: 180, height: 180)
-                            .scaleEffect(animateLogo ? 1.1 : 0.9)
+                            .frame(width: 240, height: 240)
+                            .scaleEffect(pulseGlow ? 1.15 : 1.0)
+                            .animation(.easeInOut(duration: 2.5).repeatForever(autoreverses: true), value: pulseGlow)
+
+                        // Rotating ring
+                        Circle()
+                            .strokeBorder(
+                                AngularGradient(
+                                    colors: [
+                                        Color(hex: "FF6B35").opacity(0.6),
+                                        Color(hex: "F7931E").opacity(0.2),
+                                        Color(hex: "FF6B35").opacity(0.05),
+                                        Color(hex: "F7931E").opacity(0.2),
+                                        Color(hex: "FF6B35").opacity(0.6)
+                                    ],
+                                    center: .center
+                                ),
+                                lineWidth: 2
+                            )
+                            .frame(width: 170, height: 170)
+                            .rotationEffect(.degrees(animateLogo ? 360 : 0))
+                            .animation(.linear(duration: 20).repeatForever(autoreverses: false), value: animateLogo)
 
                         // Main icon container
                         ZStack {
@@ -93,171 +107,201 @@ struct WelcomeView: View {
                                         endPoint: .bottomTrailing
                                     )
                                 )
-                                .frame(width: 120, height: 120)
-                                .shadow(color: Color.orange.opacity(0.5), radius: 20, y: 10)
+                                .frame(width: 140, height: 140)
+                                .shadow(color: Color(hex: "FF6B35").opacity(0.6), radius: 30, y: 10)
 
                             // Inner highlight
                             Circle()
                                 .fill(
                                     LinearGradient(
-                                        colors: [Color.white.opacity(0.3), Color.clear],
+                                        colors: [Color.white.opacity(0.4), Color.clear],
                                         startPoint: .topLeading,
                                         endPoint: .center
                                     )
                                 )
-                                .frame(width: 110, height: 110)
+                                .frame(width: 130, height: 130)
 
-                            // Card icon
-                            Text("🃏")
-                                .font(.system(size: 56))
-                                .shadow(color: .black.opacity(0.2), radius: 4, y: 2)
+                            // Card icons stack
+                            ZStack {
+                                Text("🂡")
+                                    .font(.system(size: 38))
+                                    .offset(x: -14, y: -5)
+                                    .rotationEffect(.degrees(-12))
+                                Text("🂱")
+                                    .font(.system(size: 38))
+                                    .offset(x: 14, y: 5)
+                                    .rotationEffect(.degrees(12))
+                                Text("👑")
+                                    .font(.system(size: 30))
+                                    .offset(y: -38)
+                            }
                         }
-                        .scaleEffect(animateLogo ? 1 : 0.8)
+                        .scaleEffect(animateLogo ? 1 : 0.5)
+                        .opacity(animateLogo ? 1 : 0)
                     }
 
-                    // App title
-                    VStack(spacing: 8) {
-                        Text("斗地主计分牌")
-                            .font(.system(size: 34, weight: .bold, design: .rounded))
+                    // App title with gradient text
+                    VStack(spacing: 12) {
+                        Text("斗地主记分器")
+                            .font(.system(size: 38, weight: .bold, design: .rounded))
                             .foregroundStyle(
                                 LinearGradient(
-                                    colors: [.white, .white.opacity(0.9)],
+                                    colors: [.white, .white.opacity(0.85)],
                                     startPoint: .top,
                                     endPoint: .bottom
                                 )
                             )
-                            .shadow(color: .black.opacity(0.3), radius: 4, y: 2)
+                            .shadow(color: .black.opacity(0.3), radius: 8, y: 4)
 
-                        Text("轻松记录每一局精彩对决")
-                            .font(.system(size: 16, weight: .medium))
-                            .foregroundColor(.white.opacity(0.7))
+                        Text("记录每一局 · 见证每一次胜利")
+                            .font(.system(size: 15, weight: .medium))
+                            .foregroundColor(.white.opacity(0.55))
+                            .tracking(2)
                     }
-                    .opacity(animateLogo ? 1 : 0)
-                    .offset(y: animateLogo ? 0 : 20)
+                    .opacity(animateTitle ? 1 : 0)
+                    .offset(y: animateTitle ? 0 : 30)
                 }
 
                 Spacer()
 
-                // Action Buttons
-                VStack(spacing: 14) {
-                    // Primary button - Start new game
+                // Start Button
+                VStack(spacing: 24) {
                     Button {
-                        withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
+                        withAnimation(.spring(response: 0.4, dampingFraction: 0.7)) {
                             instance.newGame()
                         }
                     } label: {
-                        HStack(spacing: 12) {
+                        HStack(spacing: 14) {
                             Image(systemName: "play.fill")
-                                .font(.system(size: 18, weight: .semibold))
+                                .font(.system(size: 20, weight: .semibold))
                             Text("开始新牌局")
-                                .font(.system(size: 18, weight: .semibold))
+                                .font(.system(size: 20, weight: .bold))
                         }
                         .frame(maxWidth: .infinity)
-                        .padding(.vertical, 18)
+                        .padding(.vertical, 20)
                         .background(
-                            LinearGradient(
-                                colors: [Color(hex: "FF6B35"), Color(hex: "F7931E")],
-                                startPoint: .leading,
-                                endPoint: .trailing
-                            )
+                            ZStack {
+                                // Base gradient
+                                LinearGradient(
+                                    colors: [Color(hex: "FF6B35"), Color(hex: "F7931E")],
+                                    startPoint: .leading,
+                                    endPoint: .trailing
+                                )
+
+                                // Shine effect
+                                LinearGradient(
+                                    colors: [
+                                        Color.white.opacity(0),
+                                        Color.white.opacity(0.25),
+                                        Color.white.opacity(0)
+                                    ],
+                                    startPoint: .leading,
+                                    endPoint: .trailing
+                                )
+                                .frame(width: 100)
+                                .offset(x: shineOffset)
+                            }
+                            .clipShape(RoundedRectangle(cornerRadius: 18))
                         )
                         .foregroundColor(.white)
-                        .clipShape(RoundedRectangle(cornerRadius: 16))
-                        .shadow(color: Color.orange.opacity(0.4), radius: 12, y: 6)
+                        .clipShape(RoundedRectangle(cornerRadius: 18))
+                        .shadow(color: Color(hex: "FF6B35").opacity(0.5), radius: 20, y: 10)
                     }
                     .buttonStyle(ScaleButtonStyle())
 
-                    // Secondary button - Continue game
-                    Button {
-                        withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
-                            instance.continueGame()
-                        }
-                    } label: {
-                        HStack(spacing: 12) {
-                            Image(systemName: "arrow.counterclockwise")
-                                .font(.system(size: 18, weight: .medium))
-                            Text("继续上一局")
-                                .font(.system(size: 18, weight: .semibold))
-                        }
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 18)
-                        .background(Color.white.opacity(0.12))
-                        .foregroundColor(.white)
-                        .clipShape(RoundedRectangle(cornerRadius: 16))
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 16)
-                                .stroke(Color.white.opacity(0.3), lineWidth: 1)
-                        )
+                    // Subtle hint text
+                    HStack(spacing: 6) {
+                        Image(systemName: "person.3.fill")
+                            .font(.system(size: 12))
+                        Text("三人对战 · 智慧博弈")
                     }
-                    .buttonStyle(ScaleButtonStyle())
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundColor(.white.opacity(0.35))
                 }
-                .padding(.horizontal, 28)
-                .padding(.bottom, 50)
-                .opacity(animateButtons ? 1 : 0)
-                .offset(y: animateButtons ? 0 : 30)
+                .padding(.horizontal, 32)
+                .padding(.bottom, 60)
+                .opacity(animateButton ? 1 : 0)
+                .offset(y: animateButton ? 0 : 40)
             }
         }
         .navigationBarHidden(true)
         .navigationBarBackButtonHidden(true)
         .onAppear {
-            // Staggered animations
-            withAnimation(.easeOut(duration: 0.8)) {
-                animateCards = true
-            }
-            withAnimation(.spring(response: 0.8, dampingFraction: 0.7).delay(0.2)) {
-                animateLogo = true
-            }
-            withAnimation(.easeOut(duration: 0.6).delay(0.5)) {
-                animateButtons = true
-            }
+            startAnimations()
+        }
+    }
+
+    private func startAnimations() {
+        // Start background animation
+        animateBackground = true
+
+        // Staggered entrance animations
+        withAnimation(.easeOut(duration: 1.0)) {
+            animateCards = true
+        }
+        withAnimation(.spring(response: 0.9, dampingFraction: 0.7).delay(0.3)) {
+            animateLogo = true
+        }
+        withAnimation(.easeOut(duration: 0.7).delay(0.6)) {
+            animateTitle = true
+        }
+        withAnimation(.easeOut(duration: 0.7).delay(0.9)) {
+            animateButton = true
+        }
+
+        // Start continuous animations after entrance
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) {
+            pulseGlow = true
+            startShineAnimation()
+        }
+    }
+
+    private func startShineAnimation() {
+        withAnimation(.easeInOut(duration: 2.0).repeatForever(autoreverses: false)) {
+            shineOffset = 250
         }
     }
 }
 
-// MARK: - Floating Card View
+// MARK: - Floating Poker Card
 
-/// Decorative floating card for background ambiance
-struct FloatingCardView: View {
-    let symbol: String
+/// Animated floating poker card for background decoration
+struct FloatingPokerCard: View {
+    let suit: String
+    let size: CGFloat
+    let initialX: CGFloat
+    let initialY: CGFloat
     let rotation: Double
+    let delay: Double
 
-    @State private var animate = false
+    @State private var offsetY: CGFloat = 0
+    @State private var rotationAngle: Double = 0
 
     var body: some View {
-        ZStack {
-            RoundedRectangle(cornerRadius: 8)
-                .fill(Color.white.opacity(0.1))
-                .frame(width: 50, height: 70)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 8)
-                        .stroke(Color.white.opacity(0.2), lineWidth: 1)
-                )
-
-            Text(symbol)
-                .font(.system(size: 24))
-                .opacity(0.8)
-        }
-        .rotationEffect(.degrees(rotation))
-        .offset(y: animate ? -8 : 8)
-        .animation(
-            Animation.easeInOut(duration: 3)
-                .repeatForever(autoreverses: true)
-                .delay(Double.random(in: 0...1)),
-            value: animate
-        )
-        .onAppear {
-            animate = true
-        }
+        Text(suit)
+            .font(.system(size: size))
+            .position(x: initialX, y: initialY + offsetY)
+            .rotationEffect(.degrees(rotation + rotationAngle))
+            .onAppear {
+                withAnimation(
+                    Animation.easeInOut(duration: Double.random(in: 3...5))
+                        .repeatForever(autoreverses: true)
+                        .delay(delay)
+                ) {
+                    offsetY = CGFloat.random(in: -20...20)
+                    rotationAngle = Double.random(in: -5...5)
+                }
+            }
     }
 }
 
 // MARK: - Scale Button Style
 
-/// Button style with subtle scale effect on press
+/// Button style with scale effect on press
 struct ScaleButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .scaleEffect(configuration.isPressed ? 0.96 : 1)
+            .scaleEffect(configuration.isPressed ? 0.95 : 1)
             .animation(.spring(response: 0.2, dampingFraction: 0.6), value: configuration.isPressed)
     }
 }
