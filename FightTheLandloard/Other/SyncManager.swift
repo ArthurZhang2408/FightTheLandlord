@@ -126,11 +126,12 @@ class SyncManager: ObservableObject {
             print("[SyncManager] Loaded \(cachedMatches.count) matches from cache")
         }
 
-        // Check if game records are already cached
-        let cachedGameRecords = localCache.loadAllCachedGameRecords()
-        if !cachedGameRecords.isEmpty {
-            isGameRecordsSynced = true
-            print("[SyncManager] Loaded \(cachedGameRecords.count) game records from cache")
+        // Note: Do NOT set isGameRecordsSynced here even if we have cached records
+        // The cache might only have partial data (from previously viewed matches)
+        // isGameRecordsSynced should only be true after preloadAllGameRecords() completes
+        let cachedGameRecordsCount = localCache.loadAllCachedGameRecords().count
+        if cachedGameRecordsCount > 0 {
+            print("[SyncManager] Found \(cachedGameRecordsCount) cached game records (not marked as synced)")
         }
 
         lastSyncTime = localCache.lastSyncTimestamp
@@ -707,9 +708,20 @@ class SyncManager: ObservableObject {
         currentMatches.insert(matchToSave, at: 0)
         matches = currentMatches
         localCache.cacheMatches(currentMatches)
-        localCache.cacheGameRecords(gameRecords, forMatchId: localId)
 
-        print("[SyncManager] Saved match locally: \(localId)")
+        // Ensure all game records have the correct matchId before caching
+        var recordsToCache = gameRecords
+        for i in recordsToCache.indices {
+            if recordsToCache[i].matchId != localId {
+                print("[SyncManager] Warning: Fixing mismatched matchId in game record \(i)")
+                recordsToCache[i].matchId = localId
+            }
+        }
+        localCache.cacheGameRecords(recordsToCache, forMatchId: localId)
+
+        // Verify the cache was written correctly
+        let cachedRecords = localCache.loadCachedGameRecords(forMatchId: localId)
+        print("[SyncManager] Saved match locally: \(localId) with \(gameRecords.count) records, verified \(cachedRecords.count) in cache")
 
         // 2. If online, upload directly
         if networkMonitor.isConnected {
@@ -787,19 +799,47 @@ class SyncManager: ObservableObject {
     func loadGameRecords(forMatchId matchId: String, completion: @escaping ([GameRecord]) -> Void) {
         // Load from local cache first
         let cachedRecords = localCache.loadCachedGameRecords(forMatchId: matchId)
+
+        // If we have cached records, return them immediately
         if !cachedRecords.isEmpty {
+            print("[SyncManager] Returning \(cachedRecords.count) cached records for match \(matchId)")
             completion(cachedRecords)
+
+            // Still try to refresh from Firebase in background if online
+            if networkMonitor.isConnected {
+                db.collection("gameRecords")
+                    .whereField("matchId", isEqualTo: matchId)
+                    .getDocuments { [weak self] snapshot, error in
+                        guard error == nil, let documents = snapshot?.documents else { return }
+
+                        let records = documents.compactMap { doc in
+                            try? doc.data(as: GameRecord.self)
+                        }.sorted { $0.gameIndex < $1.gameIndex }
+
+                        // Update cache if Firebase has different data
+                        if records.count != cachedRecords.count && !records.isEmpty {
+                            self?.localCache.cacheGameRecords(records, forMatchId: matchId)
+                            completion(records)
+                        }
+                    }
+            }
+            return
         }
 
-        // If online, load from Firebase and update cache
+        // Cache is empty - check if we're online
         if networkMonitor.isConnected {
+            print("[SyncManager] No cached records, loading from Firebase for match \(matchId)")
             db.collection("gameRecords")
                 .whereField("matchId", isEqualTo: matchId)
                 .getDocuments { [weak self] snapshot, error in
-                    guard error == nil, let documents = snapshot?.documents else {
-                        if cachedRecords.isEmpty {
-                            completion([])
-                        }
+                    if let error = error {
+                        print("[SyncManager] Firebase error: \(error.localizedDescription)")
+                        completion([])
+                        return
+                    }
+
+                    guard let documents = snapshot?.documents else {
+                        completion([])
                         return
                     }
 
@@ -808,14 +848,16 @@ class SyncManager: ObservableObject {
                     }.sorted { $0.gameIndex < $1.gameIndex }
 
                     // Update cache
-                    self?.localCache.cacheGameRecords(records, forMatchId: matchId)
-
-                    // If different from cache, callback with new data
-                    if records.count != cachedRecords.count {
-                        completion(records)
+                    if !records.isEmpty {
+                        self?.localCache.cacheGameRecords(records, forMatchId: matchId)
                     }
+
+                    print("[SyncManager] Loaded \(records.count) records from Firebase for match \(matchId)")
+                    completion(records)
                 }
-        } else if cachedRecords.isEmpty {
+        } else {
+            // Offline and no cache
+            print("[SyncManager] Offline and no cached records for match \(matchId)")
             completion([])
         }
     }

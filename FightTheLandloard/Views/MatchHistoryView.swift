@@ -46,6 +46,10 @@ struct MatchHistoryView: View {
                     }
                     matchToDelete = nil
                 }
+            } message: {
+                if let match = matchToDelete {
+                    Text("将删除\(match.playerAName)、\(match.playerBName)、\(match.playerCName)的\(match.totalGames)局对局记录，此操作不可撤销。")
+                }
             }
             .onChange(of: dataSingleton.navigateToMatchId) { newMatchId in
                 if let matchId = newMatchId {
@@ -320,6 +324,14 @@ struct MatchHistoryView: View {
                     MatchRowCompactView(match: match)
                 }
                 .buttonStyle(.plain)
+                .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+                    Button(role: .destructive) {
+                        matchToDelete = match
+                        showingDeleteConfirm = true
+                    } label: {
+                        Label("删除", systemImage: "trash")
+                    }
+                }
                 .contextMenu {
                     Button(role: .destructive) {
                         matchToDelete = match
