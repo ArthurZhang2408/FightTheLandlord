@@ -7,11 +7,11 @@
 
 import Foundation
 
-struct ScoreTriple {
+struct ScoreTriple: Codable {
     var A: Int = 0
     var B: Int = 0
     var C: Int = 0
-    
+
     mutating func update (prev: ScoreTriple, game: GameSetting) {
         A = prev.A + game.A
         B = prev.B + game.B

@@ -75,12 +75,12 @@ struct MatchRecord: Codable, Identifiable, Hashable {
     mutating func finalize(games: [GameSetting], scores: [ScoreTriple]) {
         self.endedAt = Date()
         self.totalGames = games.count
-        
+
         if !games.isEmpty {
             self.finalScoreA = scores.last?.A ?? 0
             self.finalScoreB = scores.last?.B ?? 0
             self.finalScoreC = scores.last?.C ?? 0
-            
+
             // Calculate snapshots (max/min cumulative scores during match)
             var maxA = 0, maxB = 0, maxC = 0
             var minA = 0, minB = 0, minC = 0
@@ -99,5 +99,55 @@ struct MatchRecord: Codable, Identifiable, Hashable {
             self.minSnapshotB = minB
             self.minSnapshotC = minC
         }
+    }
+
+    // MARK: - Cache Support
+
+    /// 从本地缓存创建MatchRecord
+    static func fromCache(
+        id: String?,
+        startedAt: Date,
+        endedAt: Date?,
+        playerAId: String,
+        playerBId: String,
+        playerCId: String,
+        playerAName: String,
+        playerBName: String,
+        playerCName: String,
+        finalScoreA: Int,
+        finalScoreB: Int,
+        finalScoreC: Int,
+        totalGames: Int,
+        maxSnapshotA: Int,
+        maxSnapshotB: Int,
+        maxSnapshotC: Int,
+        minSnapshotA: Int,
+        minSnapshotB: Int,
+        minSnapshotC: Int,
+        initialStarter: Int
+    ) -> MatchRecord {
+        var match = MatchRecord(
+            playerAId: playerAId,
+            playerBId: playerBId,
+            playerCId: playerCId,
+            playerAName: playerAName,
+            playerBName: playerBName,
+            playerCName: playerCName,
+            starter: initialStarter
+        )
+        match.id = id
+        match.startedAt = startedAt
+        match.endedAt = endedAt
+        match.finalScoreA = finalScoreA
+        match.finalScoreB = finalScoreB
+        match.finalScoreC = finalScoreC
+        match.totalGames = totalGames
+        match.maxSnapshotA = maxSnapshotA
+        match.maxSnapshotB = maxSnapshotB
+        match.maxSnapshotC = maxSnapshotC
+        match.minSnapshotA = minSnapshotA
+        match.minSnapshotB = minSnapshotB
+        match.minSnapshotC = minSnapshotC
+        return match
     }
 }

@@ -193,6 +193,7 @@ struct AddPlayerView: View {
 
 struct PlayerDetailView: View {
     let player: Player
+    @ObservedObject private var firebaseService = FirebaseService.shared
     @State private var statistics: PlayerStatistics?
     @State private var gameRecords: [GameRecord] = []
     @State private var matchRecords: [MatchRecord] = []
@@ -201,13 +202,13 @@ struct PlayerDetailView: View {
     @State private var showingColorPicker = false
     @State private var selectedColor: PlayerColor
     @State private var currentPlayerColor: Color
-    
+
     init(player: Player) {
         self.player = player
         self._selectedColor = State(initialValue: player.playerColor ?? .blue)
         self._currentPlayerColor = State(initialValue: player.displayColor)
     }
-    
+
     var body: some View {
         Group {
             if isLoading {
@@ -222,7 +223,7 @@ struct PlayerDetailView: View {
                 }
             } else if let stats = statistics {
                 StatisticsView(
-                    stats: stats, 
+                    stats: stats,
                     playerName: player.name,
                     playerId: player.id ?? "",
                     playerColor: currentPlayerColor,
@@ -234,6 +235,11 @@ struct PlayerDetailView: View {
         .navigationTitle(player.name)
         .navigationBarTitleDisplayMode(.large)
         .toolbar {
+            // Sync indicator in toolbar (subtle)
+            ToolbarItem(placement: .navigationBarLeading) {
+                GameRecordsSyncIndicator()
+            }
+
             ToolbarItem(placement: .navigationBarTrailing) {
                 HStack(spacing: 16) {
                     // Share button
@@ -276,8 +282,14 @@ struct PlayerDetailView: View {
         .onAppear {
             loadStatistics()
         }
+        .onChange(of: firebaseService.gameRecordsSyncState) { newState in
+            // Refresh statistics when sync completes
+            if newState == .synced && !isLoading {
+                loadStatistics()
+            }
+        }
     }
-    
+
     private func loadStatistics() {
         guard let playerId = player.id else {
             errorMessage = "玩家ID无效"
