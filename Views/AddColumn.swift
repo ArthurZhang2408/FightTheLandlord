@@ -70,11 +70,12 @@ struct AddColumn: View {
 
                 // MARK: - Multipliers Section (Bombs + Spring)
                 Section {
-                    // Bombs counter
+                    // Bombs counter - aligned with spring toggle
                     HStack {
                         HStack(spacing: 8) {
                             Image(systemName: "bolt.fill")
                                 .foregroundColor(.yellow)
+                                .frame(width: 20)
                             Text("炸弹")
                         }
                         Spacer()
@@ -108,15 +109,19 @@ struct AddColumn: View {
                         }
                     }
 
-                    // Spring toggle
-                    Toggle(isOn: $viewModel.setting.spring) {
+                    // Spring toggle - aligned with bombs
+                    HStack {
                         HStack(spacing: 8) {
                             Image(systemName: "sun.max.fill")
                                 .foregroundColor(.orange)
+                                .frame(width: 20)
                             Text("春天")
                         }
+                        Spacer()
+                        Toggle("", isOn: $viewModel.setting.spring)
+                            .labelsHidden()
+                            .tint(Color(hex: "FF6B35"))
                     }
-                    .tint(Color(hex: "FF6B35"))
                 } header: {
                     HStack {
                         Image(systemName: "xmark.octagon.fill")
@@ -127,21 +132,11 @@ struct AddColumn: View {
 
                 // MARK: - Result Section
                 Section {
-                    VStack(spacing: 12) {
-                        Picker("比赛结果", selection: $viewModel.setting.landlordResult) {
-                            HStack {
-                                Image(systemName: "crown.fill")
-                                Text("地主赢")
-                            }
-                            .tag(true)
-                            HStack {
-                                Image(systemName: "person.2.fill")
-                                Text("农民赢")
-                            }
-                            .tag(false)
-                        }
-                        .pickerStyle(.segmented)
+                    Picker("比赛结果", selection: $viewModel.setting.landlordResult) {
+                        Text("👑 地主赢").tag(true)
+                        Text("👨‍🌾 农民赢").tag(false)
                     }
+                    .pickerStyle(.segmented)
                 } header: {
                     HStack {
                         Image(systemName: "flag.checkered")
