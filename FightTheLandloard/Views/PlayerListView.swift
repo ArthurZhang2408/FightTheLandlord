@@ -210,41 +210,36 @@ struct PlayerDetailView: View {
     }
 
     var body: some View {
-        VStack(spacing: 0) {
-            // Sync status indicator at top
-            if firebaseService.gameRecordsSyncState != .synced {
-                GameRecordsSyncIndicator()
-                    .padding(.horizontal)
-                    .padding(.vertical, 8)
-            }
-
-            // Main content
-            Group {
-                if isLoading {
-                    SkeletonStatisticsView()
-                } else if let error = errorMessage {
-                    VStack(spacing: 12) {
-                        Image(systemName: "exclamationmark.triangle")
-                            .font(.largeTitle)
-                            .foregroundColor(.orange)
-                        Text(error)
-                            .foregroundColor(.secondary)
-                    }
-                } else if let stats = statistics {
-                    StatisticsView(
-                        stats: stats,
-                        playerName: player.name,
-                        playerId: player.id ?? "",
-                        playerColor: currentPlayerColor,
-                        gameRecords: gameRecords,
-                        matchRecords: matchRecords
-                    )
+        Group {
+            if isLoading {
+                SkeletonStatisticsView()
+            } else if let error = errorMessage {
+                VStack(spacing: 12) {
+                    Image(systemName: "exclamationmark.triangle")
+                        .font(.largeTitle)
+                        .foregroundColor(.orange)
+                    Text(error)
+                        .foregroundColor(.secondary)
                 }
+            } else if let stats = statistics {
+                StatisticsView(
+                    stats: stats,
+                    playerName: player.name,
+                    playerId: player.id ?? "",
+                    playerColor: currentPlayerColor,
+                    gameRecords: gameRecords,
+                    matchRecords: matchRecords
+                )
             }
         }
         .navigationTitle(player.name)
         .navigationBarTitleDisplayMode(.large)
         .toolbar {
+            // Sync indicator in toolbar (subtle)
+            ToolbarItem(placement: .navigationBarLeading) {
+                GameRecordsSyncIndicator()
+            }
+
             ToolbarItem(placement: .navigationBarTrailing) {
                 HStack(spacing: 16) {
                     // Share button

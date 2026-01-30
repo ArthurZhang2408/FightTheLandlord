@@ -140,9 +140,11 @@ class SyncManager: ObservableObject {
         // Check if we have completed a full sync before
         let cachedGameRecordsCount = localCache.loadAllCachedGameRecords().count
         if localCache.hasCompletedFullSync && cachedGameRecordsCount > 0 {
-            // Trust local cache - we've synced before
+            // Trust local cache - we've synced before, data is ready to use
             isGameRecordsSynced = true
-            gameRecordsSyncState = networkMonitor.isConnected ? .syncing : .offline
+            // Don't set to .syncing here - let preloadAllGameRecords handle state transitions
+            // This avoids showing "syncing" or "offline" incorrectly at startup
+            gameRecordsSyncState = .synced
             print("[SyncManager] hasCompletedFullSync=true, trusting \(cachedGameRecordsCount) cached game records")
         } else if cachedGameRecordsCount > 0 {
             // Have some cached data but never completed full sync
@@ -163,19 +165,19 @@ class SyncManager: ObservableObject {
     func preloadAllGameRecords() {
         guard networkMonitor.isConnected else {
             print("[SyncManager] Cannot preload game records: offline")
+            // Only change to offline if we don't have trusted data
             DispatchQueue.main.async {
-                self.gameRecordsSyncState = .offline
+                if !self.localCache.hasCompletedFullSync {
+                    self.gameRecordsSyncState = .offline
+                }
+                // If hasCompletedFullSync is true, keep showing .synced (trusted local data)
             }
             return
         }
 
         print("[SyncManager] Preloading all game records...")
-        DispatchQueue.main.async {
-            // If we already have cached data, show as syncing; otherwise loading
-            if self.localCache.hasCompletedFullSync {
-                self.gameRecordsSyncState = .syncing
-            }
-        }
+        // Don't change state to .syncing if we already have trusted data
+        // This keeps the UI clean - no unnecessary "syncing" indicators
 
         db.collection("gameRecords")
             .order(by: "playedAt", descending: true)
