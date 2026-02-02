@@ -240,17 +240,27 @@ struct MatchHistoryView: View {
     }
     
     // MARK: - Hierarchical List View
-    
+
     @ViewBuilder
     private var hierarchicalMatchList: some View {
         // Always show all levels (year -> month -> day)
+        // Use explicit view IDs to help SwiftUI track view identity properly
         ForEach(uniqueYears, id: \.self) { year in
-            yearSection(year: year)
+            Section {
+                yearHeader(year: year)
+
+                if expandedYears.contains(year) {
+                    ForEach(uniqueMonths(forYear: year), id: \.self) { month in
+                        monthContent(year: year, month: month)
+                    }
+                }
+            }
+            .id("year-\(year)")
         }
     }
-    
+
     @ViewBuilder
-    private func yearSection(year: Int) -> some View {
+    private func yearHeader(year: Int) -> some View {
         // Year header - prominent title with accent color
         Button {
             withAnimation(.easeInOut(duration: 0.2)) {
@@ -270,7 +280,6 @@ struct MatchHistoryView: View {
                 Image(systemName: expandedYears.contains(year) ? "chevron.down" : "chevron.right")
                     .font(.system(size: 12, weight: .bold))
                     .foregroundColor(Color(hex: "FF6B35"))
-                    .rotationEffect(.degrees(expandedYears.contains(year) ? 0 : 0))
 
                 Spacer()
 
@@ -292,140 +301,139 @@ struct MatchHistoryView: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-
-        if expandedYears.contains(year) {
-            ForEach(uniqueMonths(forYear: year), id: \.self) { month in
-                monthSection(year: year, month: month)
-            }
-        }
     }
-    
+
     @ViewBuilder
-    private func monthSection(year: Int, month: Int) -> some View {
+    private func monthContent(year: Int, month: Int) -> some View {
         let monthKey = "\(year)-\(month)"
 
-        // Month header - clean design
-        Button {
-            withAnimation(.easeInOut(duration: 0.2)) {
-                if expandedMonths.contains(monthKey) {
-                    expandedMonths.remove(monthKey)
-                } else {
-                    expandedMonths.insert(monthKey)
+        // Use Group to keep month header and its days together
+        Group {
+            // Month header - clean design
+            Button {
+                withAnimation(.easeInOut(duration: 0.2)) {
+                    if expandedMonths.contains(monthKey) {
+                        expandedMonths.remove(monthKey)
+                    } else {
+                        expandedMonths.insert(monthKey)
+                    }
+                }
+            } label: {
+                HStack(spacing: 8) {
+                    // Month indicator dot
+                    Circle()
+                        .fill(Color(hex: "FF6B35").opacity(0.6))
+                        .frame(width: 6, height: 6)
+
+                    Text("\(month)月")
+                        .font(.system(size: 18, weight: .semibold))
+                        .foregroundColor(Color(.label))
+
+                    Image(systemName: expandedMonths.contains(monthKey) ? "chevron.down" : "chevron.right")
+                        .font(.system(size: 10, weight: .semibold))
+                        .foregroundColor(.secondary)
+
+                    Spacer()
+
+                    Text("\(matchCount(forYear: year, month: month))场")
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundColor(.secondary)
+                }
+                .padding(.vertical, 10)
+                .padding(.horizontal, 4)
+                .padding(.leading, 8)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .id("month-header-\(monthKey)")
+
+            if expandedMonths.contains(monthKey) {
+                ForEach(uniqueDays(forYear: year, month: month), id: \.self) { day in
+                    dayContent(year: year, month: month, day: day)
+                        .id("day-\(year)-\(month)-\(day)")
                 }
             }
-        } label: {
-            HStack(spacing: 8) {
-                // Month indicator dot
-                Circle()
-                    .fill(Color(hex: "FF6B35").opacity(0.6))
-                    .frame(width: 6, height: 6)
-
-                Text("\(month)月")
-                    .font(.system(size: 18, weight: .semibold))
-                    .foregroundColor(Color(.label))
-
-                Image(systemName: expandedMonths.contains(monthKey) ? "chevron.down" : "chevron.right")
-                    .font(.system(size: 10, weight: .semibold))
-                    .foregroundColor(.secondary)
-
-                Spacer()
-
-                Text("\(matchCount(forYear: year, month: month))场")
-                    .font(.system(size: 12, weight: .medium))
-                    .foregroundColor(.secondary)
-            }
-            .padding(.vertical, 10)
-            .padding(.horizontal, 4)
-            .padding(.leading, 8)
-            .contentShape(Rectangle())
         }
-        .buttonStyle(.plain)
-
-        if expandedMonths.contains(monthKey) {
-            ForEach(uniqueDays(forYear: year, month: month), id: \.self) { day in
-                daySection(year: year, month: month, day: day)
-            }
-        }
+        .id("month-\(monthKey)")
     }
-    
+
     @ViewBuilder
-    private func daySection(year: Int, month: Int, day: Int) -> some View {
+    private func dayContent(year: Int, month: Int, day: Int) -> some View {
         let dayKey = "\(year)-\(month)-\(day)"
-
-        // Day header - subtle design
-        Button {
-            withAnimation(.easeInOut(duration: 0.2)) {
-                if expandedDays.contains(dayKey) {
-                    expandedDays.remove(dayKey)
-                } else {
-                    expandedDays.insert(dayKey)
-                }
-            }
-        } label: {
-            HStack(spacing: 8) {
-                // Day indicator line
-                RoundedRectangle(cornerRadius: 1)
-                    .fill(Color(.separator))
-                    .frame(width: 2, height: 12)
-
-                Text("\(day)日")
-                    .font(.system(size: 15, weight: .medium))
-                    .foregroundColor(Color(.label))
-
-                Image(systemName: expandedDays.contains(dayKey) ? "chevron.down" : "chevron.right")
-                    .font(.system(size: 9, weight: .semibold))
-                    .foregroundColor(.secondary)
-
-                Spacer()
-
-                Text("\(matchCount(forYear: year, month: month, day: day))场")
-                    .font(.system(size: 11, weight: .medium))
-                    .foregroundColor(.secondary)
-            }
-            .padding(.vertical, 8)
-            .padding(.horizontal, 4)
-            .padding(.leading, 20)
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-
-        if expandedDays.contains(dayKey) {
-            matchesList(year: year, month: month, day: day)
-        }
-    }
-    
-    @ViewBuilder
-    private func matchesList(year: Int, month: Int, day: Int) -> some View {
         let dayMatches = matches(forYear: year, month: month, day: day)
 
-        // Match rows in a card container
-        VStack(spacing: 0) {
-            ForEach(Array(dayMatches.enumerated()), id: \.element.id) { index, match in
-                SwipeableMatchRow(
-                    match: match,
-                    onTap: {
-                        navigationPath.append(match)
-                    },
-                    onDelete: {
-                        matchToDelete = match
-                        showingDeleteConfirm = true
+        // Use Group to keep day header and its matches together
+        Group {
+            // Day header - subtle design
+            Button {
+                withAnimation(.easeInOut(duration: 0.2)) {
+                    if expandedDays.contains(dayKey) {
+                        expandedDays.remove(dayKey)
+                    } else {
+                        expandedDays.insert(dayKey)
                     }
-                )
-
-                if index < dayMatches.count - 1 {
-                    Divider()
-                        .padding(.leading, 56)
                 }
+            } label: {
+                HStack(spacing: 8) {
+                    // Day indicator line
+                    RoundedRectangle(cornerRadius: 1)
+                        .fill(Color(.separator))
+                        .frame(width: 2, height: 12)
+
+                    Text("\(day)日")
+                        .font(.system(size: 15, weight: .medium))
+                        .foregroundColor(Color(.label))
+
+                    Image(systemName: expandedDays.contains(dayKey) ? "chevron.down" : "chevron.right")
+                        .font(.system(size: 9, weight: .semibold))
+                        .foregroundColor(.secondary)
+
+                    Spacer()
+
+                    Text("\(dayMatches.count)场")
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundColor(.secondary)
+                }
+                .padding(.vertical, 8)
+                .padding(.horizontal, 4)
+                .padding(.leading, 20)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .id("day-header-\(dayKey)")
+
+            if expandedDays.contains(dayKey) && !dayMatches.isEmpty {
+                // Match rows in a card container
+                VStack(spacing: 0) {
+                    ForEach(Array(dayMatches.enumerated()), id: \.element.id) { index, match in
+                        SwipeableMatchRow(
+                            match: match,
+                            onTap: {
+                                navigationPath.append(match)
+                            },
+                            onDelete: {
+                                matchToDelete = match
+                                showingDeleteConfirm = true
+                            }
+                        )
+
+                        if index < dayMatches.count - 1 {
+                            Divider()
+                                .padding(.leading, 56)
+                        }
+                    }
+                }
+                .padding(.horizontal, 14)
+                .padding(.vertical, 10)
+                .background(Color(.secondarySystemGroupedBackground))
+                .clipShape(RoundedRectangle(cornerRadius: 14))
+                .shadow(color: Color.black.opacity(0.03), radius: 4, y: 2)
+                .padding(.top, 6)
+                .padding(.bottom, 10)
+                .padding(.leading, 24)
+                .id("matches-\(dayKey)")
             }
         }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 10)
-        .background(Color(.secondarySystemGroupedBackground))
-        .clipShape(RoundedRectangle(cornerRadius: 14))
-        .shadow(color: Color.black.opacity(0.03), radius: 4, y: 2)
-        .padding(.top, 6)
-        .padding(.bottom, 10)
-        .padding(.leading, 24)
     }
 }
 
