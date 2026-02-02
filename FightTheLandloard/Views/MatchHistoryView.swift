@@ -447,109 +447,76 @@ struct SwipeableMatchRow: View {
     @State private var offset: CGFloat = 0
     @State private var isSwiped: Bool = false
 
-    private let deleteButtonWidth: CGFloat = 80
+    private let deleteButtonWidth: CGFloat = 72
     private let rowHeight: CGFloat = 60
 
-    // Calculate swipe progress (0 to 1)
-    private var swipeProgress: CGFloat {
-        min(abs(offset) / deleteButtonWidth, 1.0)
-    }
-
     var body: some View {
-        GeometryReader { geometry in
-            ZStack(alignment: .trailing) {
-                // Delete button background (revealed when swiping)
-                HStack(spacing: 0) {
-                    Spacer()
+        ZStack(alignment: .trailing) {
+            // Delete button - positioned at trailing edge, revealed when swiping
+            Button(action: {
+                // Haptic feedback
+                let impactFeedback = UIImpactFeedbackGenerator(style: .medium)
+                impactFeedback.impactOccurred()
 
-                    // Gradient delete button
-                    Button(action: {
-                        withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                withAnimation(.easeOut(duration: 0.2)) {
+                    offset = 0
+                    isSwiped = false
+                }
+                onDelete()
+            }) {
+                VStack(spacing: 6) {
+                    Image(systemName: "trash.fill")
+                        .font(.system(size: 18, weight: .medium))
+                    Text("删除")
+                        .font(.system(size: 12, weight: .medium))
+                }
+                .foregroundColor(.white)
+                .frame(width: deleteButtonWidth, height: rowHeight)
+                .background(Color.red)
+            }
+            .buttonStyle(.plain)
+
+            // Main content - slides left to reveal delete button
+            MatchRowCompactView(match: match)
+                .frame(height: rowHeight)
+                .frame(maxWidth: .infinity)
+                .background(Color(.secondarySystemGroupedBackground))
+                .offset(x: offset)
+                .onTapGesture {
+                    if isSwiped {
+                        withAnimation(.easeOut(duration: 0.2)) {
                             offset = 0
                             isSwiped = false
                         }
-                        onDelete()
-                    }) {
-                        ZStack {
-                            // Gradient background
-                            LinearGradient(
-                                colors: [
-                                    Color(hex: "FF6B6B"),
-                                    Color(hex: "EE5A5A")
-                                ],
-                                startPoint: .leading,
-                                endPoint: .trailing
-                            )
-
-                            // Icon and text
-                            VStack(spacing: 4) {
-                                // Circular icon container
-                                ZStack {
-                                    Circle()
-                                        .fill(Color.white.opacity(0.2))
-                                        .frame(width: 36, height: 36)
-
-                                    Image(systemName: "trash")
-                                        .font(.system(size: 16, weight: .medium))
-                                        .foregroundColor(.white)
-                                }
-                                .scaleEffect(0.8 + (swipeProgress * 0.2))
-
-                                Text("删除")
-                                    .font(.system(size: 11, weight: .medium))
-                                    .foregroundColor(.white.opacity(0.9))
-                            }
-                        }
-                        .frame(width: deleteButtonWidth)
-                        .frame(maxHeight: .infinity)
+                    } else {
+                        onTap()
                     }
-                    .buttonStyle(.plain)
                 }
-                .opacity(swipeProgress)
-
-                // Main content card
-                MatchRowCompactView(match: match)
-                    .frame(width: geometry.size.width)
-                    .background(Color(.secondarySystemGroupedBackground))
-                    .offset(x: offset)
-                    .scaleEffect(x: 1.0, y: 1.0 - (swipeProgress * 0.02))
-                    .onTapGesture {
-                        if isSwiped {
-                            withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-                                offset = 0
-                                isSwiped = false
+                .gesture(
+                    DragGesture(minimumDistance: 15)
+                        .onChanged { gesture in
+                            let translation = gesture.translation.width
+                            if translation < 0 {
+                                // Swiping left - reveal delete button
+                                offset = max(translation, -deleteButtonWidth)
+                            } else if isSwiped {
+                                // Swiping right when already swiped - hide delete button
+                                offset = min(-deleteButtonWidth + translation, 0)
                             }
-                        } else {
-                            onTap()
                         }
-                    }
-                    .gesture(
-                        DragGesture(minimumDistance: 10)
-                            .onChanged { gesture in
-                                let translation = gesture.translation.width
-                                if translation < 0 {
-                                    // Swiping left - reveal delete button with resistance
-                                    let resistance: CGFloat = translation < -deleteButtonWidth ? 0.3 : 1.0
-                                    offset = max(translation * resistance, -deleteButtonWidth * 1.2)
-                                } else if isSwiped {
-                                    // Swiping right when already swiped - hide delete button
-                                    offset = min(-deleteButtonWidth + translation, 0)
+                        .onEnded { gesture in
+                            withAnimation(.easeOut(duration: 0.25)) {
+                                if gesture.translation.width < -deleteButtonWidth / 2 ||
+                                   gesture.predictedEndTranslation.width < -deleteButtonWidth {
+                                    offset = -deleteButtonWidth
+                                    isSwiped = true
+                                } else {
+                                    offset = 0
+                                    isSwiped = false
                                 }
                             }
-                            .onEnded { gesture in
-                                withAnimation(.spring(response: 0.35, dampingFraction: 0.7)) {
-                                    if gesture.translation.width < -deleteButtonWidth / 2 ||
-                                       gesture.predictedEndTranslation.width < -deleteButtonWidth {
-                                        offset = -deleteButtonWidth
-                                        isSwiped = true
-                                    } else {
-                                        offset = 0
-                                        isSwiped = false
-                                    }
-                                }
-                            }
-                    )
-            }
+                        }
+                )
         }
         .frame(height: rowHeight)
         .clipped()
