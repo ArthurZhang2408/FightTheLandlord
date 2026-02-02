@@ -131,71 +131,75 @@ struct MatchHistoryView: View {
                 hasInitializedExpansion = true
             }
         }
+        .onChange(of: firebaseService.matches) { _ in
+            // When matches change, ensure new dates are expanded
+            updateExpansionStateForNewDates()
+        }
     }
-    
+
     // MARK: - Grouping Helpers
-    
+
     private var groupedMatches: [Int: [Int: [Int: [MatchRecord]]]] {
         // Group by Year -> Month -> Day
         var result: [Int: [Int: [Int: [MatchRecord]]]] = [:]
-        
+
         for match in firebaseService.matches {
             let components = Calendar.current.dateComponents([.year, .month, .day], from: match.startedAt)
             let year = components.year ?? 2024
             let month = components.month ?? 1
             let day = components.day ?? 1
-            
+
             if result[year] == nil { result[year] = [:] }
             if result[year]![month] == nil { result[year]![month] = [:] }
             if result[year]![month]![day] == nil { result[year]![month]![day] = [] }
             result[year]![month]![day]!.append(match)
         }
-        
+
         return result
     }
-    
+
     private var uniqueYears: [Int] {
         Array(groupedMatches.keys).sorted(by: >)
     }
-    
+
     private var hasMultipleYears: Bool {
         uniqueYears.count > 1
     }
-    
+
     private func uniqueMonths(forYear year: Int) -> [Int] {
         guard let yearData = groupedMatches[year] else { return [] }
         return Array(yearData.keys).sorted(by: >)
     }
-    
+
     private func hasMultipleMonths(forYear year: Int) -> Bool {
         uniqueMonths(forYear: year).count > 1
     }
-    
+
     private func uniqueDays(forYear year: Int, month: Int) -> [Int] {
         guard let monthData = groupedMatches[year]?[month] else { return [] }
         return Array(monthData.keys).sorted(by: >)
     }
-    
+
     private func hasMultipleDays(forYear year: Int, month: Int) -> Bool {
         uniqueDays(forYear: year, month: month).count > 1
     }
-    
+
     private func matches(forYear year: Int, month: Int, day: Int) -> [MatchRecord] {
         groupedMatches[year]?[month]?[day] ?? []
     }
-    
+
     private func matchCount(forYear year: Int) -> Int {
         groupedMatches[year]?.values.reduce(0) { $0 + $1.values.reduce(0) { $0 + $1.count } } ?? 0
     }
-    
+
     private func matchCount(forYear year: Int, month: Int) -> Int {
         groupedMatches[year]?[month]?.values.reduce(0) { $0 + $1.count } ?? 0
     }
-    
+
     private func matchCount(forYear year: Int, month: Int, day: Int) -> Int {
         matches(forYear: year, month: month, day: day).count
     }
-    
+
     private func initializeExpansionState() {
         // Expand all by default
         expandedYears = Set(uniqueYears)
@@ -204,6 +208,32 @@ struct MatchHistoryView: View {
                 expandedMonths.insert("\(year)-\(month)")
                 for day in uniqueDays(forYear: year, month: month) {
                     expandedDays.insert("\(year)-\(month)-\(day)")
+                }
+            }
+        }
+    }
+
+    /// Update expansion state to include any new dates that aren't already tracked
+    private func updateExpansionStateForNewDates() {
+        for year in uniqueYears {
+            // Auto-expand new years
+            if !expandedYears.contains(year) {
+                expandedYears.insert(year)
+            }
+
+            for month in uniqueMonths(forYear: year) {
+                let monthKey = "\(year)-\(month)"
+                // Auto-expand new months
+                if !expandedMonths.contains(monthKey) {
+                    expandedMonths.insert(monthKey)
+                }
+
+                for day in uniqueDays(forYear: year, month: month) {
+                    let dayKey = "\(year)-\(month)-\(day)"
+                    // Auto-expand new days
+                    if !expandedDays.contains(dayKey) {
+                        expandedDays.insert(dayKey)
+                    }
                 }
             }
         }
