@@ -11,16 +11,14 @@ import Charts
 struct MatchHistoryView: View {
     @ObservedObject private var firebaseService = FirebaseService.shared
     @ObservedObject private var dataSingleton = DataSingleton.instance
-    @State private var matchToDelete: MatchRecord?
-    @State private var showingDeleteConfirm = false
     @State private var navigationPath = NavigationPath()
-    
+
     // MARK: - Expand/Collapse State
     @State private var expandedYears: Set<Int> = []
     @State private var expandedMonths: Set<String> = [] // "2024-01" format
     @State private var expandedDays: Set<String> = [] // "2024-01-15" format
     @State private var hasInitializedExpansion = false
-    
+
     var body: some View {
         NavigationStack(path: $navigationPath) {
             Group {
@@ -35,21 +33,6 @@ struct MatchHistoryView: View {
             .navigationTitle("历史对局")
             .navigationDestination(for: MatchRecord.self) { match in
                 MatchDetailView(match: match)
-            }
-            .alert("确定删除该对局吗？", isPresented: $showingDeleteConfirm) {
-                Button("取消", role: .cancel) {
-                    matchToDelete = nil
-                }
-                Button("删除", role: .destructive) {
-                    if let match = matchToDelete, let id = match.id {
-                        firebaseService.deleteMatch(matchId: id) { _ in }
-                    }
-                    matchToDelete = nil
-                }
-            } message: {
-                if let match = matchToDelete {
-                    Text("将删除\(match.playerAName)、\(match.playerBName)、\(match.playerCName)的\(match.totalGames)局对局记录，此操作不可撤销。")
-                }
             }
             .onChange(of: dataSingleton.navigateToMatchId) { newMatchId in
                 if let matchId = newMatchId {
@@ -406,16 +389,12 @@ struct MatchHistoryView: View {
                 // Match rows in a card container
                 VStack(spacing: 0) {
                     ForEach(Array(dayMatches.enumerated()), id: \.element.id) { index, match in
-                        SwipeableMatchRow(
-                            match: match,
-                            onTap: {
-                                navigationPath.append(match)
-                            },
-                            onDelete: {
-                                matchToDelete = match
-                                showingDeleteConfirm = true
-                            }
-                        )
+                        Button {
+                            navigationPath.append(match)
+                        } label: {
+                            MatchRowCompactView(match: match)
+                        }
+                        .buttonStyle(.plain)
 
                         if index < dayMatches.count - 1 {
                             Divider()
@@ -434,92 +413,6 @@ struct MatchHistoryView: View {
                 .id("matches-\(dayKey)")
             }
         }
-    }
-}
-
-// MARK: - Swipeable Match Row
-
-struct SwipeableMatchRow: View {
-    let match: MatchRecord
-    let onTap: () -> Void
-    let onDelete: () -> Void
-
-    @State private var offset: CGFloat = 0
-    @State private var isSwiped: Bool = false
-
-    private let deleteButtonWidth: CGFloat = 72
-    private let rowHeight: CGFloat = 60
-
-    var body: some View {
-        ZStack(alignment: .trailing) {
-            // Delete button - positioned at trailing edge, revealed when swiping
-            Button(action: {
-                // Haptic feedback
-                let impactFeedback = UIImpactFeedbackGenerator(style: .medium)
-                impactFeedback.impactOccurred()
-
-                withAnimation(.easeOut(duration: 0.2)) {
-                    offset = 0
-                    isSwiped = false
-                }
-                onDelete()
-            }) {
-                VStack(spacing: 6) {
-                    Image(systemName: "trash.fill")
-                        .font(.system(size: 18, weight: .medium))
-                    Text("删除")
-                        .font(.system(size: 12, weight: .medium))
-                }
-                .foregroundColor(.white)
-                .frame(width: deleteButtonWidth, height: rowHeight)
-                .background(Color.red)
-            }
-            .buttonStyle(.plain)
-
-            // Main content - slides left to reveal delete button
-            MatchRowCompactView(match: match)
-                .frame(height: rowHeight)
-                .frame(maxWidth: .infinity)
-                .background(Color(.secondarySystemGroupedBackground))
-                .offset(x: offset)
-                .onTapGesture {
-                    if isSwiped {
-                        withAnimation(.easeOut(duration: 0.2)) {
-                            offset = 0
-                            isSwiped = false
-                        }
-                    } else {
-                        onTap()
-                    }
-                }
-                .gesture(
-                    DragGesture(minimumDistance: 15)
-                        .onChanged { gesture in
-                            let translation = gesture.translation.width
-                            if translation < 0 {
-                                // Swiping left - reveal delete button
-                                offset = max(translation, -deleteButtonWidth)
-                            } else if isSwiped {
-                                // Swiping right when already swiped - hide delete button
-                                offset = min(-deleteButtonWidth + translation, 0)
-                            }
-                        }
-                        .onEnded { gesture in
-                            withAnimation(.easeOut(duration: 0.25)) {
-                                if gesture.translation.width < -deleteButtonWidth / 2 ||
-                                   gesture.predictedEndTranslation.width < -deleteButtonWidth {
-                                    offset = -deleteButtonWidth
-                                    isSwiped = true
-                                } else {
-                                    offset = 0
-                                    isSwiped = false
-                                }
-                            }
-                        }
-                )
-        }
-        .frame(height: rowHeight)
-        .clipped()
     }
 }
 
@@ -662,11 +555,11 @@ struct EditingGameItem: Identifiable {
 
 struct MatchDetailView: View {
     let match: MatchRecord
+    @Environment(\.dismiss) private var dismiss
     @State private var gameRecords: [GameRecord] = []
     @State private var isLoading = true
     @State private var editingGame: EditingGameItem? = nil
-    @State private var showingDeleteConfirm = false
-    @State private var deleteIdx: Int = -1
+    @State private var showingDeleteMatchAlert = false
     @ObservedObject private var dataSingleton = DataSingleton.instance
     @ObservedObject private var firebaseService = FirebaseService.shared
     
@@ -823,6 +716,20 @@ struct MatchDetailView: View {
                             Text("玩家统计")
                         }
                     }
+
+                    // Delete match section
+                    Section {
+                        Button(role: .destructive) {
+                            showingDeleteMatchAlert = true
+                        } label: {
+                            HStack {
+                                Spacer()
+                                Text("删除此对局")
+                                    .font(.body)
+                                Spacer()
+                            }
+                        }
+                    }
                 }
                 .listStyle(.insetGrouped)
                 .onChange(of: highlightedGameIndex) { newIndex in
@@ -888,6 +795,20 @@ struct MatchDetailView: View {
                 playerCName: match.playerCName
             )
         }
+        .alert("确定删除此对局？", isPresented: $showingDeleteMatchAlert) {
+            Button("取消", role: .cancel) {}
+            Button("删除", role: .destructive) {
+                deleteMatch()
+            }
+        } message: {
+            Text("将删除\(match.playerAName)、\(match.playerBName)、\(match.playerCName)的\(match.totalGames)局对局记录，此操作不可撤销。")
+        }
+    }
+
+    private func deleteMatch() {
+        guard let matchId = match.id else { return }
+        firebaseService.deleteMatch(matchId: matchId) { _ in }
+        dismiss()
     }
     
     private func loadGameRecords() {
