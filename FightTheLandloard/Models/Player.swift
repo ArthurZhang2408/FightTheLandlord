@@ -1,38 +1,27 @@
 //
 //  Player.swift
-//  FightTheLandloard
+//  FightTheLandlord
 //
 //  Created by Arthur Zhang on 2024-10-20.
 //
 
 import Foundation
 import FirebaseFirestore
-import SwiftUI
 
-// Available colors for players
-enum PlayerColor: String, Codable, CaseIterable {
-    case blue = "blue"
-    case green = "green"
-    case orange = "orange"
-    case purple = "purple"
-    case red = "red"
-    case teal = "teal"
-    case pink = "pink"
-    case indigo = "indigo"
-    
-    var color: Color {
-        switch self {
-        case .blue: return .blue
-        case .green: return .green
-        case .orange: return .orange
-        case .purple: return .purple
-        case .red: return .red
-        case .teal: return .teal
-        case .pink: return .pink
-        case .indigo: return .indigo
-        }
-    }
-    
+/// Colors a player can pick to be identified in charts and avatars.
+/// Raw values are persisted in Firestore – do not rename cases.
+enum PlayerColor: String, Codable, CaseIterable, Identifiable {
+    case blue
+    case green
+    case orange
+    case purple
+    case red
+    case teal
+    case pink
+    case indigo
+
+    var id: String { rawValue }
+
     var displayName: String {
         switch self {
         case .blue: return "蓝色"
@@ -52,24 +41,25 @@ struct Player: Codable, Identifiable, Hashable {
     var name: String
     var createdAt: Date
     var playerColor: PlayerColor?
-    
-    init(id: String? = nil, name: String, playerColor: PlayerColor? = .blue) {
+
+    init(id: String? = nil, name: String, playerColor: PlayerColor? = .blue, createdAt: Date = Date()) {
         self.id = id
         self.name = name
-        self.createdAt = Date()
+        self.createdAt = createdAt
         self.playerColor = playerColor
     }
-    
-    // Get the SwiftUI Color for this player
-    var displayColor: Color {
-        return playerColor?.color ?? .blue
-    }
-    
+
+    /// Color used everywhere the player is drawn (falls back to blue).
+    var resolvedColor: PlayerColor { playerColor ?? .blue }
+
+    /// First character of the name, used for avatars.
+    var initial: String { String(name.trimmingCharacters(in: .whitespaces).prefix(1)) }
+
     func hash(into hasher: inout Hasher) {
         hasher.combine(id)
     }
-    
+
     static func == (lhs: Player, rhs: Player) -> Bool {
-        return lhs.id == rhs.id
+        lhs.id == rhs.id && lhs.name == rhs.name && lhs.playerColor == rhs.playerColor
     }
 }

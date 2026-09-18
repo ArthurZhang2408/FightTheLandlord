@@ -1,112 +1,192 @@
 //
 //  PlayerStatistics.swift
-//  FightTheLandloard
+//  FightTheLandlord
 //
 //  Created by Arthur Zhang on 2024-10-20.
+//
+//  Everything the app knows about one player, computed by `PlayerStatsEngine`.
 //
 
 import Foundation
 
-/// Computed statistics for a player
-struct PlayerStatistics {
-    var playerId: String
+/// One point on a player's cumulative score timeline (game or match level).
+struct TimelinePoint: Identifiable, Equatable {
+    let id: Int                 // position in the series (0 = starting point)
+    let matchId: String?
+    let gameIndex: Int?         // 0-based index inside the match, nil for match-level points
+    let date: Date?
+    let delta: Int              // score change at this point
+    let cumulative: Int         // running total after this point
+
+    static let origin = TimelinePoint(id: 0, matchId: nil, gameIndex: nil, date: nil, delta: 0, cumulative: 0)
+}
+
+/// Aggregate of games shared with another player.
+struct RelationStat: Identifiable, Equatable {
+    let playerId: String
     var playerName: String
-    
-    // Game counts
-    var totalGames: Int = 0
-    var gamesWon: Int = 0
-    var gamesLost: Int = 0
-    
-    // Role breakdown
-    var gamesAsLandlord: Int = 0
-    var gamesAsFarmer: Int = 0
-    var landlordWins: Int = 0
-    var landlordLosses: Int = 0
-    var farmerWins: Int = 0
-    var farmerLosses: Int = 0
-    
-    // Bid distribution (when it was their turn to bid first)
-    var firstBidderGames: Int = 0   // Games where this player was first to bid
-    var bidZeroCount: Int = 0        // Times bid 0 (不叫) when first
-    var bidOneCount: Int = 0         // Times bid 1 when first
-    var bidTwoCount: Int = 0         // Times bid 2 when first
-    var bidThreeCount: Int = 0       // Times bid 3 when first
-    
-    // Match (对局) statistics
-    var totalMatches: Int = 0
-    var matchesWon: Int = 0          // Matches where final score > 0
-    var matchesLost: Int = 0         // Matches where final score < 0
-    var matchesTied: Int = 0         // Matches where final score == 0
-    
-    // Score statistics
-    var totalScore: Int = 0          // Sum of all game scores
-    var bestGameScore: Int = 0       // Highest single game score
-    var worstGameScore: Int = 0      // Lowest single game score
-    var bestMatchScore: Int = 0      // Highest match final score
-    var worstMatchScore: Int = 0     // Lowest match final score
-    var bestSnapshot: Int = 0        // Highest cumulative score within any match
-    var worstSnapshot: Int = 0       // Lowest cumulative score within any match
-    var totalHighScore: Int = 0      // Highest overall cumulative score (prefix sum max)
-    var totalLowScore: Int = 0       // Lowest overall cumulative score (prefix sum min)
-    var totalHighGameIndex: Int = 0  // Game index where totalHighScore occurred
-    var totalLowGameIndex: Int = 0   // Game index where totalLowScore occurred
-    var bestSnapshotGameIndex: Int = 0  // Game index where bestSnapshot occurred
-    var worstSnapshotGameIndex: Int = 0 // Game index where worstSnapshot occurred
-    var bestGameScoreIndex: Int = 0  // Game index where bestGameScore occurred
-    var worstGameScoreIndex: Int = 0 // Game index where worstGameScore occurred
-    
-    // Streak statistics
-    var currentWinStreak: Int = 0    // Current consecutive wins
-    var currentLossStreak: Int = 0   // Current consecutive losses
-    var maxWinStreak: Int = 0        // Maximum consecutive wins
-    var maxLossStreak: Int = 0       // Maximum consecutive losses
-    var currentMatchWinStreak: Int = 0  // Current consecutive match wins
-    var currentMatchLossStreak: Int = 0 // Current consecutive match losses
-    var maxMatchWinStreak: Int = 0   // Maximum consecutive match wins
-    var maxMatchLossStreak: Int = 0  // Maximum consecutive match losses
-    
-    // Spring (春天) statistics
-    var springCount: Int = 0         // Times player got spring as landlord
-    var springAgainstCount: Int = 0  // Times player was spring against as farmer
-    
-    // Doubled game statistics
-    var doubledGames: Int = 0        // Games where player doubled
-    var doubledWins: Int = 0         // Wins when player doubled
-    var doubledLosses: Int = 0       // Losses when player doubled
-    
-    // Computed properties
-    var winRate: Double {
-        guard totalGames > 0 else { return 0 }
-        return Double(gamesWon) / Double(totalGames) * 100
-    }
-    
-    var landlordWinRate: Double {
-        guard gamesAsLandlord > 0 else { return 0 }
-        return Double(landlordWins) / Double(gamesAsLandlord) * 100
-    }
-    
-    var farmerWinRate: Double {
-        guard gamesAsFarmer > 0 else { return 0 }
-        return Double(farmerWins) / Double(gamesAsFarmer) * 100
-    }
-    
-    var matchWinRate: Double {
-        guard totalMatches > 0 else { return 0 }
-        return Double(matchesWon) / Double(totalMatches) * 100
-    }
-    
-    var averageScorePerGame: Double {
-        guard totalGames > 0 else { return 0 }
-        return Double(totalScore) / Double(totalGames)
-    }
-    
-    var doubledWinRate: Double {
-        guard doubledGames > 0 else { return 0 }
-        return Double(doubledWins) / Double(doubledGames) * 100
-    }
-    
+    var games: Int = 0
+    var wins: Int = 0
+    var netScore: Int = 0
+
+    var id: String { playerId }
+    var winRate: Double { games > 0 ? Double(wins) / Double(games) * 100 : 0 }
+}
+
+struct PlayerStatistics: Equatable {
+    let playerId: String
+    let playerName: String
+
+    // MARK: Volume
+    var totalGames = 0
+    var gamesWon = 0
+    var gamesLost = 0
+    var totalMatches = 0
+    var matchesWon = 0
+    var matchesLost = 0
+    var matchesTied = 0
+    var firstPlayedAt: Date?
+    var lastPlayedAt: Date?
+    var activeDays = 0
+    var totalPlayTime: TimeInterval = 0
+    var longestMatchGames = 0
+
+    // MARK: Score
+    var totalScore = 0
+    var bestGameScore = 0
+    var bestGameScoreIndex = 0
+    var worstGameScore = 0
+    var worstGameScoreIndex = 0
+    var bestMatchScore = 0
+    var worstMatchScore = 0
+    var bestSnapshot = 0             // highest cumulative score inside a single match
+    var worstSnapshot = 0            // lowest cumulative score inside a single match
+    var totalHighScore = 0           // all-time cumulative peak
+    var totalHighGameIndex = 0
+    var totalLowScore = 0            // all-time cumulative valley
+    var totalLowGameIndex = 0
+    var scoreStandardDeviation: Double = 0
+
+    // MARK: Roles
+    var gamesAsLandlord = 0
+    var landlordWins = 0
+    var landlordLosses = 0
+    var gamesAsFarmer = 0
+    var farmerWins = 0
+    var farmerLosses = 0
+    var landlordNetScore = 0
+    var farmerNetScore = 0
+    var maxLandlordStreak = 0
+
+    // MARK: Bidding
+    var firstBidderGames = 0
+    var bidCountsWhenFirst = [0, 0, 0, 0]     // 不叫, 1分, 2分, 3分 when bidding first
+    var bidCountsAll = [0, 0, 0, 0]           // all games
+    var bidAttempts = 0                       // games where the player bid > 0
+    var bidsWon = 0                           // ... and became landlord
+    var gamesByStake = [0, 0, 0, 0]           // games grouped by the winning bid (1-3)
+    var winsByStake = [0, 0, 0, 0]
+
+    // MARK: Multipliers
+    var totalBombs = 0
+    var maxBombsInGame = 0
+    var gamesWithBombs = 0
+    var bombGamesWon = 0
+    var springWins = 0                        // won a 春天 game (either role)
+    var springLosses = 0                      // lost a 春天 game (either role)
+    var springAsLandlord = 0                  // 春天: landlord swept the farmers
+    var antiSpring = 0                        // 反春: farmers swept the landlord
+    var doubledGames = 0
+    var doubledWins = 0
+    var doubledLosses = 0
+    var doubledNetScore = 0
+
+    // MARK: Streaks & form
+    var currentWinStreak = 0
+    var currentLossStreak = 0
+    var maxWinStreak = 0
+    var maxLossStreak = 0
+    var currentMatchWinStreak = 0
+    var currentMatchLossStreak = 0
+    var maxMatchWinStreak = 0
+    var maxMatchLossStreak = 0
+    /// Results of the most recent games, oldest first (true = win).
+    var recentResults: [Bool] = []
+    var recentGames = 0
+    var recentWins = 0
+    var recentNetScore = 0
+
+    // MARK: Match dynamics
+    var comebackMatches = 0                   // was behind, finished ahead
+    var collapsedMatches = 0                  // was ahead, finished behind
+    var biggestComeback = 0
+    var biggestCollapse = 0
+
+    // MARK: Relationships
+    var partners: [RelationStat] = []         // fellow farmers
+    var opponents: [RelationStat] = []        // players on the other side
+
+    // MARK: Activity
+    var gamesByWeekday = [Int](repeating: 0, count: 7)   // index = Calendar weekday - 1 (0 = Sunday)
+    var gamesByHour = [Int](repeating: 0, count: 24)
+
+    // MARK: Series for charts
+    var gamePoints: [TimelinePoint] = [.origin]
+    var matchPoints: [TimelinePoint] = [.origin]
+
     init(playerId: String, playerName: String) {
         self.playerId = playerId
         self.playerName = playerName
+    }
+
+    // MARK: - Derived values
+
+    var winRate: Double { rate(gamesWon, of: totalGames) }
+    var landlordWinRate: Double { rate(landlordWins, of: gamesAsLandlord) }
+    var farmerWinRate: Double { rate(farmerWins, of: gamesAsFarmer) }
+    var landlordRate: Double { rate(gamesAsLandlord, of: totalGames) }
+    var matchWinRate: Double { rate(matchesWon, of: totalMatches) }
+    var doubledWinRate: Double { rate(doubledWins, of: doubledGames) }
+    var bidSuccessRate: Double { rate(bidsWon, of: bidAttempts) }
+    var bombGameWinRate: Double { rate(bombGamesWon, of: gamesWithBombs) }
+    var recentWinRate: Double { rate(recentWins, of: recentGames) }
+
+    var averageScorePerGame: Double { totalGames > 0 ? Double(totalScore) / Double(totalGames) : 0 }
+    var averageScorePerMatch: Double { totalMatches > 0 ? Double(totalScore) / Double(totalMatches) : 0 }
+    var averageGamesPerMatch: Double { totalMatches > 0 ? Double(totalGames) / Double(totalMatches) : 0 }
+    var averageBombsPerGame: Double { totalGames > 0 ? Double(totalBombs) / Double(totalGames) : 0 }
+
+    /// Average bid over all games, 0 = always passes, 3 = always bids max.
+    var averageBid: Double {
+        guard totalGames > 0 else { return 0 }
+        let sum = bidCountsAll.enumerated().reduce(0) { $0 + $1.offset * $1.element }
+        return Double(sum) / Double(totalGames)
+    }
+
+    var gameSeries: [Int] { gamePoints.map { $0.cumulative } }
+    var matchSeries: [Int] { matchPoints.map { $0.cumulative } }
+
+    func winRate(stake: Int) -> Double {
+        guard (1...3).contains(stake) else { return 0 }
+        return rate(winsByStake[stake], of: gamesByStake[stake])
+    }
+
+    /// Partner with the best win rate (needs a few games to be meaningful).
+    var bestPartner: RelationStat? {
+        partners.filter { $0.games >= 3 }.max { ($0.winRate, $0.netScore) < ($1.winRate, $1.netScore) }
+    }
+
+    /// Opponent the player struggles against the most.
+    var nemesis: RelationStat? {
+        opponents.filter { $0.games >= 3 }.min { ($0.winRate, $0.netScore) < ($1.winRate, $1.netScore) }
+    }
+
+    /// Opponent the player earns the most from.
+    var favoriteOpponent: RelationStat? {
+        opponents.filter { $0.games >= 3 }.max { ($0.netScore, $0.winRate) < ($1.netScore, $1.winRate) }
+    }
+
+    private func rate(_ part: Int, of whole: Int) -> Double {
+        whole > 0 ? Double(part) / Double(whole) * 100 : 0
     }
 }

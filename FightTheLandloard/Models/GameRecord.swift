@@ -1,169 +1,156 @@
 //
 //  GameRecord.swift
-//  FightTheLandloard
+//  FightTheLandlord
 //
 //  Created by Arthur Zhang on 2024-10-20.
+//
+//  Firestore document for a single game round. The field names are part of the
+//  persisted schema and must not be renamed; use the `Seat` based helpers instead.
 //
 
 import Foundation
 import FirebaseFirestore
 
-/// A permanent record of a single game round
-struct GameRecord: Codable, Identifiable {
+struct GameRecord: Codable, Identifiable, Hashable {
     @DocumentID var id: String?
-    var matchId: String          // 对局 ID this game belongs to
-    var gameIndex: Int           // Order within the match (0-indexed)
+    var matchId: String
+    var gameIndex: Int           // 0-based order inside the match
     var playedAt: Date
-    
-    // Player IDs
+
     var playerAId: String
     var playerBId: String
     var playerCId: String
-    
-    // Player names (denormalized for easier display)
+
     var playerAName: String
     var playerBName: String
     var playerCName: String
-    
-    // Game parameters
-    var bombs: Int               // Number of bombs
-    var apoint: Int              // Player A's bid (0-3)
-    var bpoint: Int              // Player B's bid
-    var cpoint: Int              // Player C's bid
-    var adouble: Bool            // Player A doubled
-    var bdouble: Bool            // Player B doubled
-    var cdouble: Bool            // Player C doubled
-    var spring: Bool?            // 春天 - doubles the score (optional for backward compatibility)
-    var landlordResult: Bool     // Landlord won
-    var landlord: Int            // 1=A, 2=B, 3=C
-    
-    // Scores for this game
+
+    var bombs: Int
+    var apoint: Int              // bids (0-3)
+    var bpoint: Int
+    var cpoint: Int
+    var adouble: Bool
+    var bdouble: Bool
+    var cdouble: Bool
+    var spring: Bool?            // optional for records written before 春天 existed
+    var landlordResult: Bool     // landlord won
+    var landlord: Int            // 1 = A, 2 = B, 3 = C
     var scoreA: Int
     var scoreB: Int
     var scoreC: Int
-    
-    // Who was first to bid this game (0=A, 1=B, 2=C)
-    // Optional for backward compatibility with old records
-    var firstBidder: Int?
-    
-    // Computed property for safe access to spring value
-    var isSpring: Bool {
-        return spring ?? false
-    }
-    
-    // Computed property for safe access to firstBidder value
-    var firstBidderIndex: Int {
-        return firstBidder ?? 0
-    }
-    
-    init(matchId: String, gameIndex: Int, playerAId: String, playerBId: String, playerCId: String,
-         playerAName: String, playerBName: String, playerCName: String, gameSetting: GameSetting, firstBidder: Int) {
+    var firstBidder: Int?        // 0 = A, 1 = B, 2 = C (optional for old records)
+
+    // MARK: - Construction
+
+    init(id: String? = nil,
+         matchId: String,
+         gameIndex: Int,
+         playedAt: Date,
+         playerIds: [String],
+         playerNames: [String],
+         bombs: Int,
+         bids: [Int],
+         doubles: [Bool],
+         spring: Bool?,
+         landlordResult: Bool,
+         landlord: Int,
+         scores: [Int],
+         firstBidder: Int?) {
+        self.id = id
         self.matchId = matchId
         self.gameIndex = gameIndex
-        self.playedAt = Date()
-        self.playerAId = playerAId
-        self.playerBId = playerBId
-        self.playerCId = playerCId
-        self.playerAName = playerAName
-        self.playerBName = playerBName
-        self.playerCName = playerCName
-        self.bombs = gameSetting.bombs
-        self.apoint = gameSetting.apoint
-        self.bpoint = gameSetting.bpoint
-        self.cpoint = gameSetting.cpoint
-        self.adouble = gameSetting.adouble
-        self.bdouble = gameSetting.bdouble
-        self.cdouble = gameSetting.cdouble
-        self.spring = gameSetting.spring
-        self.landlordResult = gameSetting.landlordResult
-        self.landlord = gameSetting.landlord
-        self.scoreA = gameSetting.A
-        self.scoreB = gameSetting.B
-        self.scoreC = gameSetting.C
+        self.playedAt = playedAt
+        self.playerAId = playerIds[0]
+        self.playerBId = playerIds[1]
+        self.playerCId = playerIds[2]
+        self.playerAName = playerNames[0]
+        self.playerBName = playerNames[1]
+        self.playerCName = playerNames[2]
+        self.bombs = bombs
+        self.apoint = bids[0]
+        self.bpoint = bids[1]
+        self.cpoint = bids[2]
+        self.adouble = doubles[0]
+        self.bdouble = doubles[1]
+        self.cdouble = doubles[2]
+        self.spring = spring
+        self.landlordResult = landlordResult
+        self.landlord = landlord
+        self.scoreA = scores[0]
+        self.scoreB = scores[1]
+        self.scoreC = scores[2]
         self.firstBidder = firstBidder
     }
 
-    // MARK: - Cache Support
-
-    /// 从本地缓存创建GameRecord（使用私有初始化器）
-    static func fromCache(
-        id: String?,
-        matchId: String,
-        gameIndex: Int,
-        playedAt: Date,
-        playerAId: String,
-        playerBId: String,
-        playerCId: String,
-        playerAName: String,
-        playerBName: String,
-        playerCName: String,
-        bombs: Int,
-        apoint: Int,
-        bpoint: Int,
-        cpoint: Int,
-        adouble: Bool,
-        bdouble: Bool,
-        cdouble: Bool,
-        spring: Bool?,
-        landlordResult: Bool,
-        landlord: Int,
-        scoreA: Int,
-        scoreB: Int,
-        scoreC: Int,
-        firstBidder: Int?
-    ) -> GameRecord {
-        var record = GameRecord()
-        record.id = id
-        record.matchId = matchId
-        record.gameIndex = gameIndex
-        record.playedAt = playedAt
-        record.playerAId = playerAId
-        record.playerBId = playerBId
-        record.playerCId = playerCId
-        record.playerAName = playerAName
-        record.playerBName = playerBName
-        record.playerCName = playerCName
-        record.bombs = bombs
-        record.apoint = apoint
-        record.bpoint = bpoint
-        record.cpoint = cpoint
-        record.adouble = adouble
-        record.bdouble = bdouble
-        record.cdouble = cdouble
-        record.spring = spring
-        record.landlordResult = landlordResult
-        record.landlord = landlord
-        record.scoreA = scoreA
-        record.scoreB = scoreB
-        record.scoreC = scoreC
-        record.firstBidder = firstBidder
-        return record
+    /// Build a record from an in-memory game.
+    init(game: Game, matchId: String, gameIndex: Int, playerIds: [String], playerNames: [String]) {
+        self.init(
+            id: nil,
+            matchId: matchId,
+            gameIndex: gameIndex,
+            playedAt: game.playedAt,
+            playerIds: playerIds,
+            playerNames: playerNames,
+            bombs: game.bombs,
+            bids: game.bids,
+            doubles: game.doubles,
+            spring: game.spring,
+            landlordResult: game.landlordWon,
+            landlord: game.landlord.legacyLandlordValue,
+            scores: game.scores,
+            firstBidder: game.firstBidder.rawValue
+        )
     }
 
-    /// 内部使用的空初始化器
-    private init() {
-        self.matchId = ""
-        self.gameIndex = 0
-        self.playedAt = Date()
-        self.playerAId = ""
-        self.playerBId = ""
-        self.playerCId = ""
-        self.playerAName = ""
-        self.playerBName = ""
-        self.playerCName = ""
-        self.bombs = 0
-        self.apoint = 0
-        self.bpoint = 0
-        self.cpoint = 0
-        self.adouble = false
-        self.bdouble = false
-        self.cdouble = false
-        self.spring = nil
-        self.landlordResult = false
-        self.landlord = 1
-        self.scoreA = 0
-        self.scoreB = 0
-        self.scoreC = 0
-        self.firstBidder = nil
+    // MARK: - Seat based access
+
+    var playerIds: [String] { [playerAId, playerBId, playerCId] }
+    var playerNames: [String] { [playerAName, playerBName, playerCName] }
+    var bids: [Int] { [apoint, bpoint, cpoint] }
+    var doubles: [Bool] { [adouble, bdouble, cdouble] }
+    var scores: [Int] { [scoreA, scoreB, scoreC] }
+    var isSpring: Bool { spring ?? false }
+    var landlordSeat: Seat { Seat(legacyLandlordValue: landlord) }
+    var firstBidderSeat: Seat { Seat(rawValue: firstBidder ?? 0) ?? .a }
+    var winningBid: Int { bids.max() ?? 0 }
+
+    func seat(of playerId: String) -> Seat? {
+        if playerAId == playerId { return .a }
+        if playerBId == playerId { return .b }
+        if playerCId == playerId { return .c }
+        return nil
+    }
+
+    func playerId(at seat: Seat) -> String { playerIds[seat] }
+    func playerName(at seat: Seat) -> String { playerNames[seat] }
+    func score(for seat: Seat) -> Int { scores[seat] }
+    func bid(for seat: Seat) -> Int { bids[seat] }
+    func doubled(_ seat: Seat) -> Bool { doubles[seat] }
+    func isLandlord(_ seat: Seat) -> Bool { landlordSeat == seat }
+
+    /// Convert back into an in-memory game (used when resuming or editing a match).
+    var game: Game {
+        Game(
+            id: id ?? "\(matchId)-\(gameIndex)",
+            bids: bids,
+            doubles: doubles,
+            bombs: bombs,
+            spring: isSpring,
+            landlordWon: landlordResult,
+            landlord: landlordSeat,
+            scores: scores,
+            firstBidder: firstBidderSeat,
+            playedAt: playedAt
+        )
+    }
+
+    func hash(into hasher: inout Hasher) {
+        hasher.combine(matchId)
+        hasher.combine(gameIndex)
+    }
+
+    static func == (lhs: GameRecord, rhs: GameRecord) -> Bool {
+        lhs.matchId == rhs.matchId && lhs.gameIndex == rhs.gameIndex &&
+        lhs.scores == rhs.scores && lhs.playedAt == rhs.playedAt
     }
 }
