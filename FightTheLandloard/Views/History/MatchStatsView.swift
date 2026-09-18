@@ -7,6 +7,7 @@
 
 import SwiftUI
 
+@MainActor
 struct MatchStatsView: View {
     let matchId: String
 

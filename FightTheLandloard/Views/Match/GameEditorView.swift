@@ -21,7 +21,6 @@ struct GameEditorView: View {
     var onNoBids: (() -> Void)? = nil
 
     @Environment(\.dismiss) private var dismiss
-    @Environment(AppSettings.self) private var settings
     @State private var draft = Game()
     @State private var validationMessage: String?
 

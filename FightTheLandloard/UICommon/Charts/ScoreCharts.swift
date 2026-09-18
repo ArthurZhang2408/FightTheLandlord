@@ -142,6 +142,8 @@ struct ScoreLineChart: View {
             .frame(height: height)
             .contentShape(Rectangle())
             .onTapGesture { onExpand?() }
+            .accessibilityAddTraits(onExpand != nil ? .isButton : [])
+            .accessibilityAction { onExpand?() }
         }
     }
 }
@@ -158,7 +160,7 @@ struct FullscreenChartView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var hiddenSeries: Set<String> = []
     @State private var selectedX: Int?
-    @State private var visibleCount: Int = 0
+    @State private var visibleCount: Int?
     @State private var lastMagnification: CGFloat = 1
     @State private var scrollX: Int = 0
 
@@ -184,13 +186,14 @@ struct FullscreenChartView: View {
                 }
                 ToolbarItem(placement: .primaryAction) {
                     Button("重置") { resetZoom() }
-                        .disabled(visibleCount >= maxCount)
+                        .disabled(currentVisible >= maxCount)
                 }
             }
         }
         .landscapeOrientation()
-        .onAppear { if visibleCount == 0 { visibleCount = maxCount } }
     }
+
+    private var currentVisible: Int { visibleCount ?? maxCount }
 
     private var legend: some View {
         ScrollView(.horizontal, showsIndicators: false) {
@@ -222,7 +225,7 @@ struct FullscreenChartView: View {
                 .lineStyle(StrokeStyle(lineWidth: 2.5))
                 .interpolationMethod(.monotone)
 
-                if visibleCount <= 60 {
+                if currentVisible <= 60 {
                     PointMark(
                         x: .value(xLabel, point.index),
                         y: .value("分数", point.value)
@@ -239,7 +242,7 @@ struct FullscreenChartView: View {
                 RuleMark(x: .value(xLabel, x))
                     .foregroundStyle(AppTheme.textSecondary.opacity(0.5))
                     .lineStyle(StrokeStyle(lineWidth: 1))
-                    .annotation(position: .top, alignment: .center, overflowResolution: .init(x: .fit(to: .chart), y: .disabled)) {
+                    .annotation(position: .top, alignment: .center, overflowResolution: .init(x: .fit(to: .chart), y: .fit(to: .chart))) {
                         tooltip(at: x)
                     }
             }
@@ -249,7 +252,7 @@ struct FullscreenChartView: View {
         .chartXAxisLabel(xLabel)
         .chartYAxisLabel("累计得分")
         .chartScrollableAxes(.horizontal)
-        .chartXVisibleDomain(length: max(minVisible, min(maxCount, visibleCount)))
+        .chartXVisibleDomain(length: max(minVisible, min(maxCount, currentVisible)))
         .chartScrollPosition(x: $scrollX)
         .chartXSelection(value: $selectedX)
         .chartXAxis {
@@ -269,7 +272,7 @@ struct FullscreenChartView: View {
                 .onChanged { value in
                     let delta = value / lastMagnification
                     lastMagnification = value
-                    let proposed = Double(visibleCount) / Double(delta)
+                    let proposed = Double(currentVisible) / Double(delta)
                     visibleCount = max(minVisible, min(maxCount, Int(proposed.rounded())))
                 }
                 .onEnded { _ in lastMagnification = 1 }
@@ -332,7 +335,7 @@ struct FullscreenChartView: View {
 
     private var footer: some View {
         HStack {
-            Text(visibleCount < maxCount ? "显示 \(min(visibleCount, maxCount)) / \(maxCount) 点 · 左右滑动查看" : "共 \(maxCount) 点 · 双指缩放")
+            Text(currentVisible < maxCount ? "显示 \(currentVisible) / \(maxCount) 点 · 左右滑动查看" : "共 \(maxCount) 点 · 双指缩放")
                 .font(.caption)
                 .foregroundStyle(AppTheme.textTertiary)
             Spacer()
@@ -359,19 +362,31 @@ struct LandscapeOrientationModifier: ViewModifier {
     func body(content: Content) -> some View {
         content
             .onAppear { OrientationController.request(.landscape) }
-            .onDisappear { OrientationController.request(.portrait) }
+            .onDisappear { OrientationController.request(OrientationController.defaultMask) }
     }
 }
 
+/// Orientation lock. The app delegate reports `mask` as the supported orientations
+/// so the geometry request is honoured; the Info.plist must still list landscape
+/// orientations for the fullscreen chart to rotate.
+@MainActor
 enum OrientationController {
+    static var mask: UIInterfaceOrientationMask = defaultMask
+
+    static var defaultMask: UIInterfaceOrientationMask {
+        UIDevice.current.userInterfaceIdiom == .pad ? .all : .portrait
+    }
+
     static func request(_ orientations: UIInterfaceOrientationMask) {
+        mask = orientations
         let scenes = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }
         let scene = scenes.first(where: { $0.activationState == .foregroundActive }) ?? scenes.first
         guard let windowScene = scene else { return }
-        windowScene.requestGeometryUpdate(.iOS(interfaceOrientations: orientations)) { _ in }
         windowScene.windows.first?.rootViewController?.setNeedsUpdateOfSupportedInterfaceOrientations()
+        windowScene.requestGeometryUpdate(.iOS(interfaceOrientations: orientations)) { _ in }
     }
 }
+
 
 extension View {
     func landscapeOrientation() -> some View {

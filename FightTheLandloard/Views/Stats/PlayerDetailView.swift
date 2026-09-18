@@ -7,6 +7,7 @@
 
 import SwiftUI
 
+@MainActor
 struct PlayerDetailView: View {
     let player: Player
 

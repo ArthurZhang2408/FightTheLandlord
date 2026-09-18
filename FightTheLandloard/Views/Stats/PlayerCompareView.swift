@@ -7,6 +7,7 @@
 
 import SwiftUI
 
+@MainActor
 struct PlayerCompareView: View {
     let players: [Player]
 

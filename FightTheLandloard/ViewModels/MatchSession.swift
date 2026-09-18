@@ -149,8 +149,12 @@ final class MatchSession {
     }
 
     /// Loads a saved match back onto the board so it can be continued.
-    func resume(match: MatchRecord, records: [GameRecord]) {
-        guard let id = match.id else { return }
+    /// Returns false (and does nothing) when the match's games are not cached yet;
+    /// resuming with an incomplete record set would overwrite history.
+    @discardableResult
+    func resume(match: MatchRecord, records: [GameRecord]) -> Bool {
+        guard let id = match.id else { return false }
+        guard match.totalGames == 0 || records.count == match.totalGames else { return false }
         cancelPendingSync()
         let starter = match.starterSeat
         let games = records.sorted { $0.gameIndex < $1.gameIndex }.enumerated().map { index, record -> Game in
@@ -175,6 +179,7 @@ final class MatchSession {
         persist()
         // Reopen the history entry.
         syncNow(endedAt: nil, autoEnded: nil)
+        return true
     }
 
     func dismissAutoEndedBanner() {

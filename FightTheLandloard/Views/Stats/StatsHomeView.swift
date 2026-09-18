@@ -7,6 +7,7 @@
 
 import SwiftUI
 
+@MainActor
 struct StatsHomeView: View {
     @Environment(DataStore.self) private var store
     @Environment(AppSettings.self) private var settings

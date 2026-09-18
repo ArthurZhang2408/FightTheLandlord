@@ -7,9 +7,19 @@
 
 import FirebaseCore
 import SwiftUI
+import UIKit
+
+/// Reports the orientations the fullscreen chart asks for (see `OrientationController`).
+final class AppDelegate: NSObject, UIApplicationDelegate {
+    func application(_ application: UIApplication,
+                     supportedInterfaceOrientationsFor window: UIWindow?) -> UIInterfaceOrientationMask {
+        OrientationController.mask
+    }
+}
 
 @main
 struct FightTheLandloardApp: App {
+    @UIApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
     @Environment(\.scenePhase) private var scenePhase
 
     @State private var store: DataStore

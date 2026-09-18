@@ -7,6 +7,7 @@
 
 import SwiftUI
 
+@MainActor
 struct MatchBoardView: View {
     @Environment(DataStore.self) private var store
     @Environment(MatchSession.self) private var session
@@ -22,6 +23,7 @@ struct MatchBoardView: View {
     @State private var showFullscreenChart = false
     @State private var lastEndedMatchId: String?
     @State private var creatingPlayerFor: Seat?
+    @State private var showRecordsMissingAlert = false
 
     private enum GameEditorTarget: Identifiable {
         case add
@@ -101,6 +103,11 @@ struct MatchBoardView: View {
             } message: {
                 Text("三个位置都选好玩家后才能保存对局。")
             }
+            .alert("记录尚未同步", isPresented: $showRecordsMissingAlert) {
+                Button("好", role: .cancel) {}
+            } message: {
+                Text("这场对局的每局记录还没有下载完成，请联网稍候再试。")
+            }
         }
     }
 
@@ -141,6 +148,7 @@ struct MatchBoardView: View {
                 } label: {
                     Image(systemName: "ellipsis.circle")
                 }
+                .accessibilityLabel("更多")
                 Button("结束") {
                     if session.games.isEmpty {
                         showDiscardConfirmation = true
@@ -157,6 +165,7 @@ struct MatchBoardView: View {
                 } label: {
                     Image(systemName: "gearshape")
                 }
+                .accessibilityLabel("设置")
             }
         }
     }
@@ -239,8 +248,7 @@ struct MatchBoardView: View {
             HStack(spacing: AppTheme.Spacing.s) {
                 Button {
                     if let match = store.match(id: info.matchId) {
-                        session.resume(match: match, records: store.records(forMatch: match.id))
-                        Haptics.medium()
+                        resume(match)
                     } else {
                         session.dismissAutoEndedBanner()
                     }
@@ -269,14 +277,23 @@ struct MatchBoardView: View {
                 .font(.caption)
                 .foregroundStyle(AppTheme.textSecondary)
             Button {
-                session.resume(match: match, records: store.records(forMatch: match.id))
-                Haptics.medium()
+                resume(match)
             } label: {
                 Label("继续这场对局", systemImage: "play.fill")
             }
             .buttonStyle(SecondaryButtonStyle())
         }
         .card()
+    }
+
+    private func resume(_ match: MatchRecord) {
+        let records = store.records(forMatch: match.id)
+        if session.resume(match: match, records: records) {
+            Haptics.medium()
+        } else {
+            store.ensureRecordsLoaded(forMatch: match.id)
+            showRecordsMissingAlert = true
+        }
     }
 
     // MARK: - Active board
@@ -469,15 +486,20 @@ struct MatchBoardView: View {
             } else {
                 VStack(spacing: 0) {
                     ForEach(Array(session.games.enumerated().reversed()), id: \.element.id) { index, game in
-                        GameRowView(
-                            number: index + 1,
-                            game: game,
-                            playerNames: session.playerNames,
-                            cumulative: session.cumulativeScores[index],
-                            showCumulative: !settings.scorePerGame
-                        )
-                        .contentShape(Rectangle())
-                        .onTapGesture { editor = .edit(index) }
+                        Button {
+                            editor = .edit(index)
+                        } label: {
+                            GameRowView(
+                                number: index + 1,
+                                game: game,
+                                playerNames: session.playerNames,
+                                cumulative: session.cumulativeScores[index],
+                                showCumulative: !settings.scorePerGame
+                            )
+                            .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityHint("修改这一局")
                         .contextMenu {
                             Button {
                                 editor = .edit(index)

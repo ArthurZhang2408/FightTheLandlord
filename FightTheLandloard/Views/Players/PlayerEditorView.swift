@@ -7,6 +7,7 @@
 
 import SwiftUI
 
+@MainActor
 struct PlayerEditorView: View {
     enum Mode: Equatable {
         case create
@@ -73,7 +74,10 @@ struct PlayerEditorView: View {
                 } else {
                     color = suggestedColor()
                 }
-                nameFocused = true
+                Task { @MainActor in
+                    try? await Task.sleep(for: .milliseconds(300))
+                    nameFocused = true
+                }
             }
         }
         .presentationDetents([.medium, .large])

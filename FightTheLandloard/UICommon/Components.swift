@@ -78,6 +78,8 @@ struct ScoreText: View {
             .font(AppFont.score(size, weight: weight))
             .foregroundStyle(value == 0 ? (neutralColor ?? AppTheme.textSecondary) : AppTheme.scoreColor(value, greenWin: settings.greenWin))
             .monospacedDigit()
+            .lineLimit(1)
+            .minimumScaleFactor(0.6)
             .contentTransition(.numericText())
     }
 }
@@ -317,6 +319,7 @@ extension EmptyStateView where Action == EmptyView {
 struct PrimaryButtonStyle: ButtonStyle {
     var tint: Color = AppTheme.accent
     var fullWidth: Bool = true
+    @Environment(\.isEnabled) private var isEnabled
 
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
@@ -327,6 +330,7 @@ struct PrimaryButtonStyle: ButtonStyle {
             .frame(maxWidth: fullWidth ? .infinity : nil)
             .background(tint.opacity(configuration.isPressed ? 0.8 : 1))
             .clipShape(RoundedRectangle(cornerRadius: AppTheme.Radius.m, style: .continuous))
+            .opacity(isEnabled ? 1 : 0.4)
             .scaleEffect(configuration.isPressed ? 0.98 : 1)
             .animation(.easeOut(duration: 0.15), value: configuration.isPressed)
     }
@@ -335,6 +339,7 @@ struct PrimaryButtonStyle: ButtonStyle {
 struct SecondaryButtonStyle: ButtonStyle {
     var tint: Color = AppTheme.accent
     var fullWidth: Bool = true
+    @Environment(\.isEnabled) private var isEnabled
 
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
@@ -345,6 +350,7 @@ struct SecondaryButtonStyle: ButtonStyle {
             .frame(maxWidth: fullWidth ? .infinity : nil)
             .background(tint.opacity(configuration.isPressed ? 0.18 : 0.1))
             .clipShape(RoundedRectangle(cornerRadius: AppTheme.Radius.m, style: .continuous))
+            .opacity(isEnabled ? 1 : 0.4)
             .scaleEffect(configuration.isPressed ? 0.98 : 1)
             .animation(.easeOut(duration: 0.15), value: configuration.isPressed)
     }

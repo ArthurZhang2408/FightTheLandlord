@@ -8,6 +8,7 @@
 
 import SwiftUI
 
+@MainActor
 struct MatchDetailView: View {
     let matchId: String
     var highlightGameIndex: Int? = nil
@@ -26,6 +27,7 @@ struct MatchDetailView: View {
     @State private var showFullscreenChart = false
     @State private var showStats = false
     @State private var showEndFailedAlert = false
+    @State private var showRecordsMissingAlert = false
 
     private var match: MatchRecord? { store.match(id: matchId) }
     private var records: [GameRecord] { store.records(forMatch: matchId) }
@@ -128,6 +130,11 @@ struct MatchDetailView: View {
             Button("取消", role: .cancel) {}
         } message: {
             Text("继续这场对局前需要先处理计分板上的对局。")
+        }
+        .alert("记录尚未同步", isPresented: $showRecordsMissingAlert) {
+            Button("好", role: .cancel) {}
+        } message: {
+            Text("这场对局的每局记录还没有下载完成，请联网稍候再试。")
         }
         .alert("无法结束当前对局", isPresented: $showEndFailedAlert) {
             Button("好", role: .cancel) {}
@@ -302,17 +309,22 @@ struct MatchDetailView: View {
                 let cumulative = cumulativeScores
                 VStack(spacing: 0) {
                     ForEach(Array(games.enumerated()), id: \.element.id) { index, game in
-                        GameRowView(
-                            number: index + 1,
-                            game: game,
-                            playerNames: names,
-                            cumulative: cumulative[index],
-                            showCumulative: !settings.scorePerGame,
-                            highlighted: highlighted == index
-                        )
+                        Button {
+                            editing = EditingGame(index: index)
+                        } label: {
+                            GameRowView(
+                                number: index + 1,
+                                game: game,
+                                playerNames: names,
+                                cumulative: cumulative[index],
+                                showCumulative: !settings.scorePerGame,
+                                highlighted: highlighted == index
+                            )
+                            .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityHint("修改这一局")
                         .id("game-\(index)")
-                        .contentShape(Rectangle())
-                        .onTapGesture { editing = EditingGame(index: index) }
                         if index < games.count - 1 {
                             Divider().overlay(AppTheme.hairline).padding(.leading, 52)
                         }
@@ -422,9 +434,13 @@ struct MatchDetailView: View {
 
     private func resume() {
         guard let match = match else { return }
-        session.resume(match: match, records: records)
-        Haptics.medium()
-        router.selectedTab = .match
+        if session.resume(match: match, records: records) {
+            Haptics.medium()
+            router.selectedTab = .match
+        } else {
+            store.ensureRecordsLoaded(forMatch: matchId)
+            showRecordsMissingAlert = true
+        }
     }
 }
 

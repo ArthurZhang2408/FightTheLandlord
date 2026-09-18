@@ -12,6 +12,7 @@ struct MatchRoute: Hashable {
     let gameIndex: Int?
 }
 
+@MainActor
 struct HistoryView: View {
     @Environment(DataStore.self) private var store
     @Environment(AppRouter.self) private var router
@@ -104,6 +105,7 @@ struct HistoryView: View {
     }
 }
 
+@MainActor
 struct MatchRowView: View {
     @Environment(DataStore.self) private var store
     let match: MatchRecord

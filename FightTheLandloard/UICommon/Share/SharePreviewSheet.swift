@@ -7,7 +7,9 @@
 
 import SwiftUI
 import Photos
+import UniformTypeIdentifiers
 
+@MainActor
 struct SharePreviewSheet: View {
     let content: ShareContent
 
@@ -15,7 +17,7 @@ struct SharePreviewSheet: View {
     @Environment(\.dismiss) private var dismiss
     @State private var dark = false
     @State private var image: UIImage?
-    @State private var isRendering = true
+    @State private var didInitialize = false
     @State private var toast: String?
 
     var body: some View {
@@ -58,7 +60,7 @@ struct SharePreviewSheet: View {
 
                         if let image = image {
                             ShareLink(
-                                item: Image(uiImage: image),
+                                item: PosterFile(image: image, name: content.fileName),
                                 preview: SharePreview(content.title, image: Image(uiImage: image))
                             ) {
                                 Label("分享", systemImage: "square.and.arrow.up")
@@ -96,20 +98,22 @@ struct SharePreviewSheet: View {
                         .transition(.move(edge: .top).combined(with: .opacity))
                 }
             }
-            .task(id: dark) { render() }
             .onAppear {
-                dark = settings.shareDarkTheme
+                if !didInitialize {
+                    didInitialize = true
+                    dark = settings.shareDarkTheme
+                }
+                render()
             }
             .onChange(of: dark) { _, value in
                 settings.shareDarkTheme = value
+                render()
             }
         }
     }
 
     private func render() {
-        isRendering = true
         image = ShareRenderer.render(content, dark: dark)
-        isRendering = false
     }
 
     private func saveToPhotos() {
@@ -130,6 +134,21 @@ struct SharePreviewSheet: View {
         withAnimation { toast = message }
         DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
             withAnimation { toast = nil }
+        }
+    }
+}
+
+/// PNG file for the share sheet (keeps a readable file name in AirDrop / Files).
+struct PosterFile: Transferable {
+    let image: UIImage
+    let name: String
+
+    static var transferRepresentation: some TransferRepresentation {
+        FileRepresentation(exportedContentType: .png) { poster in
+            guard let data = poster.image.pngData() else { throw CocoaError(.fileWriteUnknown) }
+            let url = FileManager.default.temporaryDirectory.appendingPathComponent("\(poster.name).png")
+            try data.write(to: url, options: .atomic)
+            return SentTransferredFile(url)
         }
     }
 }

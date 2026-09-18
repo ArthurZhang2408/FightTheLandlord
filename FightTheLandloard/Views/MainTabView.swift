@@ -5,6 +5,7 @@
 
 import SwiftUI
 
+@MainActor
 struct MainTabView: View {
     @Environment(AppRouter.self) private var router
 

@@ -165,6 +165,7 @@ extension View {
 
 // MARK: - Haptics
 
+@MainActor
 enum Haptics {
     static func light() {
         guard AppSettings.shared.hapticsEnabled else { return }

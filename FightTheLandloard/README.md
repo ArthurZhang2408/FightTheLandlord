@@ -63,6 +63,7 @@ Collections `players`, `matches`, `gameRecords` keep their original field names.
 - Requires the Firebase SDK (FirebaseCore, FirebaseFirestore) via Swift Package Manager and a `GoogleService-Info.plist` in `Other/` (git-ignored).
 - Deployment target iOS 17.0 (the app uses `@Observable`, `chartXSelection`, `SectorMark`-era Charts APIs).
 - `NSPhotoLibraryAddUsageDescription` must be present in Info.plist for “保存到相册”.
+- The fullscreen chart rotates to landscape through `OrientationController` and the app delegate's `supportedInterfaceOrientationsFor`; Info.plist must list the landscape orientations under `UISupportedInterfaceOrientations` for that to take effect (portrait stays the default everywhere else).
 
 ## Development notes
 

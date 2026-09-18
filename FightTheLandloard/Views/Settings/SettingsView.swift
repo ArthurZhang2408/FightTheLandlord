@@ -5,6 +5,7 @@
 
 import SwiftUI
 
+@MainActor
 struct SettingsView: View {
     @Environment(AppSettings.self) private var settings
     @Environment(\.dismiss) private var dismiss

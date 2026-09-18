@@ -8,6 +8,7 @@
 import SwiftUI
 
 /// Small toolbar indicator. Hidden while everything is synced and online.
+@MainActor
 struct SyncStatusIndicator: View {
     @Environment(DataStore.self) private var store
 
@@ -41,9 +42,11 @@ struct SyncStatusIndicator: View {
 }
 
 /// Settings section describing sync state with manual controls.
+@MainActor
 struct SyncSettingsSection: View {
     @Environment(DataStore.self) private var store
     @State private var showResetConfirmation = false
+    @State private var cacheSizeText = "–"
 
     var body: some View {
         Section {
@@ -59,7 +62,7 @@ struct SyncSettingsSection: View {
                 }
             }
             LabeledContent("本地缓存") {
-                Text(cacheSize).foregroundStyle(AppTheme.textSecondary)
+                Text(cacheSizeText).foregroundStyle(AppTheme.textSecondary)
             }
             Button {
                 store.forceSync()
@@ -72,17 +75,28 @@ struct SyncSettingsSection: View {
             } label: {
                 Label("重置本地数据并重新同步", systemImage: "arrow.counterclockwise")
             }
+            .confirmationDialog("重置本地数据？", isPresented: $showResetConfirmation, titleVisibility: .visible) {
+                Button("重置并重新同步", role: .destructive) {
+                    store.resetAndSync()
+                    refreshCacheSize()
+                }
+                Button("取消", role: .cancel) {}
+            } message: {
+                Text("未同步的数据将丢失。")
+            }
         } header: {
             Text("数据同步")
         } footer: {
             Text("记录会先保存在本机，联网后自动上传。重置会清除本地缓存并从服务器重新下载，未同步的数据将丢失。")
         }
-        .confirmationDialog("重置本地数据？", isPresented: $showResetConfirmation, titleVisibility: .visible) {
-            Button("重置并重新同步", role: .destructive) { store.resetAndSync() }
-            Button("取消", role: .cancel) {}
-        } message: {
-            Text("未同步的数据将丢失。")
-        }
+        .onAppear(perform: refreshCacheSize)
+    }
+
+    private func refreshCacheSize() {
+        let formatter = ByteCountFormatter()
+        formatter.allowedUnits = [.useKB, .useMB]
+        formatter.countStyle = .file
+        cacheSizeText = formatter.string(fromByteCount: LocalCacheManager.shared.cacheSize)
     }
 
     private var statusText: String {
@@ -101,12 +115,5 @@ struct SyncSettingsSection: View {
         case .offline: return AppTheme.gold
         case .error: return AppTheme.red
         }
-    }
-
-    private var cacheSize: String {
-        let formatter = ByteCountFormatter()
-        formatter.allowedUnits = [.useKB, .useMB]
-        formatter.countStyle = .file
-        return formatter.string(fromByteCount: LocalCacheManager.shared.cacheSize)
     }
 }
