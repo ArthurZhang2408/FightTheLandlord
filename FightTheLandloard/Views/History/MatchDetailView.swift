@@ -24,6 +24,8 @@ struct MatchDetailView: View {
     @State private var showResumeOptions = false
     @State private var showShare = false
     @State private var showFullscreenChart = false
+    @State private var showStats = false
+    @State private var showEndFailedAlert = false
 
     private var match: MatchRecord? { store.match(id: matchId) }
     private var records: [GameRecord] { store.records(forMatch: matchId) }
@@ -64,8 +66,8 @@ struct MatchDetailView: View {
                                 Label("继续这场对局", systemImage: "play")
                             }
                         }
-                        NavigationLink {
-                            MatchStatsView(matchId: matchId)
+                        Button {
+                            showStats = true
                         } label: {
                             Label("详细统计", systemImage: "chart.bar")
                         }
@@ -80,6 +82,9 @@ struct MatchDetailView: View {
                     }
                 }
             }
+        }
+        .navigationDestination(isPresented: $showStats) {
+            MatchStatsView(matchId: matchId)
         }
         .sheet(item: $editing) { target in
             if games.indices.contains(target.index) {
@@ -99,7 +104,10 @@ struct MatchDetailView: View {
             FullscreenChartView(title: "得分走势", series: chartSeries, xLabel: "局") { _, point in
                 if let index = point.gameIndex {
                     showFullscreenChart = false
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { applyHighlight(index) }
+                    Task { @MainActor in
+                        try? await Task.sleep(for: .milliseconds(400))
+                        applyHighlight(index)
+                    }
                 }
             }
         }
@@ -111,8 +119,7 @@ struct MatchDetailView: View {
         }
         .confirmationDialog("计分板上已有对局", isPresented: $showResumeOptions, titleVisibility: .visible) {
             Button("结束并保存当前对局，然后继续") {
-                _ = session.endMatch()
-                resume()
+                if session.endMatch() != nil { resume() } else { showEndFailedAlert = true }
             }
             Button("放弃当前对局，然后继续", role: .destructive) {
                 session.discardMatch()
@@ -122,10 +129,18 @@ struct MatchDetailView: View {
         } message: {
             Text("继续这场对局前需要先处理计分板上的对局。")
         }
+        .alert("无法结束当前对局", isPresented: $showEndFailedAlert) {
+            Button("好", role: .cancel) {}
+        } message: {
+            Text("计分板上的对局还没有选齐玩家，请先到计分板处理。")
+        }
         .onAppear {
             store.ensureRecordsLoaded(forMatch: matchId)
             if let index = highlightGameIndex {
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) { applyHighlight(index) }
+                Task { @MainActor in
+                    try? await Task.sleep(for: .milliseconds(350))
+                    applyHighlight(index)
+                }
             }
         }
     }
@@ -209,11 +224,11 @@ struct MatchDetailView: View {
 
             HStack(spacing: 0) {
                 ForEach(match.ranking, id: \.self) { seat in
-                    let rank = stats.seats.indices.contains(seat.rawValue) ? stats.stats(for: seat).rank : 1
+                    let isWinner = match.winnerSeat == seat
                     VStack(spacing: 8) {
                         ZStack(alignment: .topTrailing) {
-                            PlayerAvatar(name: names[seat], color: colors[seat], size: 44, emphasized: rank == 1)
-                            if rank == 1 {
+                            PlayerAvatar(name: names[seat], color: colors[seat], size: 44, emphasized: isWinner)
+                            if isWinner {
                                 Image(systemName: "crown.fill")
                                     .font(.system(size: 10, weight: .bold))
                                     .foregroundStyle(AppTheme.gold)
@@ -332,7 +347,7 @@ struct MatchDetailView: View {
             VStack(spacing: 0) {
                 ForEach(stats.seats) { seat in
                     HStack(spacing: 12) {
-                        PlayerAvatar(name: seat.playerName, color: colors[seat.seat], size: 34)
+                        PlayerAvatar(name: names[seat.seat], color: colors[seat.seat], size: 34)
                         VStack(alignment: .leading, spacing: 3) {
                             Text(names[seat.seat]).font(.subheadline.weight(.semibold))
                             Text("\(seat.gamesWon)胜 \(seat.gamesLost)负 · 地主 \(seat.landlordWins)/\(seat.landlordGames) · 农民 \(seat.farmerWins)/\(seat.farmerGames)")
@@ -362,8 +377,10 @@ struct MatchDetailView: View {
     // MARK: - Actions
 
     private func applyHighlight(_ index: Int) {
-        highlighted = index
-        DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
+        highlighted = nil
+        Task { @MainActor in
+            highlighted = index
+            try? await Task.sleep(for: .seconds(3))
             if highlighted == index { withAnimation { highlighted = nil } }
         }
     }

@@ -65,13 +65,14 @@ struct MatchStatsView: View {
     private func seatCard(_ seat: SeatMatchStats, stats: MatchStatistics, match: MatchRecord) -> some View {
         let color = store.player(id: seat.playerId)?.color ?? seatFallbackColor(seat.seat)
         let name = store.playerNameLookup[seat.playerId] ?? seat.playerName
+        let isWinner = match.winnerSeat == seat.seat
         return VStack(spacing: AppTheme.Spacing.m) {
             HStack(spacing: 12) {
-                PlayerAvatar(name: name, color: color, size: 40, emphasized: seat.rank == 1)
+                PlayerAvatar(name: name, color: color, size: 40, emphasized: isWinner)
                 VStack(alignment: .leading, spacing: 2) {
                     HStack(spacing: 6) {
                         Text(name).font(.headline)
-                        Chip(text: "第\(seat.rank)名", tint: seat.rank == 1 ? AppTheme.gold : AppTheme.textSecondary)
+                        Chip(text: "第\(seat.rank)名", tint: isWinner ? AppTheme.gold : AppTheme.textSecondary)
                         if seat.isComeback { Chip(text: "逆转", tint: AppTheme.jade, icon: "arrow.uturn.up") }
                         if seat.isCollapse { Chip(text: "崩盘", tint: AppTheme.red, icon: "arrow.uturn.down") }
                     }

@@ -15,6 +15,7 @@ struct StatsHomeView: View {
     @State private var showCompare = false
     @State private var editingPlayer: Player?
     @State private var playerToDelete: Player?
+    @State private var cachedEntries: [LeaderboardEntry] = []
 
     var body: some View {
         NavigationStack {
@@ -57,6 +58,10 @@ struct StatsHomeView: View {
                     .accessibilityLabel("添加玩家")
                 }
             }
+            .onAppear(perform: recompute)
+            .onChange(of: store.gameRecords) { _, _ in recompute() }
+            .onChange(of: store.matches) { _, _ in recompute() }
+            .onChange(of: store.players) { _, _ in recompute() }
             .sheet(isPresented: $showAddPlayer) {
                 PlayerEditorView(mode: .create)
             }
@@ -79,7 +84,11 @@ struct StatsHomeView: View {
     }
 
     private var entries: [LeaderboardEntry] {
-        Leaderboard.sorted(store.leaderboard(), by: metric)
+        Leaderboard.sorted(cachedEntries, by: metric)
+    }
+
+    private func recompute() {
+        cachedEntries = store.leaderboard()
     }
 
     private var leaderboard: some View {

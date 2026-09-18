@@ -55,6 +55,11 @@ struct PlayerCompareView: View {
                         VStack(spacing: AppTheme.Spacing.l) {
                             ScoreLineChart(series: series, xLabel: mode == .games ? "局" : "场", height: 260, onExpand: { showFullscreen = true })
                                 .card()
+                            Text(mode == .games ? "横轴为各自的第几局，用于比较走势形状，不代表同一时间。" : "横轴为各自参加的第几场。")
+                                .font(.caption)
+                                .foregroundStyle(AppTheme.textTertiary)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .padding(.horizontal, 4)
                             summaryTable
                         }
                         .padding()
@@ -73,7 +78,8 @@ struct PlayerCompareView: View {
                 FullscreenChartView(title: "玩家对比", series: series, xLabel: mode == .games ? "局" : "场") { _, point in
                     if let matchId = point.matchId {
                         showFullscreen = false
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
+                        Task { @MainActor in
+                            try? await Task.sleep(for: .milliseconds(400))
                             router.showMatch(id: matchId, gameIndex: point.gameIndex)
                             dismiss()
                         }

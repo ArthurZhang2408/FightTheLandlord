@@ -32,16 +32,20 @@ struct HistoryView: View {
                         .padding(.top)
                 } else if store.matches.isEmpty {
                     EmptyStateView(icon: "clock.arrow.circlepath", title: "还没有历史对局", message: "结束一场对局后会出现在这里。")
+                } else if groups.isEmpty {
+                    EmptyStateView(icon: "magnifyingglass", title: "没有匹配的对局", message: "换个玩家名称试试。")
                 } else {
                     list
                 }
             }
             .background(AppTheme.background)
+            .searchable(text: $searchText, prompt: "按玩家搜索")
             .navigationTitle("历史")
             .navigationDestination(for: MatchRoute.self) { route in
                 MatchDetailView(matchId: route.matchId, highlightGameIndex: route.gameIndex)
             }
             .onChange(of: router.pendingMatch) { _, _ in consumePendingNavigation() }
+            .onChange(of: store.matches.count) { _, _ in consumePendingNavigation() }
             .onAppear { consumePendingNavigation() }
         }
     }
@@ -88,12 +92,13 @@ struct HistoryView: View {
             }
         }
         .listStyle(.insetGrouped)
-        .searchable(text: $searchText, prompt: "按玩家搜索")
     }
 
+    /// Navigates once the requested match is available; a request for a match that
+    /// has not arrived from the sync layer yet is kept until it does.
     private func consumePendingNavigation() {
-        guard let request = router.consumeMatchRequest() else { return }
-        guard store.match(id: request.matchId) != nil else { return }
+        guard let request = router.pendingMatch, store.match(id: request.matchId) != nil else { return }
+        _ = router.consumeMatchRequest()
         path = NavigationPath()
         path.append(MatchRoute(matchId: request.matchId, gameIndex: request.gameIndex))
     }

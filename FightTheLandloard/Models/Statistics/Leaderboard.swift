@@ -90,7 +90,12 @@ enum Leaderboard {
     static func sorted(_ entries: [LeaderboardEntry], by metric: LeaderboardMetric) -> [LeaderboardEntry] {
         switch metric {
         case .netScore:
-            return entries.sorted { ($0.netScore, $0.winRate, $0.games) > ($1.netScore, $1.winRate, $1.games) }
+            // Players without any games sit at the bottom rather than above negative totals.
+            return entries.sorted { lhs, rhs in
+                let l = (lhs.games > 0 ? 1 : 0, lhs.netScore, lhs.winRate, lhs.games)
+                let r = (rhs.games > 0 ? 1 : 0, rhs.netScore, rhs.winRate, rhs.games)
+                return l > r
+            }
         case .winRate:
             // Players with very few games should not top the table.
             return entries.sorted { lhs, rhs in
