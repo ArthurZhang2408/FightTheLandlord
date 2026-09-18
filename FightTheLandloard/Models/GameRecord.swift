@@ -102,6 +102,11 @@ struct GameRecord: Codable, Identifiable, Hashable {
         )
     }
 
+    /// Stable Firestore document id for the n-th game of a match.
+    static func documentId(matchId: String, index: Int) -> String {
+        "\(matchId)-\(index)"
+    }
+
     // MARK: - Seat based access
 
     var playerIds: [String] { [playerAId, playerBId, playerCId] }

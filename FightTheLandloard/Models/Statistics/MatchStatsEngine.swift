@@ -10,7 +10,15 @@ import Foundation
 enum MatchStatsEngine {
 
     static func compute(match: MatchRecord, records: [GameRecord]) -> MatchStatistics {
-        let games = records.sorted { $0.gameIndex < $1.gameIndex }.map { $0.game }
+        let starter = match.starterSeat
+        // Records written before `firstBidder` existed follow the plain rotation.
+        let games = records.sorted { $0.gameIndex < $1.gameIndex }.enumerated().map { index, record -> Game in
+            var game = record.game
+            if record.firstBidder == nil {
+                game.firstBidder = Seat(rawValue: (index + starter.rawValue) % 3) ?? .a
+            }
+            return game
+        }
         return compute(
             matchId: match.id,
             playerIds: match.playerIds,
@@ -60,7 +68,7 @@ enum MatchStatsEngine {
                 stats.mostBombsGameIndex = index
             }
 
-            let firstBidder = Seat(rawValue: (index + starter.rawValue) % 3) ?? game.firstBidder
+            let firstBidder = game.firstBidder
 
             for seat in Seat.allCases {
                 let score = game.scores[seat]

@@ -37,7 +37,9 @@ final class MatchSession {
     /// Shown as a "continue?" banner until dismissed or a new match starts.
     private(set) var lastAutoEnded: AutoEndedInfo?
     /// Inactivity window before the board is closed automatically (0 = never).
-    var idleTimeout: TimeInterval = 2 * 3600
+    var idleTimeout: TimeInterval = 2 * 3600 {
+        didSet { startIdleTimer() }
+    }
 
     @ObservationIgnored private let store: DataStore
     @ObservationIgnored private let defaults: UserDefaults
@@ -101,7 +103,7 @@ final class MatchSession {
     func startNewMatch(playerIds: [String?] = [nil, nil, nil], starter: Seat = .a) {
         cancelPendingSync()
         active = ActiveMatch(playerIds: playerIds, starter: starter)
-        lastAutoEnded = nil
+        setLastAutoEnded(nil)
         persist()
     }
 
@@ -117,6 +119,8 @@ final class MatchSession {
         guard let current = active else { return nil }
         cancelPendingSync()
         guard current.hasGames else {
+            // A mirrored entry without games is not worth keeping in history.
+            if current.isSavedToHistory { store.deleteMatch(id: current.id) }
             clearBoard()
             return nil
         }
@@ -126,13 +130,20 @@ final class MatchSession {
         return record.id
     }
 
-    /// Throws the current board away. A match that was already auto-saved stays in
-    /// history as it was last synced.
+    /// Throws the board away. Games that were never synced are lost; a match that
+    /// was already mirrored into history keeps what history has and is closed.
     func discardMatch() {
         cancelPendingSync()
-        if let current = active, current.isSavedToHistory, let record = makeRecord(endedAt: Date(), autoEnded: false) {
-            // Close the mirrored entry so it does not linger as "in progress".
-            store.saveMatch(record, games: current.games)
+        if let current = active, current.isSavedToHistory {
+            let synced = store.records(forMatch: current.id).map { $0.game }
+            if synced.isEmpty {
+                store.deleteMatch(id: current.id)
+            } else if var record = store.match(id: current.id) {
+                record.endedAt = Date()
+                record.autoEnded = false
+                record.apply(games: synced)
+                store.saveMatch(record, games: synced)
+            }
         }
         clearBoard()
     }
@@ -160,15 +171,23 @@ final class MatchSession {
         )
         resumed.nextBidderOverride = nil
         active = resumed
-        if lastAutoEnded?.matchId == id { lastAutoEnded = nil }
+        if lastAutoEnded?.matchId == id { setLastAutoEnded(nil) }
         persist()
         // Reopen the history entry.
         syncNow(endedAt: nil, autoEnded: nil)
     }
 
     func dismissAutoEndedBanner() {
-        lastAutoEnded = nil
-        defaults.removeObject(forKey: Key.lastAutoEnded)
+        setLastAutoEnded(nil)
+    }
+
+    private func setLastAutoEnded(_ info: AutoEndedInfo?) {
+        lastAutoEnded = info
+        if let info = info, let data = try? JSONEncoder().encode(info) {
+            defaults.set(data, forKey: Key.lastAutoEnded)
+        } else {
+            defaults.removeObject(forKey: Key.lastAutoEnded)
+        }
     }
 
     // MARK: - Editing
@@ -246,20 +265,18 @@ final class MatchSession {
         if current.isSaveable, let record = makeRecord(endedAt: current.lastActivityAt, autoEnded: true) {
             cancelPendingSync()
             store.saveMatch(record, games: current.games)
-            lastAutoEnded = AutoEndedInfo(
+            setLastAutoEnded(AutoEndedInfo(
                 matchId: current.id,
                 endedAt: current.lastActivityAt,
                 playerNames: record.playerNames,
                 games: current.games.count
-            )
-            if let data = try? JSONEncoder().encode(lastAutoEnded) {
-                defaults.set(data, forKey: Key.lastAutoEnded)
-            }
+            ))
             clearBoard()
             return true
         }
         if !current.hasGames {
             // An untouched board is not worth keeping around.
+            if current.isSavedToHistory { store.deleteMatch(id: current.id) }
             clearBoard()
             return true
         }

@@ -38,10 +38,12 @@ struct FightTheLandloardApp: App {
                 .tint(AppTheme.accent)
                 .onChange(of: scenePhase) { _, phase in
                     switch phase {
-                    case .background, .inactive:
+                    case .background:
                         session.appDidEnterBackground()
                     case .active:
                         session.appDidBecomeActive()
+                    case .inactive:
+                        break
                     @unknown default:
                         break
                     }

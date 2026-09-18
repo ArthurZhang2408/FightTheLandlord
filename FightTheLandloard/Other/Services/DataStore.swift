@@ -172,9 +172,11 @@ final class DataStore {
     /// Creates or updates a match in history together with its games.
     func saveMatch(_ record: MatchRecord, games: [Game]) {
         guard let matchId = record.id else { return }
-        let records = games.enumerated().map { index, game in
-            GameRecord(game: game, matchId: matchId, gameIndex: index,
-                       playerIds: record.playerIds, playerNames: record.playerNames)
+        let records = games.enumerated().map { index, game -> GameRecord in
+            var gameRecord = GameRecord(game: game, matchId: matchId, gameIndex: index,
+                                        playerIds: record.playerIds, playerNames: record.playerNames)
+            gameRecord.id = GameRecord.documentId(matchId: matchId, index: index)
+            return gameRecord
         }
         sync.upsertMatch(record, records: records)
     }

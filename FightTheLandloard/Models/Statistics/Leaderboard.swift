@@ -73,8 +73,10 @@ enum Leaderboard {
             for seat in Seat.allCases {
                 let id = match.playerId(at: seat)
                 guard var entry = entries[id] else { continue }
-                entry.matches += 1
-                if match.finalScore(for: seat) > 0 { entry.matchWins += 1 }
+                if match.endedAt != nil {
+                    entry.matches += 1
+                    if match.finalScore(for: seat) > 0 { entry.matchWins += 1 }
+                }
                 entry.lastPlayedAt = max(entry.lastPlayedAt ?? .distantPast, match.lastActivityAt ?? match.startedAt)
                 entries[id] = entry
             }

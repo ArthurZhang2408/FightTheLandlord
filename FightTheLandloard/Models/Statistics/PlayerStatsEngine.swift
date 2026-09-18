@@ -39,6 +39,8 @@ enum PlayerStatsEngine {
         let myMatches = matchRecords
             .filter { $0.seat(of: playerId) != nil }
             .sorted { $0.startedAt < $1.startedAt }
+        // A match that is still being played has no result yet.
+        let endedMatches = myMatches.filter { $0.endedAt != nil }
         let games = orderedGames(gameRecords.filter { $0.seat(of: playerId) != nil }, matches: myMatches)
 
         var starters: [String: Int] = [:]
@@ -47,7 +49,7 @@ enum PlayerStatsEngine {
         }
         computeGameStats(&stats, games: games, playerId: playerId, playerNames: playerNames,
                          starters: starters, recentWindow: recentWindow, formWindow: formWindow)
-        computeMatchStats(&stats, matches: myMatches, playerId: playerId)
+        computeMatchStats(&stats, matches: endedMatches, playerId: playerId)
         computeActivity(&stats, games: games, matches: myMatches)
         return stats
     }

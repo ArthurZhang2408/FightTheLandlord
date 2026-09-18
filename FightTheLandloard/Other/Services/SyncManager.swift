@@ -66,10 +66,15 @@ final class SyncManager: ObservableObject {
             .sink { [weak self] _ in self?.onNetworkRestored() }
             .store(in: &cancellables)
 
-        networkMonitor.$isConnected
+        networkMonitor.$status
             .receive(on: DispatchQueue.main)
-            .sink { [weak self] connected in
-                if !connected { self?.syncStatus = .offline }
+            .sink { [weak self] status in
+                guard let self = self else { return }
+                if status == .disconnected {
+                    self.syncStatus = .offline
+                    // Nothing more is coming; let the UI leave its loading state.
+                    self.hasLoadedInitialData = true
+                }
             }
             .store(in: &cancellables)
     }
@@ -90,10 +95,12 @@ final class SyncManager: ObservableObject {
             startFirebaseListeners()
             processPendingOperations()
             preloadAllGameRecords()
-        } else {
+        } else if networkMonitor.status == .disconnected {
             syncStatus = .offline
             hasLoadedInitialData = true
         }
+        // While the path monitor is still deciding, the first "connected" update
+        // arrives through `networkRestored` and starts the listeners.
         updatePendingCount()
     }
 
@@ -141,9 +148,15 @@ final class SyncManager: ObservableObject {
                 guard let documents = snapshot?.documents else { return }
                 let remote = documents.compactMap { try? $0.data(as: GameRecord.self) }
                 let remoteMatchIds = Set(remote.map { $0.matchId })
-                // Keep records of matches that only exist locally (still queued for upload).
-                let localOnly = self.localCache.allGameRecords.filter { !remoteMatchIds.contains($0.matchId) }
-                let merged = remote + localOnly
+                // Local data wins for matches that only exist locally or still have an
+                // upload queued; the remote copy of those is stale.
+                let pendingMatchIds = Set(self.pendingQueue.allOperations
+                    .filter { ($0.type == .createMatch || $0.type == .updateMatch) && $0.isOpen }
+                    .compactMap { $0.localId })
+                let keepLocal = self.localCache.allGameRecords.filter {
+                    !remoteMatchIds.contains($0.matchId) || pendingMatchIds.contains($0.matchId)
+                }
+                let merged = remote.filter { !pendingMatchIds.contains($0.matchId) } + keepLocal
                 self.localCache.replaceAllGameRecords(merged)
 
                 self.onMain {
@@ -262,6 +275,7 @@ final class SyncManager: ObservableObject {
     private func onNetworkRestored() {
         syncStatus = .syncing
         isSyncing = true
+        pendingQueue.resetRetries()
         if playersListener == nil { startFirebaseListeners() }
         processPendingOperations()
         if !isGameRecordsSynced { preloadAllGameRecords() }
@@ -375,12 +389,17 @@ final class SyncManager: ObservableObject {
                     completion(false, error.localizedDescription)
                     return
                 }
+                // Deterministic ids: concurrent upserts overwrite the same documents
+                // instead of piling up duplicates; older random-id documents are removed.
+                let newIds = Set(records.indices.map { GameRecord.documentId(matchId: matchId, index: $0) })
                 let batch = self.db.batch()
-                snapshot?.documents.forEach { batch.deleteDocument($0.reference) }
-                for var record in records {
+                snapshot?.documents
+                    .filter { !newIds.contains($0.documentID) }
+                    .forEach { batch.deleteDocument($0.reference) }
+                for (index, var record) in records.enumerated() {
                     record.matchId = matchId
                     record.id = nil
-                    let ref = self.db.collection("gameRecords").document()
+                    let ref = self.db.collection("gameRecords").document(GameRecord.documentId(matchId: matchId, index: index))
                     do {
                         try batch.setData(from: record, forDocument: ref)
                     } catch {

@@ -197,10 +197,22 @@ final class PendingOperationQueue {
         saveToDisk()
     }
 
+    /// Operations that will still be attempted (exhausted ones are not counted).
     var pendingCount: Int {
         lock.lock()
         defer { lock.unlock() }
-        return operations.filter { $0.status == .pending || $0.status == .failed }.count
+        return operations.filter { ($0.status == .pending || $0.status == .failed) && $0.retryCount < maxRetryCount }.count
+    }
+
+    /// Gives exhausted operations another chance (e.g. after the network came back).
+    func resetRetries() {
+        lock.lock()
+        defer { lock.unlock() }
+        for index in operations.indices where operations[index].status == .failed {
+            operations[index].retryCount = 0
+            operations[index].lastAttemptAt = nil
+        }
+        saveToDisk()
     }
 
     var hasPendingOperations: Bool { pendingCount > 0 }
