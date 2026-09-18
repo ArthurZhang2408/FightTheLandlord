@@ -1,0 +1,638 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		4954E8332CB6D9CC0050739D /* FirebaseAuth in Frameworks */ = {isa = PBXBuildFile; productRef = 4954E8322CB6D9CC0050739D /* FirebaseAuth */; };
+		4954E8352CB6D9CC0050739D /* FirebaseFirestore in Frameworks */ = {isa = PBXBuildFile; productRef = 4954E8342CB6D9CC0050739D /* FirebaseFirestore */; };
+		49C8E86D2CAFD30A00FB817D /* FightTheLandloardTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 49C8E86C2CAFD30A00FB817D /* FightTheLandloardTests.swift */; };
+		49C8E8772CAFD30A00FB817D /* FightTheLandloardUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 49C8E8762CAFD30A00FB817D /* FightTheLandloardUITests.swift */; };
+		49C8E8792CAFD30A00FB817D /* FightTheLandloardUITestsLaunchTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 49C8E8782CAFD30A00FB817D /* FightTheLandloardUITestsLaunchTests.swift */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		49C8E8692CAFD30A00FB817D /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 49C8E8502CAFD30800FB817D /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 49C8E8572CAFD30800FB817D;
+			remoteInfo = FightTheLandloard;
+		};
+		49C8E8732CAFD30A00FB817D /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 49C8E8502CAFD30800FB817D /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 49C8E8572CAFD30800FB817D;
+			remoteInfo = FightTheLandloard;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXFileReference section */
+		49C8E8582CAFD30800FB817D /* FightTheLandloard.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = FightTheLandloard.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		49C8E8682CAFD30A00FB817D /* FightTheLandloardTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = FightTheLandloardTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		49C8E86C2CAFD30A00FB817D /* FightTheLandloardTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FightTheLandloardTests.swift; sourceTree = "<group>"; };
+		49C8E8722CAFD30A00FB817D /* FightTheLandloardUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = FightTheLandloardUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		49C8E8762CAFD30A00FB817D /* FightTheLandloardUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FightTheLandloardUITests.swift; sourceTree = "<group>"; };
+		49C8E8782CAFD30A00FB817D /* FightTheLandloardUITestsLaunchTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FightTheLandloardUITestsLaunchTests.swift; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		49F5A1000000000000000002 /* Exceptions for "FightTheLandloard" folder in "FightTheLandloard" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				.gitignore,
+			);
+			target = 49C8E8572CAFD30800FB817D /* FightTheLandloard */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
+
+/* Begin PBXFileSystemSynchronizedRootGroup section */
+		49F5A1000000000000000001 /* FightTheLandloard */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				49F5A1000000000000000002 /* Exceptions for "FightTheLandloard" folder in "FightTheLandloard" target */,
+			);
+			path = FightTheLandloard;
+			sourceTree = "<group>";
+		};
+/* End PBXFileSystemSynchronizedRootGroup section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		49C8E8552CAFD30800FB817D /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				4954E8332CB6D9CC0050739D /* FirebaseAuth in Frameworks */,
+				4954E8352CB6D9CC0050739D /* FirebaseFirestore in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		49C8E8652CAFD30A00FB817D /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		49C8E86F2CAFD30A00FB817D /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		49C8E84F2CAFD30800FB817D = {
+			isa = PBXGroup;
+			children = (
+				49F5A1000000000000000001 /* FightTheLandloard */,
+				49C8E86B2CAFD30A00FB817D /* FightTheLandloardTests */,
+				49C8E8752CAFD30A00FB817D /* FightTheLandloardUITests */,
+				49C8E8592CAFD30800FB817D /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		49C8E8592CAFD30800FB817D /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				49C8E8582CAFD30800FB817D /* FightTheLandloard.app */,
+				49C8E8682CAFD30A00FB817D /* FightTheLandloardTests.xctest */,
+				49C8E8722CAFD30A00FB817D /* FightTheLandloardUITests.xctest */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		49C8E86B2CAFD30A00FB817D /* FightTheLandloardTests */ = {
+			isa = PBXGroup;
+			children = (
+				49C8E86C2CAFD30A00FB817D /* FightTheLandloardTests.swift */,
+			);
+			path = FightTheLandloardTests;
+			sourceTree = "<group>";
+		};
+		49C8E8752CAFD30A00FB817D /* FightTheLandloardUITests */ = {
+			isa = PBXGroup;
+			children = (
+				49C8E8762CAFD30A00FB817D /* FightTheLandloardUITests.swift */,
+				49C8E8782CAFD30A00FB817D /* FightTheLandloardUITestsLaunchTests.swift */,
+			);
+			path = FightTheLandloardUITests;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		49C8E8572CAFD30800FB817D /* FightTheLandloard */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 49C8E87C2CAFD30A00FB817D /* Build configuration list for PBXNativeTarget "FightTheLandloard" */;
+			buildPhases = (
+				49C8E8542CAFD30800FB817D /* Sources */,
+				49C8E8552CAFD30800FB817D /* Frameworks */,
+				49C8E8562CAFD30800FB817D /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				49F5A1000000000000000001 /* FightTheLandloard */,
+			);
+			name = FightTheLandloard;
+			packageProductDependencies = (
+				4954E8322CB6D9CC0050739D /* FirebaseAuth */,
+				4954E8342CB6D9CC0050739D /* FirebaseFirestore */,
+			);
+			productName = FightTheLandloard;
+			productReference = 49C8E8582CAFD30800FB817D /* FightTheLandloard.app */;
+			productType = "com.apple.product-type.application";
+		};
+		49C8E8672CAFD30A00FB817D /* FightTheLandloardTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 49C8E87F2CAFD30A00FB817D /* Build configuration list for PBXNativeTarget "FightTheLandloardTests" */;
+			buildPhases = (
+				49C8E8642CAFD30A00FB817D /* Sources */,
+				49C8E8652CAFD30A00FB817D /* Frameworks */,
+				49C8E8662CAFD30A00FB817D /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				49C8E86A2CAFD30A00FB817D /* PBXTargetDependency */,
+			);
+			name = FightTheLandloardTests;
+			productName = FightTheLandloardTests;
+			productReference = 49C8E8682CAFD30A00FB817D /* FightTheLandloardTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
+		49C8E8712CAFD30A00FB817D /* FightTheLandloardUITests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 49C8E8822CAFD30A00FB817D /* Build configuration list for PBXNativeTarget "FightTheLandloardUITests" */;
+			buildPhases = (
+				49C8E86E2CAFD30A00FB817D /* Sources */,
+				49C8E86F2CAFD30A00FB817D /* Frameworks */,
+				49C8E8702CAFD30A00FB817D /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				49C8E8742CAFD30A00FB817D /* PBXTargetDependency */,
+			);
+			name = FightTheLandloardUITests;
+			productName = FightTheLandloardUITests;
+			productReference = 49C8E8722CAFD30A00FB817D /* FightTheLandloardUITests.xctest */;
+			productType = "com.apple.product-type.bundle.ui-testing";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		49C8E8502CAFD30800FB817D /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = 1;
+				LastSwiftUpdateCheck = 1540;
+				LastUpgradeCheck = 1540;
+				TargetAttributes = {
+					49C8E8572CAFD30800FB817D = {
+						CreatedOnToolsVersion = 15.4;
+					};
+					49C8E8672CAFD30A00FB817D = {
+						CreatedOnToolsVersion = 15.4;
+						TestTargetID = 49C8E8572CAFD30800FB817D;
+					};
+					49C8E8712CAFD30A00FB817D = {
+						CreatedOnToolsVersion = 15.4;
+						TestTargetID = 49C8E8572CAFD30800FB817D;
+					};
+				};
+			};
+			buildConfigurationList = 49C8E8532CAFD30800FB817D /* Build configuration list for PBXProject "FightTheLandloard" */;
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+				Base,
+			);
+			mainGroup = 49C8E84F2CAFD30800FB817D;
+			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				4954E8312CB6D9CC0050739D /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */,
+			);
+			preferredProjectObjectVersion = 77;
+			productRefGroup = 49C8E8592CAFD30800FB817D /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				49C8E8572CAFD30800FB817D /* FightTheLandloard */,
+				49C8E8672CAFD30A00FB817D /* FightTheLandloardTests */,
+				49C8E8712CAFD30A00FB817D /* FightTheLandloardUITests */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		49C8E8562CAFD30800FB817D /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		49C8E8662CAFD30A00FB817D /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		49C8E8702CAFD30A00FB817D /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		49C8E8542CAFD30800FB817D /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		49C8E8642CAFD30A00FB817D /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				49C8E86D2CAFD30A00FB817D /* FightTheLandloardTests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		49C8E86E2CAFD30A00FB817D /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				49C8E8772CAFD30A00FB817D /* FightTheLandloardUITests.swift in Sources */,
+				49C8E8792CAFD30A00FB817D /* FightTheLandloardUITestsLaunchTests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		49C8E86A2CAFD30A00FB817D /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 49C8E8572CAFD30800FB817D /* FightTheLandloard */;
+			targetProxy = 49C8E8692CAFD30A00FB817D /* PBXContainerItemProxy */;
+		};
+		49C8E8742CAFD30A00FB817D /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 49C8E8572CAFD30800FB817D /* FightTheLandloard */;
+			targetProxy = 49C8E8732CAFD30A00FB817D /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
+/* Begin XCBuildConfiguration section */
+		49C8E87A2CAFD30A00FB817D /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"DEBUG=1",
+					"$(inherited)",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.5;
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				SDKROOT = iphoneos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+			};
+			name = Debug;
+		};
+		49C8E87B2CAFD30A00FB817D /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.5;
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				SDKROOT = iphoneos;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
+		49C8E87D2CAFD30A00FB817D /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_ASSET_PATHS = "\"FightTheLandloard/Preview Content\"";
+				DEVELOPMENT_TEAM = 997LG4R775;
+				ENABLE_PREVIEWS = YES;
+				EXCLUDED_SOURCE_FILE_NAMES = (
+					".omc/*",
+					".omc/**/*",
+					"*.md",
+					"**/*.md",
+				);
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = "斗地主计分牌";
+				INFOPLIST_KEY_NSPhotoLibraryAddUsageDescription = "允许下载该图片到本地";
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight UIInterfaceOrientationPortrait";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = UIInterfaceOrientationPortrait;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = az.FightTheLandloard;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		49C8E87E2CAFD30A00FB817D /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_ASSET_PATHS = "\"FightTheLandloard/Preview Content\"";
+				DEVELOPMENT_TEAM = 997LG4R775;
+				ENABLE_PREVIEWS = YES;
+				EXCLUDED_SOURCE_FILE_NAMES = (
+					".omc/*",
+					".omc/**/*",
+					"*.md",
+					"**/*.md",
+				);
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = "斗地主计分牌";
+				INFOPLIST_KEY_NSPhotoLibraryAddUsageDescription = "允许下载该图片到本地";
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight UIInterfaceOrientationPortrait";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = UIInterfaceOrientationPortrait;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = az.FightTheLandloard;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+		49C8E8802CAFD30A00FB817D /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES = YES;
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 997LG4R775;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.5;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = az.FightTheLandloardTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/FightTheLandloard.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/FightTheLandloard";
+			};
+			name = Debug;
+		};
+		49C8E8812CAFD30A00FB817D /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES = YES;
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 997LG4R775;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.5;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = az.FightTheLandloardTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/FightTheLandloard.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/FightTheLandloard";
+			};
+			name = Release;
+		};
+		49C8E8832CAFD30A00FB817D /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES = YES;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 997LG4R775;
+				GENERATE_INFOPLIST_FILE = YES;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = az.FightTheLandloardUITests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = FightTheLandloard;
+			};
+			name = Debug;
+		};
+		49C8E8842CAFD30A00FB817D /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES = YES;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 997LG4R775;
+				GENERATE_INFOPLIST_FILE = YES;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = az.FightTheLandloardUITests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = FightTheLandloard;
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		49C8E8532CAFD30800FB817D /* Build configuration list for PBXProject "FightTheLandloard" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				49C8E87A2CAFD30A00FB817D /* Debug */,
+				49C8E87B2CAFD30A00FB817D /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		49C8E87C2CAFD30A00FB817D /* Build configuration list for PBXNativeTarget "FightTheLandloard" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				49C8E87D2CAFD30A00FB817D /* Debug */,
+				49C8E87E2CAFD30A00FB817D /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		49C8E87F2CAFD30A00FB817D /* Build configuration list for PBXNativeTarget "FightTheLandloardTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				49C8E8802CAFD30A00FB817D /* Debug */,
+				49C8E8812CAFD30A00FB817D /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		49C8E8822CAFD30A00FB817D /* Build configuration list for PBXNativeTarget "FightTheLandloardUITests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				49C8E8832CAFD30A00FB817D /* Debug */,
+				49C8E8842CAFD30A00FB817D /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		4954E8312CB6D9CC0050739D /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/firebase/firebase-ios-sdk";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 11.3.0;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		4954E8322CB6D9CC0050739D /* FirebaseAuth */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 4954E8312CB6D9CC0050739D /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseAuth;
+		};
+		4954E8342CB6D9CC0050739D /* FirebaseFirestore */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 4954E8312CB6D9CC0050739D /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseFirestore;
+		};
+/* End XCSwiftPackageProductDependency section */
+	};
+	rootObject = 49C8E8502CAFD30800FB817D /* Project object */;
+}
