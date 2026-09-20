@@ -197,13 +197,12 @@ struct ScoreLineChart: View {
 
 // MARK: - Fullscreen chart
 
-/// Landscape chart with scrolling, zoom and point selection.
+/// Landscape chart with pan, zoom and point selection.
 ///
-/// Interaction: a tap anywhere on the plot selects the nearest x position (the
-/// chart's own selection gesture is not used because it needs a long press once
-/// the chart scrolls). Zoom is a pinch or the +/− buttons; the selected point's
-/// values appear in a panel under the chart, where each series row is a button
-/// that opens the game or match behind it.
+/// The chart is not a scrollable chart: the x scale's domain is a window the
+/// view owns, so dragging pans it, pinching (or the +/− buttons) resizes it and
+/// a tap maps straight to an x value. The selected point's values sit in a
+/// panel under the chart, where each series chip opens its game or match.
 struct FullscreenChartView: View {
     let title: String
     let series: [ChartSeries]
@@ -220,15 +219,36 @@ struct FullscreenChartView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var hiddenSeries: Set<String> = []
     @State private var selectedX: Int?
-    @State private var visibleCount: Int?
-    @State private var pinchBase: Int?
-    @State private var scrollX: Double = 0
+    /// Width of the window in x units; nil shows everything.
+    @State private var visibleSpan: Double?
+    /// Leading x value of the window.
+    @State private var windowStart: Double = 0
+    @State private var panOrigin: Double?
+    @State private var pinchOrigin: Double?
+
+    /// Everything derived from the data and the current window, computed once per body.
+    private struct Window {
+        let full: ClosedRange<Int>
+        let span: Double
+        let start: Double
+        var end: Double { start + span }
+        var fullSpan: Double { Double(full.upperBound - full.lowerBound) }
+        var showsAll: Bool { span >= fullSpan }
+        var domain: ClosedRange<Double> { start...end }
+        func contains(_ x: Int) -> Bool { Double(x) >= start - 0.5 && Double(x) <= end + 0.5 }
+    }
+
+    private static let minSpan: Double = 4
+
+    private func makeWindow() -> Window {
+        let full = xDomain(of: series)
+        let fullSpan = Double(full.upperBound - full.lowerBound)
+        let span = min(fullSpan, max(min(Self.minSpan, fullSpan), visibleSpan ?? fullSpan))
+        let start = min(Double(full.upperBound) - span, max(Double(full.lowerBound), windowStart))
+        return Window(full: full, span: span, start: start)
+    }
 
     private var visible: [ChartSeries] { series.filter { !hiddenSeries.contains($0.id) } }
-    private var domain: ClosedRange<Int> { xDomain(of: series) }
-    private var totalCount: Int { domain.upperBound - domain.lowerBound + 1 }
-    private var minVisible: Int { min(6, max(2, totalCount)) }
-    private var currentVisible: Int { min(totalCount, max(minVisible, visibleCount ?? totalCount)) }
 
     private var fittedYDomain: ClosedRange<Int> {
         let values = series.flatMap { $0.values } + [referenceValue]
@@ -239,10 +259,11 @@ struct FullscreenChartView: View {
     }
 
     var body: some View {
+        let window = makeWindow()
         NavigationStack {
             VStack(spacing: 0) {
-                legend
-                chart
+                legend(window)
+                chart(window)
                     .padding(.horizontal)
                     .padding(.bottom, 6)
                 selectionPanel
@@ -256,21 +277,21 @@ struct FullscreenChartView: View {
                 }
                 ToolbarItemGroup(placement: .primaryAction) {
                     Button {
-                        zoom(by: 1.6)
+                        zoom(window, by: 1.6)
                     } label: {
                         Image(systemName: "minus.magnifyingglass")
                     }
-                    .disabled(currentVisible >= totalCount)
+                    .disabled(window.showsAll)
                     .accessibilityLabel("缩小")
                     Button {
-                        zoom(by: 1 / 1.6)
+                        zoom(window, by: 1 / 1.6)
                     } label: {
                         Image(systemName: "plus.magnifyingglass")
                     }
-                    .disabled(currentVisible <= minVisible)
+                    .disabled(window.span <= Self.minSpan)
                     .accessibilityLabel("放大")
-                    Button("全部") { resetZoom() }
-                        .disabled(currentVisible >= totalCount && selectedX == nil)
+                    Button("全部") { reset(window) }
+                        .disabled(window.showsAll && selectedX == nil)
                 }
             }
         }
@@ -279,46 +300,58 @@ struct FullscreenChartView: View {
 
     // MARK: Legend
 
-    private var legend: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 8) {
-                ForEach(series) { s in
-                    Button {
-                        if hiddenSeries.contains(s.id) {
-                            hiddenSeries.remove(s.id)
-                        } else if visible.count > 1 {
-                            hiddenSeries.insert(s.id)
+    private func legend(_ window: Window) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 8) {
+                    ForEach(series) { s in
+                        Button {
+                            if hiddenSeries.contains(s.id) {
+                                hiddenSeries.remove(s.id)
+                            } else if visible.count > 1 {
+                                hiddenSeries.insert(s.id)
+                            }
+                        } label: {
+                            Chip(text: "\(s.name)  \(valueStyle.format(s.lastValue))",
+                                 tint: s.color,
+                                 filled: !hiddenSeries.contains(s.id))
                         }
-                    } label: {
-                        Chip(text: "\(s.name)  \(valueStyle.format(s.lastValue))",
-                             tint: s.color,
-                             filled: !hiddenSeries.contains(s.id))
+                        .buttonStyle(.plain)
+                        .accessibilityHint("显示或隐藏这条线")
                     }
-                    .buttonStyle(.plain)
-                    .accessibilityHint("显示或隐藏这条线")
                 }
-                Spacer(minLength: 0)
-                Text(hint)
-                    .font(.caption2)
-                    .foregroundStyle(AppTheme.textTertiary)
-                    .lineLimit(1)
+                .padding(.horizontal)
             }
+            HStack {
+                Text(hint(window))
+                if let label = referenceLabel {
+                    Spacer(minLength: 8)
+                    Text("虚线：\(label)")
+                }
+            }
+            .font(.caption2)
+            .foregroundStyle(AppTheme.textTertiary)
+            .lineLimit(1)
             .padding(.horizontal)
-            .padding(.vertical, 8)
         }
+        .padding(.vertical, 8)
     }
 
-    private var hint: String {
-        if currentVisible < totalCount {
-            return "显示 \(currentVisible) / \(totalCount) 点 · 左右滑动 · 点击选点"
+    private func hint(_ window: Window) -> String {
+        let count = window.full.upperBound - window.full.lowerBound + 1
+        if window.showsAll {
+            return "共 \(count) 点 · 双指或 +/− 缩放 · 点击选点"
         }
-        return "共 \(totalCount) 点 · 双指或 +/− 缩放 · 点击选点"
+        let from = Int(window.start.rounded())
+        let to = Int(window.end.rounded())
+        return "第 \(from)–\(to) \(xLabel)，共 \(count) 点 · 拖动平移 · 点击选点"
     }
 
     // MARK: Chart
 
-    private var chart: some View {
-        Chart {
+    private func chart(_ window: Window) -> some View {
+        let showsPoints = window.span <= 60
+        return Chart {
             ForEach(flatten(visible)) { point in
                 LineMark(
                     x: .value(xLabel, Double(point.index)),
@@ -328,7 +361,7 @@ struct FullscreenChartView: View {
                 .lineStyle(StrokeStyle(lineWidth: 2.5))
                 .interpolationMethod(.monotone)
 
-                if currentVisible <= 60 || selectedX == point.index {
+                if (showsPoints || selectedX == point.index), window.contains(point.index) {
                     PointMark(
                         x: .value(xLabel, Double(point.index)),
                         y: .value("数值", point.value)
@@ -340,14 +373,6 @@ struct FullscreenChartView: View {
             RuleMark(y: .value("参考", referenceValue))
                 .foregroundStyle(AppTheme.textTertiary.opacity(0.6))
                 .lineStyle(StrokeStyle(lineWidth: 1, dash: [4, 4]))
-                .annotation(position: .top, alignment: .trailing) {
-                    if let label = referenceLabel {
-                        Text(label)
-                            .font(.caption2)
-                            .foregroundStyle(AppTheme.textTertiary)
-                            .padding(.trailing, 4)
-                    }
-                }
 
             if let x = selectedX {
                 RuleMark(x: .value(xLabel, Double(x)))
@@ -359,17 +384,15 @@ struct FullscreenChartView: View {
         .chartLegend(.hidden)
         .chartXAxisLabel(xLabel)
         .chartYAxisLabel(yLabel)
+        .chartXScale(domain: window.domain)
         .chartYScale(domain: yDomain ?? fittedYDomain)
-        .chartScrollableAxes(.horizontal)
-        .chartXVisibleDomain(length: Double(max(1, currentVisible - 1)))
-        .chartScrollPosition(x: $scrollX)
-        .onAppear { scrollX = Double(domain.lowerBound) }
+        .chartPlotStyle { plot in plot.clipped() }
         .chartXAxis {
             AxisMarks(values: .automatic(desiredCount: 8)) { value in
                 AxisGridLine().foregroundStyle(AppTheme.hairline)
                 AxisValueLabel {
                     if let v = value.as(Double.self) {
-                        Text("\(Int(v.rounded()))").font(.caption2)
+                        Text(axisNumber(v, percent: false)).font(.caption2)
                     }
                 }
             }
@@ -391,49 +414,67 @@ struct FullscreenChartView: View {
                     .fill(Color.clear)
                     .contentShape(Rectangle())
                     .onTapGesture { location in
-                        select(at: location, in: plot)
+                        select(at: location, in: plot, window: window)
                     }
+                    .gesture(
+                        DragGesture(minimumDistance: 8)
+                            .onChanged { value in
+                                pan(by: value.translation.width, plotWidth: plot.width, window: window)
+                            }
+                            .onEnded { _ in panOrigin = nil }
+                    )
                     .simultaneousGesture(
                         MagnificationGesture()
                             .onChanged { value in
-                                let base = pinchBase ?? currentVisible
-                                pinchBase = base
-                                setVisible(Int((Double(base) / Double(value)).rounded()))
+                                let origin = pinchOrigin ?? window.span
+                                pinchOrigin = origin
+                                setSpan(origin / Double(value), keepingCenterOf: window)
                             }
-                            .onEnded { _ in pinchBase = nil }
+                            .onEnded { _ in pinchOrigin = nil }
                     )
             }
         }
     }
 
-    /// Maps a tap to the nearest x position. The visible domain runs from the
-    /// scroll position over `currentVisible - 1` units, so the fraction across
-    /// the plot width gives the x value directly.
-    private func select(at location: CGPoint, in plot: CGRect) {
+    // MARK: Gestures
+
+    /// A tap picks the x value under the finger: the window maps linearly onto the plot width.
+    private func select(at location: CGPoint, in plot: CGRect, window: Window) {
         guard plot.width > 0 else { return }
         let fraction = max(0, min(1, (location.x - plot.minX) / plot.width))
-        let value = scrollX + Double(fraction) * Double(max(1, currentVisible - 1))
-        let x = min(domain.upperBound, max(domain.lowerBound, Int(value.rounded())))
+        let value = window.start + Double(fraction) * window.span
+        let x = min(window.full.upperBound, max(window.full.lowerBound, Int(value.rounded())))
         withAnimation(.easeOut(duration: 0.15)) {
             selectedX = selectedX == x ? nil : x
         }
         Haptics.selection()
     }
 
-    private func zoom(by factor: Double) {
+    private func pan(by translation: CGFloat, plotWidth: CGFloat, window: Window) {
+        guard plotWidth > 0, !window.showsAll else { return }
+        let origin = panOrigin ?? window.start
+        panOrigin = origin
+        windowStart = origin - Double(translation) / Double(plotWidth) * window.span
+    }
+
+    private func zoom(_ window: Window, by factor: Double) {
         withAnimation(.easeOut(duration: 0.2)) {
-            setVisible(Int((Double(currentVisible) * factor).rounded()))
+            setSpan(window.span * factor, keepingCenterOf: window)
         }
     }
 
-    private func setVisible(_ count: Int) {
-        visibleCount = min(totalCount, max(minVisible, count))
+    /// Resizes the window around its current centre.
+    private func setSpan(_ span: Double, keepingCenterOf window: Window) {
+        let clamped = min(window.fullSpan, max(min(Self.minSpan, window.fullSpan), span))
+        let center = window.start + window.span / 2
+        visibleSpan = clamped
+        windowStart = center - clamped / 2
     }
 
-    private func resetZoom() {
+    private func reset(_ window: Window) {
         withAnimation(.easeOut(duration: 0.25)) {
-            visibleCount = totalCount
-            scrollX = Double(domain.lowerBound)
+            visibleSpan = nil
+            windowStart = Double(window.full.lowerBound)
             selectedX = nil
         }
     }

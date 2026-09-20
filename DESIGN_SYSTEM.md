@@ -51,7 +51,7 @@ Player colors (`PlayerColor.color`) are eight refined hues that stay legible on 
 ## Charts
 
 - Compact charts: lines only, monotone interpolation, dashed zero line, soft grid, legend chips. Tap or the expand button opens the fullscreen chart.
-- Fullscreen: landscape, scrollable x axis. A tap on the plot selects the nearest point (no long press); zoom by pinch or the +/− toolbar buttons. The selected point's values sit in a panel under the chart, one chip per series; a chip with a chevron opens that game or match. Percent series (rolling win rate) use the same component with a percent value style and a labelled reference line.
+- Fullscreen: landscape. The x scale's domain is a window the view owns (no scrollable axes): drag pans it, pinch or the +/− toolbar buttons resize it, and a tap on the plot selects the nearest point. The selected point's values sit in a panel under the chart, one chip per series; a chip with a chevron opens that game or match. Percent series (rolling win rate) use the same component with a percent value style and a labelled reference line.
 - Colors come from the players; never from a chart default palette.
 
 ## Copy
