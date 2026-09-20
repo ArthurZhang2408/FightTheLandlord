@@ -13,6 +13,9 @@ An iOS app (SwiftUI, iOS 17+) for keeping score in 斗地主 (Dou Di Zhu). It re
 ## Architecture
 
 ```
+FightTheLandloard.xcodeproj
+FightTheLandloardTests/ XCTest cases for the engines
+FightTheLandloard/
 Models/                 Pure value types + engines (no UI, no Firebase calls)
   Seat, Game, ActiveMatch, Player, GameRecord, MatchRecord
   Scoring/ScoreCalculator          single source of truth for 斗地主 scoring
@@ -59,11 +62,11 @@ Collections `players`, `matches`, `gameRecords` keep their original field names.
 
 ## Building
 
-- Open the Xcode project that contains this folder (the project file is not part of this repository). The project uses a synchronized folder group, so new files under `Models/`, `Other/`, `UICommon/`, `ViewModels/` and `Views/` are picked up automatically. If your project uses manual groups instead, add the new folders to the app target.
-- Requires the Firebase SDK (FirebaseCore, FirebaseFirestore) via Swift Package Manager and a `GoogleService-Info.plist` in `Other/` (git-ignored).
-- Deployment target iOS 17.0 (the app uses `@Observable`, `chartXSelection`, `SectorMark`-era Charts APIs).
-- `NSPhotoLibraryAddUsageDescription` must be present in Info.plist for “保存到相册”.
-- The fullscreen chart rotates to landscape through `OrientationController` and the app delegate's `supportedInterfaceOrientationsFor`; Info.plist must list the landscape orientations under `UISupportedInterfaceOrientations` for that to take effect (portrait stays the default everywhere else).
+- Open `FightTheLandloard.xcodeproj` at the repository root. The app sources live in `FightTheLandloard/`, unit tests in `FightTheLandloardTests/`, UI tests in `FightTheLandloardUITests/`. All three are synchronized folder groups, so new files are picked up automatically.
+- Requires the Firebase SDK (FirebaseCore, FirebaseFirestore, resolved through Swift Package Manager) and a `GoogleService-Info.plist` in `FightTheLandloard/Other/` (git-ignored, never commit it).
+- Deployment target iOS 17.5, Swift 5 language mode.
+- The project's build settings already provide `NSPhotoLibraryAddUsageDescription` (“保存到相册”) and landscape orientations on iPhone, which the fullscreen chart uses through `OrientationController` and the app delegate's `supportedInterfaceOrientationsFor`; every other screen stays portrait.
+- Unit tests for the scoring and statistics engines are in `FightTheLandloardTests/`; run them with ⌘U.
 
 ## Development notes
 

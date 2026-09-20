@@ -373,9 +373,8 @@ struct LandscapeOrientationModifier: ViewModifier {
 enum OrientationController {
     static var mask: UIInterfaceOrientationMask = defaultMask
 
-    static var defaultMask: UIInterfaceOrientationMask {
-        UIDevice.current.userInterfaceIdiom == .pad ? .all : .portrait
-    }
+    /// The project supports portrait only outside the fullscreen chart (iPhone and iPad).
+    static var defaultMask: UIInterfaceOrientationMask { .portrait }
 
     static func request(_ orientations: UIInterfaceOrientationMask) {
         mask = orientations
