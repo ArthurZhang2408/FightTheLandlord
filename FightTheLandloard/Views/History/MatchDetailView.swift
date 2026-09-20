@@ -21,6 +21,8 @@ struct MatchDetailView: View {
 
     @State private var editing: EditingGame?
     @State private var highlighted: Int?
+    /// Highlight requested before the games were loaded; applied once they arrive.
+    @State private var pendingHighlight: Int?
     @State private var showDeleteConfirmation = false
     @State private var showResumeOptions = false
     @State private var showShare = false
@@ -144,12 +146,20 @@ struct MatchDetailView: View {
         .onAppear {
             store.ensureRecordsLoaded(forMatch: matchId)
             if let index = highlightGameIndex {
+                pendingHighlight = index
                 Task { @MainActor in
                     try? await Task.sleep(for: .milliseconds(350))
-                    applyHighlight(index)
+                    applyPendingHighlight()
                 }
             }
         }
+        .onChange(of: games.count) { _, _ in applyPendingHighlight() }
+    }
+
+    private func applyPendingHighlight() {
+        guard let index = pendingHighlight, games.indices.contains(index) else { return }
+        pendingHighlight = nil
+        applyHighlight(index)
     }
 
     // MARK: - Content
@@ -388,12 +398,16 @@ struct MatchDetailView: View {
 
     // MARK: - Actions
 
+    /// Scrolls the row into view and tints it briefly, the way a table view
+    /// flashes a row when you jump to it: on at once, gone after about two seconds.
     private func applyHighlight(_ index: Int) {
         highlighted = nil
         Task { @MainActor in
-            highlighted = index
-            try? await Task.sleep(for: .seconds(3))
-            if highlighted == index { withAnimation { highlighted = nil } }
+            withAnimation(.easeOut(duration: 0.2)) { highlighted = index }
+            try? await Task.sleep(for: .milliseconds(1_600))
+            if highlighted == index {
+                withAnimation(.easeOut(duration: 0.6)) { highlighted = nil }
+            }
         }
     }
 

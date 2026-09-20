@@ -54,9 +54,17 @@ struct PlayerCompareView: View {
                 } else {
                     ScrollView {
                         VStack(spacing: AppTheme.Spacing.l) {
-                            ScoreLineChart(series: series, xLabel: mode == .games ? "局" : "场", height: 260, onExpand: { showFullscreen = true })
-                                .card()
-                            Text(mode == .games ? "横轴为各自的第几局，用于比较走势形状，不代表同一时间。" : "横轴为各自参加的第几场。")
+                            ScoreLineChart(
+                                series: series,
+                                xLabel: mode == .matches ? "场" : "局",
+                                height: 260,
+                                onExpand: { showFullscreen = true },
+                                yDomain: mode == .form ? formDomain : nil,
+                                referenceValue: mode == .form ? 50 : 0,
+                                valueStyle: mode == .form ? .percent : .score
+                            )
+                            .card()
+                            Text(modeCaption)
                                 .font(.caption)
                                 .foregroundStyle(AppTheme.textTertiary)
                                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -76,7 +84,16 @@ struct PlayerCompareView: View {
                 }
             }
             .fullScreenCover(isPresented: $showFullscreen) {
-                FullscreenChartView(title: "玩家对比", series: series, xLabel: mode == .games ? "局" : "场") { _, point in
+                FullscreenChartView(
+                    title: "玩家对比",
+                    series: series,
+                    xLabel: mode == .matches ? "场" : "局",
+                    yLabel: mode == .form ? "近\(formWindow)局胜率" : "累计得分",
+                    valueStyle: mode == .form ? .percent : .score,
+                    yDomain: mode == .form ? formDomain : nil,
+                    referenceValue: mode == .form ? 50 : 0,
+                    referenceLabel: mode == .form ? "50%" : nil
+                ) { _, point in
                     if let matchId = point.matchId {
                         showFullscreen = false
                         Task { @MainActor in
@@ -98,8 +115,42 @@ struct PlayerCompareView: View {
     private var series: [ChartSeries] {
         selectedPlayers.compactMap { player in
             guard let id = player.id, let stats = statsById[id] else { return nil }
-            return ChartSeries(id: id, name: player.name, color: player.color,
-                               points: mode == .games ? stats.gamePoints : stats.matchPoints)
+            switch mode {
+            case .games:
+                return ChartSeries(id: id, name: player.name, color: player.color, points: stats.gamePoints)
+            case .matches:
+                return ChartSeries(id: id, name: player.name, color: player.color, points: stats.matchPoints)
+            case .form:
+                // One window for everyone so the curves are comparable.
+                let points = PlayerStatsEngine.rollingPoints(from: stats.gamePoints, window: formWindow)
+                guard points.count >= 2 else { return nil }
+                return ChartSeries(id: id, name: player.name, color: player.color, points: points)
+            }
+        }
+    }
+
+    /// Rolling window shared by the compared players: the window the least
+    /// experienced of them would get on their own page.
+    private var formWindow: Int {
+        let counts = selectedPlayers.compactMap { player in
+            player.id.flatMap { statsById[$0]?.totalGames }
+        }
+        guard let smallest = counts.min() else { return PlayerStatsEngine.Evolution.minRollingWindow }
+        return PlayerStatsEngine.Evolution.rollingWindow(forGames: smallest)
+    }
+
+    private var formDomain: ClosedRange<Int> {
+        let values = series.flatMap { $0.values } + [50]
+        let low = max(0, (values.min() ?? 0) - 10)
+        let high = min(100, (values.max() ?? 100) + 10)
+        return low...max(low + 10, high)
+    }
+
+    private var modeCaption: String {
+        switch mode {
+        case .games: return "横轴为各自的第几局，用于比较走势形状，不代表同一时间。"
+        case .matches: return "横轴为各自参加的第几场。"
+        case .form: return "每一点是该玩家截至那一局的近 \(formWindow) 局胜率，横轴为各自的第几局；不足 \(formWindow + 1) 局的玩家不显示。"
         }
     }
 

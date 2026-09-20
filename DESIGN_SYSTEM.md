@@ -45,13 +45,13 @@ Player colors (`PlayerColor.color`) are eight refined hues that stay legible on 
 - **记一局** – form: bids per seat (segmented) with 加倍 toggle, bombs stepper, 春天, result, live score preview and multiplier explanation.
 - **历史** – collapsible year (when more than one) and month sections; a day with three or more matches becomes its own collapsible group, quieter days list their rows straight under the month with the date on the row. Rows carry badges (进行中 / 自动结束) and three score capsules; winner marked with a crown.
 - **对局详情** – header (ranked players, peak/valley, quick facts), round list (tap to edit), trend, player performance, actions in an ellipsis menu (继续 / 详细统计 / 删除), share button.
-- **统计** – leaderboard with metric picker; player page with rings, form, trend (按局/按场), roles, bidding style, special situations, records, partners & rivals, activity.
+- **统计** – leaderboard with metric picker; player page in three segments: 概览 (rings, form, trend 按局/按场/状态, monthly bars), 风格 (early/middle/recent slices with date ranges and a one-line reading, win rate by situation, roles, bidding, specials), 纪录 (record rows that open the match or game, partners & rivals, activity). Record rows share one 44pt height and show a chevron when they link somewhere; the target row in 对局详情 flashes for about two seconds.
 - **分享海报** – fixed 390pt width, 3× scale, light/dark `PosterTheme`, `Canvas` charts, never dynamic colors.
 
 ## Charts
 
 - Compact charts: lines only, monotone interpolation, dashed zero line, soft grid, legend chips. Tap or the expand button opens the fullscreen chart.
-- Fullscreen: scrollable and pinch-zoomable x axis, `chartXSelection` with a material tooltip listing every series at that point; tapping a row jumps to the match.
+- Fullscreen: landscape, scrollable x axis. A tap on the plot selects the nearest point (no long press); zoom by pinch or the +/− toolbar buttons. The selected point's values sit in a panel under the chart, one chip per series; a chip with a chevron opens that game or match. Percent series (rolling win rate) use the same component with a percent value style and a labelled reference line.
 - Colors come from the players; never from a chart default palette.
 
 ## Copy

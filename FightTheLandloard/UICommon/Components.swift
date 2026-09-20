@@ -135,6 +135,8 @@ struct StatRowItem: View {
     let value: String
     var valueColor: Color = AppTheme.textPrimary
     var detail: String? = nil
+    /// Shows a disclosure chevron; the caller wraps the row in a Button.
+    var showsChevron: Bool = false
 
     var body: some View {
         HStack(spacing: 12) {
@@ -151,14 +153,24 @@ struct StatRowItem: View {
                     .font(AppFont.score(17, weight: .semibold))
                     .foregroundStyle(valueColor)
                     .monospacedDigit()
+                    .lineLimit(1)
                 if let detail = detail {
                     Text(detail)
                         .font(.caption2)
                         .foregroundStyle(AppTheme.textTertiary)
+                        .lineLimit(1)
                 }
             }
+            if showsChevron {
+                Image(systemName: "chevron.right")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(AppTheme.textTertiary)
+            }
         }
-        .padding(.vertical, 2)
+        // Rows with and without a detail line share one height (and meet the
+        // 44pt touch target once they become buttons).
+        .frame(minHeight: 44)
+        .contentShape(Rectangle())
     }
 }
 

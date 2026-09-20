@@ -93,6 +93,16 @@ final class StatsEngineTests: XCTestCase {
         XCTAssertEqual(stats.landlordWins, 2)
         XCTAssertEqual(stats.springAsLandlord, 2)
         XCTAssertEqual(stats.comebackMatches, 2)
+        // Records point at where they happened: C's best game is the 800 spring in
+        // game 3 of the first match; the comeback turned at the -300 valley of game 1.
+        XCTAssertEqual(stats.bestGameRef, RecordRef(matchId: first.0.id!, gameIndex: 2))
+        XCTAssertEqual(stats.worstGameRef, RecordRef(matchId: first.0.id!, gameIndex: 0))
+        XCTAssertEqual(stats.biggestComebackRef, RecordRef(matchId: first.0.id!, gameIndex: 0))
+        XCTAssertEqual(stats.maxWinStreakRef, RecordRef(matchId: first.0.id!, gameIndex: 2))
+        XCTAssertEqual(stats.bestMatchRef, RecordRef(matchId: first.0.id!, gameIndex: nil))
+        XCTAssertEqual(stats.longestMatchRef, RecordRef(matchId: first.0.id!, gameIndex: nil))
+        XCTAssertEqual(stats.maxBombsRef, RecordRef(matchId: first.0.id!, gameIndex: 1))
+        XCTAssertNil(stats.biggestCollapseRef)
         XCTAssertEqual(stats.bidCountsAll[2], 2)
         XCTAssertEqual(stats.bidsWon, 2)
         XCTAssertEqual(stats.gamePoints.count, 7)       // origin + 6 games
@@ -170,8 +180,17 @@ final class StatsEngineTests: XCTestCase {
         XCTAssertEqual(stats.months.map { $0.games }, [3, 3, 3, 3])
         XCTAssertEqual(stats.months.map { $0.matches }, [1, 1, 1, 1])
         XCTAssertEqual(stats.months.first?.netScore, 700)
-        XCTAssertEqual(stats.rollingWinRate.count, 12)
-        XCTAssertEqual(stats.rollingWinRate.last ?? 0, 8.0 / 12.0 * 100, accuracy: 0.01)
+        // 12 games → the smallest window (10): three full windows, the last one
+        // covering games 3…12 (7 wins), each point tied to its game.
+        XCTAssertEqual(stats.rollingWindow, 10)
+        XCTAssertEqual(stats.rollingWinRate.count, 3)
+        XCTAssertEqual(stats.rollingWinRate.last ?? 0, 70, accuracy: 0.01)
+        XCTAssertEqual(stats.rollingPoints.map { $0.id }, [10, 11, 12])
+        XCTAssertEqual(stats.rollingPoints.first?.gameIndex, 0)
+        XCTAssertEqual(stats.rollingPoints.first?.matchId, samples[3].0.id)
+        XCTAssertEqual(stats.rollingPoints.last?.cumulative, 70)
+        XCTAssertEqual(stats.periods.first?.start, starts[0])
+        XCTAssertEqual(stats.periods.last?.end, starts[3])
         // In every match C loses game 1 (-300) and is behind for games 2 and 3, which C wins.
         XCTAssertEqual(stats.gamesWhenTrailing, 8)
         XCTAssertEqual(stats.winsWhenTrailing, 8)
@@ -184,8 +203,20 @@ final class StatsEngineTests: XCTestCase {
         let (match, records, _) = sampleMatch(start: Date(timeIntervalSince1970: 1_700_000_000))
         let stats = PlayerStatsEngine.compute(playerId: "p-a", playerName: "阿明", gameRecords: records, matchRecords: [match])
         XCTAssertTrue(stats.periods.isEmpty)
-        XCTAssertEqual(stats.rollingWinRate.count, 3)
+        XCTAssertTrue(stats.rollingWinRate.isEmpty)      // fewer games than the smallest window
+        XCTAssertEqual(stats.rollingWindow, 0)
         XCTAssertEqual(stats.months.count, 1)
+    }
+
+    func testRollingWindowGrowsWithCareer() {
+        typealias Evolution = PlayerStatsEngine.Evolution
+        XCTAssertEqual(Evolution.rollingWindow(forGames: 12), 10)
+        XCTAssertEqual(Evolution.rollingWindow(forGames: 100), 20)
+        XCTAssertEqual(Evolution.rollingWindow(forGames: 1_000), 50)
+
+        let results = [true, true, false, false, true]
+        XCTAssertEqual(PlayerStatsEngine.rollingWinRates(results: results, window: 2), [100, 50, 0, 50])
+        XCTAssertTrue(PlayerStatsEngine.rollingWinRates(results: results, window: 6).isEmpty)
     }
 
     func testActiveMatchRotationAndTotals() {

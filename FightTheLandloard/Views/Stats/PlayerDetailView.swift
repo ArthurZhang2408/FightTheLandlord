@@ -61,7 +61,7 @@ struct PlayerDetailView: View {
                         if !stats.periods.isEmpty {
                             evolutionCard(stats)
                         } else {
-                            InfoBanner(icon: "hourglass", title: "风格演变需要至少 12 局", message: "累积更多对局后，这里会比较早期、中期和近期的打法。", tint: AppTheme.textSecondary)
+                            InfoBanner(icon: "hourglass", title: "风格演变需要至少 \(PlayerStatsEngine.Evolution.minimumGamesForSlices) 局", message: "累积更多对局后，这里会比较早期、中期和近期的打法。", tint: AppTheme.textSecondary)
                         }
                         situationalCard(stats)
                         rolesCard(stats)
@@ -120,7 +120,16 @@ struct PlayerDetailView: View {
         .onChange(of: store.players) { _, _ in recompute() }
         .fullScreenCover(isPresented: $showFullscreenChart) {
             if let stats = stats {
-                FullscreenChartView(title: "\(currentPlayer.name) · 得分走势", series: [series(stats)], xLabel: chartMode == .games ? "局" : "场") { _, point in
+                FullscreenChartView(
+                    title: "\(currentPlayer.name) · \(chartMode == .form ? "状态走势" : "得分走势")",
+                    series: [series(stats)],
+                    xLabel: chartMode == .matches ? "场" : "局",
+                    yLabel: chartMode == .form ? "近\(stats.rollingWindow)局胜率" : "累计得分",
+                    valueStyle: chartMode == .form ? .percent : .score,
+                    yDomain: chartMode == .form ? formDomain(stats) : nil,
+                    referenceValue: chartMode == .form ? Int(stats.winRate.rounded()) : 0,
+                    referenceLabel: chartMode == .form ? "生涯平均 \(ScoreFormat.percent(stats.winRate, digits: 0))" : nil
+                ) { _, point in
                     if let matchId = point.matchId {
                         showFullscreenChart = false
                         Task { @MainActor in
@@ -131,6 +140,12 @@ struct PlayerDetailView: View {
                 }
             }
         }
+    }
+
+    /// Jumps to the match (and game) behind a record.
+    private func open(_ ref: RecordRef) {
+        Haptics.light()
+        router.showMatch(id: ref.matchId, gameIndex: ref.gameIndex)
     }
 
     private func recompute() {
@@ -144,9 +159,16 @@ struct PlayerDetailView: View {
         case .matches:
             return ChartSeries(name: currentPlayer.name, color: currentPlayer.color, points: stats.matchPoints)
         case .form:
-            return ChartSeries(name: "近\(stats.rollingWindow)局胜率", color: currentPlayer.color,
-                               values: stats.rollingWinRate.map { Int($0.rounded()) })
+            return ChartSeries(name: "近\(stats.rollingWindow)局胜率", color: currentPlayer.color, points: stats.rollingPoints)
         }
+    }
+
+    /// Percent range that fits the curve and the career average, never beyond 0…100.
+    private func formDomain(_ stats: PlayerStatistics) -> ClosedRange<Int> {
+        let values = stats.rollingPoints.map { $0.cumulative } + [Int(stats.winRate.rounded())]
+        let low = max(0, (values.min() ?? 0) - 10)
+        let high = min(100, (values.max() ?? 100) + 10)
+        return low...max(low + 10, high)
     }
 
     // MARK: - Header
@@ -236,20 +258,25 @@ struct PlayerDetailView: View {
                 .frame(width: 170)
             }
             VStack(alignment: .leading, spacing: 8) {
-                ScoreLineChart(
-                    series: [series(stats)],
-                    xLabel: chartMode == .matches ? "场" : "局",
-                    height: 170,
-                    showLegend: false,
-                    showArea: true,
-                    onExpand: chartMode == .form ? nil : { showFullscreenChart = true },
-                    yDomain: chartMode == .form ? 0...100 : nil,
-                    referenceValue: chartMode == .form ? 50 : 0
-                )
-                if chartMode == .form {
-                    Text("每一点是截至该局的近 \(stats.rollingWindow) 局胜率，虚线为 50%。")
-                        .font(.caption2)
-                        .foregroundStyle(AppTheme.textTertiary)
+                if chartMode == .form, stats.rollingPoints.count < 2 {
+                    EmptyStateView(icon: "waveform.path.ecg", title: "状态走势需要至少 \(PlayerStatsEngine.Evolution.minRollingWindow + 1) 局", message: "每一点是截至该局的近 \(PlayerStatsEngine.Evolution.minRollingWindow) 局胜率，局数够了才有曲线。")
+                } else {
+                    ScoreLineChart(
+                        series: [series(stats)],
+                        xLabel: chartMode == .matches ? "场" : "局",
+                        height: 170,
+                        showLegend: false,
+                        showArea: true,
+                        onExpand: { showFullscreenChart = true },
+                        yDomain: chartMode == .form ? formDomain(stats) : nil,
+                        referenceValue: chartMode == .form ? Int(stats.winRate.rounded()) : 0,
+                        valueStyle: chartMode == .form ? .percent : .score
+                    )
+                    if chartMode == .form {
+                        Text("每一点是截至该局的近 \(stats.rollingWindow) 局胜率（窗口随生涯长度变化），虚线为生涯平均 \(ScoreFormat.percent(stats.winRate, digits: 0))。")
+                            .font(.caption2)
+                            .foregroundStyle(AppTheme.textTertiary)
+                    }
                 }
             }
             .card()
@@ -285,16 +312,23 @@ struct PlayerDetailView: View {
 
     private func evolutionCard(_ stats: PlayerStatistics) -> some View {
         VStack(spacing: AppTheme.Spacing.s) {
-            SectionHeader("风格演变", subtitle: "生涯分三段，每段约 \(stats.periods.first?.games ?? 0) 局")
+            SectionHeader("风格演变", subtitle: "按局数平分三段，每段 \(stats.periods.first?.games ?? 0) 局左右")
             VStack(spacing: AppTheme.Spacing.m) {
                 HStack {
                     Text("")
                         .frame(width: 60, alignment: .leading)
                     ForEach(stats.periods) { period in
-                        Text(period.label)
-                            .font(.caption2)
-                            .foregroundStyle(AppTheme.textTertiary)
-                            .frame(maxWidth: .infinity)
+                        VStack(spacing: 1) {
+                            Text(period.label)
+                                .font(.caption2.weight(.medium))
+                                .foregroundStyle(AppTheme.textSecondary)
+                            Text(periodRange(period))
+                                .font(.system(size: 9))
+                                .foregroundStyle(AppTheme.textTertiary)
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.8)
+                        }
+                        .frame(maxWidth: .infinity)
                     }
                     Text("变化")
                         .font(.caption2)
@@ -320,6 +354,21 @@ struct PlayerDetailView: View {
         }
     }
 
+    private static let periodDateFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.locale = Locale(identifier: "zh_CN")
+        f.dateFormat = "yy.M"
+        return f
+    }()
+
+    /// "24.10–25.3", or a single month when the slice fits in one.
+    private func periodRange(_ period: PeriodSnapshot) -> String {
+        guard let start = period.start, let end = period.end else { return "" }
+        let from = Self.periodDateFormatter.string(from: start)
+        let to = Self.periodDateFormatter.string(from: end)
+        return from == to ? from : "\(from)–\(to)"
+    }
+
     private func deltaPercentPoints(_ delta: Double) -> String {
         (delta >= 0 ? "+" : "") + String(format: "%.0f", delta)
     }
@@ -328,29 +377,39 @@ struct PlayerDetailView: View {
         (delta >= 0 ? "+" : "") + String(format: "%.\(digits)f", delta)
     }
 
+    /// Plain-language reading of the first vs. last slice, using the engine's thresholds.
     private func evolutionSummary(_ stats: PlayerStatistics) -> String {
         guard let first = stats.earliestPeriod, let last = stats.latestPeriod else { return "" }
+        let rate = PlayerStatsEngine.Evolution.rateChangeThreshold
+        let bid = PlayerStatsEngine.Evolution.bidChangeThreshold
         var parts: [String] = []
         let bidDelta = last.averageBid - first.averageBid
-        if bidDelta >= 0.3 { parts.append("叫分更积极了") } else if bidDelta <= -0.3 { parts.append("叫分更谨慎了") }
+        if bidDelta >= bid { parts.append("叫分更积极了") } else if bidDelta <= -bid { parts.append("叫分更谨慎了") }
         let landlordDelta = last.landlordRate - first.landlordRate
-        if landlordDelta >= 8 { parts.append("更常当地主") } else if landlordDelta <= -8 { parts.append("更少当地主") }
+        if landlordDelta >= rate { parts.append("更常当地主") } else if landlordDelta <= -rate { parts.append("更少当地主") }
         let winDelta = last.winRate - first.winRate
-        if winDelta >= 8 { parts.append("胜率明显上升") } else if winDelta <= -8 { parts.append("胜率有所下滑") }
+        if winDelta >= rate { parts.append("胜率明显上升") } else if winDelta <= -rate { parts.append("胜率有所下滑") }
         let doubleDelta = last.doubleRate - first.doubleRate
-        if doubleDelta >= 8 { parts.append("更敢加倍") } else if doubleDelta <= -8 { parts.append("加倍更克制") }
+        if doubleDelta >= rate { parts.append("更敢加倍") } else if doubleDelta <= -rate { parts.append("加倍更克制") }
         if parts.isEmpty { return "早期到近期风格基本稳定。" }
         return "和早期相比：" + parts.joined(separator: "，") + "。"
     }
 
     private func situationalCard(_ stats: PlayerStatistics) -> some View {
         VStack(spacing: AppTheme.Spacing.s) {
-            SectionHeader("情境表现", subtitle: "整体胜率 \(ScoreFormat.percent(stats.winRate, digits: 0))")
-            HStack(spacing: AppTheme.Spacing.s) {
-                StatTile(title: "落后时", value: stats.gamesWhenTrailing > 0 ? ScoreFormat.percent(stats.trailingWinRate, digits: 0) : "–", caption: "\(stats.gamesWhenTrailing) 局", icon: "arrow.down.right", tint: stats.gamesWhenTrailing > 0 ? trendTint(stats.trailingWinRate - stats.winRate) : AppTheme.textPrimary)
-                StatTile(title: "领先时", value: stats.gamesWhenLeading > 0 ? ScoreFormat.percent(stats.leadingWinRate, digits: 0) : "–", caption: "\(stats.gamesWhenLeading) 局", icon: "arrow.up.right", tint: stats.gamesWhenLeading > 0 ? trendTint(stats.leadingWinRate - stats.winRate) : AppTheme.textPrimary)
-                StatTile(title: "尾盘", value: stats.lateGames > 0 ? ScoreFormat.percent(stats.lateWinRate, digits: 0) : "–", caption: "每场最后⅓局", icon: "flag.checkered", tint: stats.lateGames > 0 ? trendTint(stats.lateWinRate - stats.winRate) : AppTheme.textPrimary)
+            SectionHeader("不同局面下的胜率", subtitle: "整体 \(ScoreFormat.percent(stats.winRate, digits: 0))")
+            VStack(spacing: AppTheme.Spacing.s) {
+                HStack(spacing: AppTheme.Spacing.s) {
+                    StatTile(title: "落后时胜率", value: stats.gamesWhenTrailing > 0 ? ScoreFormat.percent(stats.trailingWinRate, digits: 0) : "–", caption: "\(stats.gamesWhenTrailing) 局", icon: "arrow.down.right", tint: stats.gamesWhenTrailing > 0 ? trendTint(stats.trailingWinRate - stats.winRate) : AppTheme.textPrimary)
+                    StatTile(title: "领先时胜率", value: stats.gamesWhenLeading > 0 ? ScoreFormat.percent(stats.leadingWinRate, digits: 0) : "–", caption: "\(stats.gamesWhenLeading) 局", icon: "arrow.up.right", tint: stats.gamesWhenLeading > 0 ? trendTint(stats.leadingWinRate - stats.winRate) : AppTheme.textPrimary)
+                    StatTile(title: "尾盘胜率", value: stats.lateGames > 0 ? ScoreFormat.percent(stats.lateWinRate, digits: 0) : "–", caption: "\(stats.lateGames) 局", icon: "flag.checkered", tint: stats.lateGames > 0 ? trendTint(stats.lateWinRate - stats.winRate) : AppTheme.textPrimary)
+                }
+                Text("落后 / 领先：这一局开始前，本场净分为负 / 为正。尾盘：一场里最后三分之一的局（只算 6 局以上的场）。颜色表示比整体胜率高还是低。")
+                    .font(.caption2)
+                    .foregroundStyle(AppTheme.textTertiary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
             }
+            .card()
         }
     }
 
@@ -361,10 +420,22 @@ struct PlayerDetailView: View {
                 roleRow(title: "地主", isLandlord: true, games: stats.gamesAsLandlord, wins: stats.landlordWins, rate: stats.landlordWinRate, net: stats.landlordNetScore)
                 roleRow(title: "农民", isLandlord: false, games: stats.gamesAsFarmer, wins: stats.farmerWins, rate: stats.farmerWinRate, net: stats.farmerNetScore)
                 if stats.maxLandlordStreak >= 2 {
-                    Text("最多连续 \(stats.maxLandlordStreak) 局当地主")
+                    Button {
+                        if let ref = stats.maxLandlordStreakRef { open(ref) }
+                    } label: {
+                        HStack(spacing: 4) {
+                            Text("最多连续 \(stats.maxLandlordStreak) 局当地主")
+                            if stats.maxLandlordStreakRef != nil {
+                                Image(systemName: "chevron.right").font(.system(size: 9, weight: .semibold))
+                            }
+                            Spacer()
+                        }
                         .font(.caption)
                         .foregroundStyle(AppTheme.textTertiary)
-                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(stats.maxLandlordStreakRef == nil)
                 }
             }
             .card()
@@ -431,7 +502,7 @@ struct PlayerDetailView: View {
                 StatTile(title: "被春", value: "\(stats.springLosses)", caption: "输掉的春天局", icon: "cloud.rain.fill")
                 StatTile(title: "加倍局", value: "\(stats.doubledGames)", caption: stats.doubledGames > 0 ? "胜率 \(ScoreFormat.percent(stats.doubledWinRate, digits: 0))" : nil, icon: "multiply.circle.fill")
                 StatTile(title: "加倍净收益", value: ScoreFormat.signed(stats.doubledNetScore), caption: "加倍局合计", tint: AppTheme.scoreColor(stats.doubledNetScore, greenWin: settings.greenWin))
-                StatTile(title: "波动", value: ScoreFormat.decimal(stats.scoreStandardDeviation, digits: 0), caption: "单局标准差")
+                StatTile(title: "得分起伏", value: "±" + ScoreFormat.decimal(stats.scoreStandardDeviation, digits: 0), caption: "单局得分的标准差")
             }
             .padding(AppTheme.Spacing.m)
             .background(AppTheme.surface)
@@ -445,34 +516,56 @@ struct PlayerDetailView: View {
     private func recordsCard(_ stats: PlayerStatistics) -> some View {
         let green = settings.greenWin
         return VStack(spacing: AppTheme.Spacing.s) {
-            SectionHeader("纪录")
-            VStack(spacing: 2) {
+            SectionHeader("纪录", subtitle: "点击可跳到那一局 / 那一场")
+            VStack(spacing: 0) {
                 Group {
-                    StatRowItem(icon: "flame.fill", tint: AppTheme.accent, label: "最长连胜", value: "\(stats.maxWinStreak)", detail: stats.maxMatchWinStreak > 0 ? "场次连胜 \(stats.maxMatchWinStreak)" : nil)
-                    StatRowItem(icon: "snowflake", tint: AppTheme.textSecondary, label: "最长连败", value: "\(stats.maxLossStreak)", detail: stats.maxMatchLossStreak > 0 ? "场次连败 \(stats.maxMatchLossStreak)" : nil)
+                    recordRow(icon: "flame.fill", tint: AppTheme.accent, label: "最长连胜", value: "\(stats.maxWinStreak) 局", detail: stats.maxMatchWinStreak > 0 ? "场次连胜 \(stats.maxMatchWinStreak)" : nil, ref: stats.maxWinStreak > 0 ? stats.maxWinStreakRef : nil)
+                    recordRow(icon: "snowflake", tint: AppTheme.textSecondary, label: "最长连败", value: "\(stats.maxLossStreak) 局", detail: stats.maxMatchLossStreak > 0 ? "场次连败 \(stats.maxMatchLossStreak)" : nil, ref: stats.maxLossStreak > 0 ? stats.maxLossStreakRef : nil)
                 }
                 Divider().overlay(AppTheme.hairline)
                 Group {
-                    StatRowItem(icon: "arrow.up.circle.fill", tint: AppTheme.scoreColor(1, greenWin: green), label: "单局最高", value: ScoreFormat.signed(stats.bestGameScore), valueColor: AppTheme.scoreColor(stats.bestGameScore, greenWin: green), detail: stats.bestGameScore > 0 ? "生涯第 \(stats.bestGameScoreIndex + 1) 局" : nil)
-                    StatRowItem(icon: "arrow.down.circle.fill", tint: AppTheme.scoreColor(-1, greenWin: green), label: "单局最低", value: ScoreFormat.signed(stats.worstGameScore), valueColor: AppTheme.scoreColor(stats.worstGameScore, greenWin: green), detail: stats.worstGameScore < 0 ? "生涯第 \(stats.worstGameScoreIndex + 1) 局" : nil)
-                    StatRowItem(icon: "trophy.fill", tint: AppTheme.gold, label: "单场最高", value: ScoreFormat.signed(stats.bestMatchScore), valueColor: AppTheme.scoreColor(stats.bestMatchScore, greenWin: green))
-                    StatRowItem(icon: "xmark.circle.fill", tint: AppTheme.textSecondary, label: "单场最低", value: ScoreFormat.signed(stats.worstMatchScore), valueColor: AppTheme.scoreColor(stats.worstMatchScore, greenWin: green))
+                    recordRow(icon: "arrow.up.circle.fill", tint: AppTheme.scoreColor(1, greenWin: green), label: "单局最高", value: ScoreFormat.signed(stats.bestGameScore), valueColor: AppTheme.scoreColor(stats.bestGameScore, greenWin: green), detail: stats.bestGameScore > 0 ? "生涯第 \(stats.bestGameScoreIndex + 1) 局" : nil, ref: stats.bestGameScore > 0 ? stats.bestGameRef : nil)
+                    recordRow(icon: "arrow.down.circle.fill", tint: AppTheme.scoreColor(-1, greenWin: green), label: "单局最低", value: ScoreFormat.signed(stats.worstGameScore), valueColor: AppTheme.scoreColor(stats.worstGameScore, greenWin: green), detail: stats.worstGameScore < 0 ? "生涯第 \(stats.worstGameScoreIndex + 1) 局" : nil, ref: stats.worstGameScore < 0 ? stats.worstGameRef : nil)
+                    recordRow(icon: "trophy.fill", tint: AppTheme.gold, label: "单场最高", value: ScoreFormat.signed(stats.bestMatchScore), valueColor: AppTheme.scoreColor(stats.bestMatchScore, greenWin: green), detail: stats.bestMatchRef.flatMap { matchDate($0) }, ref: stats.bestMatchScore > 0 ? stats.bestMatchRef : nil)
+                    recordRow(icon: "xmark.circle.fill", tint: AppTheme.textSecondary, label: "单场最低", value: ScoreFormat.signed(stats.worstMatchScore), valueColor: AppTheme.scoreColor(stats.worstMatchScore, greenWin: green), detail: stats.worstMatchRef.flatMap { matchDate($0) }, ref: stats.worstMatchScore < 0 ? stats.worstMatchRef : nil)
+                    recordRow(icon: "flame.circle.fill", tint: AppTheme.accent, label: "单局最多炸弹", value: "\(stats.maxBombsInGame) 个", detail: stats.maxBombsRef.flatMap { matchDate($0) }, ref: stats.maxBombsInGame > 0 ? stats.maxBombsRef : nil)
                 }
                 Divider().overlay(AppTheme.hairline)
                 Group {
-                    StatRowItem(icon: "chart.line.uptrend.xyaxis", tint: AppTheme.jade, label: "历史峰值", value: ScoreFormat.signed(stats.totalHighScore), valueColor: AppTheme.scoreColor(stats.totalHighScore, greenWin: green), detail: stats.totalHighScore > 0 ? "生涯第 \(stats.totalHighGameIndex + 1) 局时" : nil)
-                    StatRowItem(icon: "chart.line.downtrend.xyaxis", tint: AppTheme.red, label: "历史谷底", value: ScoreFormat.signed(stats.totalLowScore), valueColor: AppTheme.scoreColor(stats.totalLowScore, greenWin: green), detail: stats.totalLowScore < 0 ? "生涯第 \(stats.totalLowGameIndex + 1) 局时" : nil)
-                    StatRowItem(icon: "star.fill", tint: AppTheme.gold, label: "场内巅峰 / 谷底", value: "\(ScoreFormat.signed(stats.bestSnapshot)) / \(ScoreFormat.signed(stats.worstSnapshot))")
+                    recordRow(icon: "chart.line.uptrend.xyaxis", tint: AppTheme.jade, label: "历史峰值", value: ScoreFormat.signed(stats.totalHighScore), valueColor: AppTheme.scoreColor(stats.totalHighScore, greenWin: green), detail: stats.totalHighScore > 0 ? "累计到生涯第 \(stats.totalHighGameIndex + 1) 局" : nil, ref: stats.totalHighScore > 0 ? stats.totalHighRef : nil)
+                    recordRow(icon: "chart.line.downtrend.xyaxis", tint: AppTheme.red, label: "历史谷底", value: ScoreFormat.signed(stats.totalLowScore), valueColor: AppTheme.scoreColor(stats.totalLowScore, greenWin: green), detail: stats.totalLowScore < 0 ? "累计到生涯第 \(stats.totalLowGameIndex + 1) 局" : nil, ref: stats.totalLowScore < 0 ? stats.totalLowRef : nil)
+                    recordRow(icon: "star.fill", tint: AppTheme.gold, label: "单场内最高", value: ScoreFormat.signed(stats.bestSnapshot), valueColor: AppTheme.scoreColor(stats.bestSnapshot, greenWin: green), detail: "一场中途达到过的最高分", ref: stats.bestSnapshot > 0 ? stats.bestSnapshotRef : nil)
+                    recordRow(icon: "star.slash.fill", tint: AppTheme.textSecondary, label: "单场内最低", value: ScoreFormat.signed(stats.worstSnapshot), valueColor: AppTheme.scoreColor(stats.worstSnapshot, greenWin: green), detail: "一场中途跌到过的最低分", ref: stats.worstSnapshot < 0 ? stats.worstSnapshotRef : nil)
                 }
                 Divider().overlay(AppTheme.hairline)
                 Group {
-                    StatRowItem(icon: "arrow.uturn.up", tint: AppTheme.jade, label: "逆转取胜", value: "\(stats.comebackMatches) 场", detail: stats.biggestComeback > 0 ? "最大逆转 \(stats.biggestComeback)" : nil)
-                    StatRowItem(icon: "arrow.uturn.down", tint: AppTheme.red, label: "领先崩盘", value: "\(stats.collapsedMatches) 场", detail: stats.biggestCollapse > 0 ? "最大回吐 \(stats.biggestCollapse)" : nil)
-                    StatRowItem(icon: "rectangle.stack", tint: AppTheme.textSecondary, label: "单场最多", value: "\(stats.longestMatchGames) 局", detail: "平均 \(ScoreFormat.decimal(stats.averageGamesPerMatch)) 局/场")
+                    recordRow(icon: "arrow.uturn.up", tint: AppTheme.jade, label: "逆转取胜", value: "\(stats.comebackMatches) 场", detail: stats.biggestComeback > 0 ? "最大逆转 \(stats.biggestComeback) 分，跳到转折那一局" : nil, ref: stats.biggestComeback > 0 ? stats.biggestComebackRef : nil)
+                    recordRow(icon: "arrow.uturn.down", tint: AppTheme.red, label: "领先崩盘", value: "\(stats.collapsedMatches) 场", detail: stats.biggestCollapse > 0 ? "最大回吐 \(stats.biggestCollapse) 分，跳到最高点那一局" : nil, ref: stats.biggestCollapse > 0 ? stats.biggestCollapseRef : nil)
+                    recordRow(icon: "rectangle.stack", tint: AppTheme.textSecondary, label: "单场最多局", value: "\(stats.longestMatchGames) 局", detail: "平均 \(ScoreFormat.decimal(stats.averageGamesPerMatch)) 局/场", ref: stats.longestMatchGames > 0 ? stats.longestMatchRef : nil)
                 }
             }
-            .card()
+            .card(padding: AppTheme.Spacing.s)
         }
+    }
+
+    /// A record row; with a reference it becomes a button that opens the match or game.
+    @ViewBuilder
+    private func recordRow(icon: String, tint: Color, label: String, value: String, valueColor: Color = AppTheme.textPrimary, detail: String? = nil, ref: RecordRef?) -> some View {
+        if let ref = ref {
+            Button {
+                open(ref)
+            } label: {
+                StatRowItem(icon: icon, tint: tint, label: label, value: value, valueColor: valueColor, detail: detail, showsChevron: true)
+            }
+            .buttonStyle(.plain)
+            .accessibilityHint(ref.gameIndex == nil ? "查看那一场对局" : "查看那一局")
+        } else {
+            StatRowItem(icon: icon, tint: tint, label: label, value: value, valueColor: valueColor, detail: detail)
+        }
+    }
+
+    private func matchDate(_ ref: RecordRef) -> String? {
+        store.match(id: ref.matchId).map { DateFormat.shortDateTime.string(from: $0.startedAt) }
     }
 
     private func relationsCard(_ stats: PlayerStatistics) -> some View {

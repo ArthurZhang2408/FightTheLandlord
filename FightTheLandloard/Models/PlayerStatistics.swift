@@ -21,6 +21,13 @@ struct TimelinePoint: Identifiable, Equatable {
     static let origin = TimelinePoint(id: 0, matchId: nil, gameIndex: nil, date: nil, delta: 0, cumulative: 0)
 }
 
+/// Where a record was set, so the UI can jump straight to it.
+struct RecordRef: Equatable {
+    let matchId: String
+    /// 0-based game inside the match; nil when the record belongs to the match as a whole.
+    let gameIndex: Int?
+}
+
 /// Aggregate of games shared with another player.
 struct RelationStat: Identifiable, Equatable {
     let playerId: String
@@ -37,6 +44,9 @@ struct RelationStat: Identifiable, Equatable {
 struct PeriodSnapshot: Identifiable, Equatable {
     let id: Int
     let label: String
+    /// Dates of the first and last match in the slice.
+    var start: Date?
+    var end: Date?
     var games = 0
     var wins = 0
     var netScore = 0
@@ -86,16 +96,24 @@ struct PlayerStatistics: Equatable {
     var totalScore = 0
     var bestGameScore = 0
     var bestGameScoreIndex = 0
+    var bestGameRef: RecordRef?
     var worstGameScore = 0
     var worstGameScoreIndex = 0
+    var worstGameRef: RecordRef?
     var bestMatchScore = 0
+    var bestMatchRef: RecordRef?
     var worstMatchScore = 0
+    var worstMatchRef: RecordRef?
     var bestSnapshot = 0             // highest cumulative score inside a single match
+    var bestSnapshotRef: RecordRef?  // ... and the game that reached it
     var worstSnapshot = 0            // lowest cumulative score inside a single match
+    var worstSnapshotRef: RecordRef?
     var totalHighScore = 0           // all-time cumulative peak
     var totalHighGameIndex = 0
+    var totalHighRef: RecordRef?
     var totalLowScore = 0            // all-time cumulative valley
     var totalLowGameIndex = 0
+    var totalLowRef: RecordRef?
     var scoreStandardDeviation: Double = 0
 
     // MARK: Roles
@@ -108,6 +126,7 @@ struct PlayerStatistics: Equatable {
     var landlordNetScore = 0
     var farmerNetScore = 0
     var maxLandlordStreak = 0
+    var maxLandlordStreakRef: RecordRef?      // last game of that streak
 
     // MARK: Bidding
     var firstBidderGames = 0
@@ -121,6 +140,7 @@ struct PlayerStatistics: Equatable {
     // MARK: Multipliers
     var totalBombs = 0
     var maxBombsInGame = 0
+    var maxBombsRef: RecordRef?
     var gamesWithBombs = 0
     var bombGamesWon = 0
     var springWins = 0                        // won a 春天 game (either role)
@@ -136,7 +156,9 @@ struct PlayerStatistics: Equatable {
     var currentWinStreak = 0
     var currentLossStreak = 0
     var maxWinStreak = 0
+    var maxWinStreakRef: RecordRef?           // last game of the streak
     var maxLossStreak = 0
+    var maxLossStreakRef: RecordRef?
     var currentMatchWinStreak = 0
     var currentMatchLossStreak = 0
     var maxMatchWinStreak = 0
@@ -151,7 +173,10 @@ struct PlayerStatistics: Equatable {
     var comebackMatches = 0                   // was behind, finished ahead
     var collapsedMatches = 0                  // was ahead, finished behind
     var biggestComeback = 0
+    var biggestComebackRef: RecordRef?        // the turning point: the game at the valley
     var biggestCollapse = 0
+    var biggestCollapseRef: RecordRef?        // the game at the peak before the slide
+    var longestMatchRef: RecordRef?
 
     // MARK: Relationships
     var partners: [RelationStat] = []         // fellow farmers
@@ -162,13 +187,21 @@ struct PlayerStatistics: Equatable {
     var gamesByHour = [Int](repeating: 0, count: 24)
 
     // MARK: Change over time
-    /// Career split into up to three equal slices (empty with fewer than 12 games).
+    /// Career split into equal slices by game count (see `PlayerStatsEngine.Evolution`);
+    /// empty until there are enough games for every slice.
     var periods: [PeriodSnapshot] = []
     /// Calendar months with at least one game, oldest first.
     var months: [MonthSnapshot] = []
-    /// Win rate over the previous `rollingWindow` games, one value per game.
+    /// Size of the sliding window behind `rollingPoints`; grows with the career
+    /// (see `PlayerStatsEngine.Evolution.rollingWindow`). 0 when there are too few games.
+    var rollingWindow = 0
+    /// Win rate over the previous `rollingWindow` games, one value per game starting
+    /// at the first full window (so the curve never starts with a 0% / 100% noise point).
     var rollingWinRate: [Double] = []
-    var rollingWindow = 20
+    /// The same curve as chart points: `cumulative` is the rounded percentage,
+    /// `delta` that game's own score, and the match / game reference lets the
+    /// chart jump to the game.
+    var rollingPoints: [TimelinePoint] = []
 
     // MARK: Situational
     var gamesWhenTrailing = 0       // the player's match total was negative before the game

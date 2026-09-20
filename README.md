@@ -7,7 +7,7 @@ An iOS app (SwiftUI, iOS 17+) for keeping score in 斗地主 (Dou Di Zhu). It re
 - **计分板 (Match tab)** – pick three players, tap “记一局” for each round: bids, doubles, bombs, spring and who won. The score is computed live before you save. Running totals, per-round list and a trend chart update instantly.
 - **Auto-save / auto-finish** – the board is persisted on every change. Leaving the app mirrors the sitting into History as “进行中”. After a configurable idle period (default 2 hours) the match is closed automatically. Any match, closed or not, can be reopened from History with “继续这场对局”.
 - **历史 (History tab)** – matches grouped by year and month (collapsible), with busy days (3+ matches) grouped further; searchable by player. A match page shows results, every round (editable), the trend, per-player performance and a detailed breakdown; it can be shared, continued or deleted.
-- **统计 (Stats tab)** – a leaderboard (总分 / 胜率 / 局数 / 场胜率) and a rich per-player page: recent form, role performance, bidding style, bombs / spring / doubling, records, best partner / nemesis, activity by weekday. A comparison chart overlays several players.
+- **统计 (Stats tab)** – a leaderboard (总分 / 胜率 / 局数 / 场胜率) and a per-player page in three parts: 概览 (form, score trend, rolling win rate, monthly net score), 风格 (early / middle / recent slices of the career, win rate by situation, roles, bidding, specials) and 纪录 (records, partners and rivals, activity). Every record and every chart point links to the match or game behind it. A comparison chart overlays several players' scores or rolling win rates.
 - **分享** – deterministic light or dark posters rendered from fixed-palette views (charts drawn with `Canvas`), saved to Photos or shared with the system sheet.
 
 ## Architecture
