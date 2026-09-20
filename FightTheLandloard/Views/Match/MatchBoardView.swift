@@ -219,10 +219,30 @@ struct MatchBoardView: View {
                                 Haptics.light()
                                 session.startNewMatch(reusing: previous)
                             } label: {
-                                Text("沿用上次玩家：\(previous.playerNames.joined(separator: "、"))")
-                                    .lineLimit(1)
+                                VStack(spacing: 2) {
+                                    Text("沿用上次玩家，再开一场")
+                                    Text(previous.playerNames.joined(separator: "、"))
+                                        .font(.caption.weight(.regular))
+                                        .opacity(0.75)
+                                        .lineLimit(1)
+                                }
                             }
                             .buttonStyle(SecondaryButtonStyle())
+
+                            Button {
+                                resume(previous)
+                            } label: {
+                                HStack(spacing: 4) {
+                                    Image(systemName: "arrow.uturn.backward")
+                                        .font(.system(size: 11, weight: .semibold))
+                                    Text("继续上一场对局（\(previous.totalGames) 局）")
+                                        .font(.subheadline.weight(.medium))
+                                }
+                                .foregroundStyle(AppTheme.textSecondary)
+                                .padding(.vertical, 6)
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityHint("重新打开上一场已结束的对局并继续记分")
                         }
                     }
                     .padding(.horizontal, AppTheme.Spacing.xl)
@@ -491,16 +511,18 @@ struct MatchBoardView: View {
                 EmptyStateView(icon: "rectangle.stack.badge.plus", title: "还没有记录", message: "点击下方“记一局”开始记分。")
                     .card(padding: AppTheme.Spacing.s)
             } else {
+                let rows = gameRows
                 VStack(spacing: 0) {
-                    ForEach(Array(session.games.enumerated().reversed()), id: \.element.id) { index, game in
+                    ForEach(rows.reversed()) { row in
+                        let index = row.index
                         Button {
                             editor = .edit(index)
                         } label: {
                             GameRowView(
                                 number: index + 1,
-                                game: game,
-                                playerNames: session.playerNames,
-                                cumulative: session.cumulativeScores[index],
+                                game: row.game,
+                                playerNames: row.playerNames,
+                                cumulative: row.cumulative,
                                 showCumulative: !settings.scorePerGame
                             )
                             .contentShape(Rectangle())
@@ -526,6 +548,31 @@ struct MatchBoardView: View {
                 }
                 .card(padding: 0)
             }
+        }
+    }
+
+    /// One immutable snapshot per game. Rows must never index into `session`
+    /// directly: SwiftUI can re-render a row after the match has been ended and
+    /// the session's arrays are already empty.
+    private struct GameRowSnapshot: Identifiable {
+        let index: Int
+        let game: Game
+        let cumulative: [Int]
+        let playerNames: [String]
+        var id: String { game.id }
+    }
+
+    private var gameRows: [GameRowSnapshot] {
+        let games = session.games
+        let cumulative = session.cumulativeScores
+        let names = session.playerNames
+        return games.indices.map { index in
+            GameRowSnapshot(
+                index: index,
+                game: games[index],
+                cumulative: index < cumulative.count ? cumulative[index] : [0, 0, 0],
+                playerNames: names
+            )
         }
     }
 

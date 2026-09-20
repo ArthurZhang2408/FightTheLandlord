@@ -41,9 +41,9 @@ Player colors (`PlayerColor.color`) are eight refined hues that stay legible on 
 
 ## Screens
 
-- **计分板** – hero scoreboard card (seat pickers + totals + next bidder), reverse-chronological round list, trend card, summary tiles, floating “记一局”. Idle state offers “开始新牌局”, “沿用上次玩家” and a resume banner for auto-ended or in-progress matches.
+- **计分板** – hero scoreboard card (seat pickers + totals + next bidder), reverse-chronological round list, trend card, summary tiles, floating “记一局”. Idle state offers “开始新牌局”, “沿用上次玩家，再开一场”, a “继续上一场对局” link and a resume banner for auto-ended or in-progress matches.
 - **记一局** – form: bids per seat (segmented) with 加倍 toggle, bombs stepper, 春天, result, live score preview and multiplier explanation.
-- **历史** – month sections, rows with date, badges (进行中 / 自动结束) and three score capsules; winner marked with a crown.
+- **历史** – collapsible year (when more than one) and month sections; a day with three or more matches becomes its own collapsible group, quieter days list their rows straight under the month with the date on the row. Rows carry badges (进行中 / 自动结束) and three score capsules; winner marked with a crown.
 - **对局详情** – header (ranked players, peak/valley, quick facts), round list (tap to edit), trend, player performance, actions in an ellipsis menu (继续 / 详细统计 / 删除), share button.
 - **统计** – leaderboard with metric picker; player page with rings, form, trend (按局/按场), roles, bidding style, special situations, records, partners & rivals, activity.
 - **分享海报** – fixed 390pt width, 3× scale, light/dark `PosterTheme`, `Canvas` charts, never dynamic colors.

@@ -2,8 +2,9 @@
 //  HistoryView.swift
 //  FightTheLandlord
 //
-//  Saved matches in a year → month → day tree. Everything starts expanded;
-//  any level can be collapsed by tapping its header.
+//  Saved matches grouped by year and month, with a collapsible day group for
+//  days that had several matches. Everything starts expanded; any header can
+//  be collapsed by tapping it.
 //
 
 import SwiftUI
@@ -27,7 +28,13 @@ struct HistoryView: View {
         let id: String          // yyyy-MM-dd
         let date: Date
         let matches: [MatchRecord]
+        /// Busy days get their own collapsible header; quieter days list their
+        /// matches directly under the month with the date on each row.
+        var isGrouped: Bool { matches.count >= HistoryView.groupedDayThreshold }
     }
+
+    /// Minimum number of matches on one day before that day becomes a collapsible group.
+    static let groupedDayThreshold = 3
 
     private struct MonthGroup: Identifiable {
         let id: String          // yyyy-MM
@@ -141,11 +148,13 @@ struct HistoryView: View {
                         Section {
                             if !collapsedMonths.contains(month.id) {
                                 ForEach(month.days) { day in
-                                    dayHeader(day)
-                                    if !collapsedDays.contains(day.id) {
+                                    if day.isGrouped {
+                                        dayHeader(day)
+                                    }
+                                    if !day.isGrouped || !collapsedDays.contains(day.id) {
                                         ForEach(day.matches) { match in
                                             NavigationLink(value: MatchRoute(matchId: match.id ?? "", gameIndex: nil)) {
-                                                MatchRowView(match: match)
+                                                MatchRowView(match: match, showsDate: !day.isGrouped)
                                             }
                                         }
                                     }
@@ -261,11 +270,14 @@ struct HistoryView: View {
 struct MatchRowView: View {
     @Environment(DataStore.self) private var store
     let match: MatchRecord
+    /// Rows under a day header only need the time; rows listed straight under a
+    /// month carry the date as well.
+    var showsDate: Bool = true
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 8) {
-                Text(DateFormat.time.string(from: match.startedAt))
+                Text((showsDate ? DateFormat.shortDateTime : DateFormat.time).string(from: match.startedAt))
                     .font(.subheadline.weight(.medium))
                     .monospacedDigit()
                 if match.isInProgress {
