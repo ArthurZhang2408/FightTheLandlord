@@ -9,11 +9,6 @@
 /* Begin PBXBuildFile section */
 		4954E8332CB6D9CC0050739D /* FirebaseAuth in Frameworks */ = {isa = PBXBuildFile; productRef = 4954E8322CB6D9CC0050739D /* FirebaseAuth */; };
 		4954E8352CB6D9CC0050739D /* FirebaseFirestore in Frameworks */ = {isa = PBXBuildFile; productRef = 4954E8342CB6D9CC0050739D /* FirebaseFirestore */; };
-		49C8E86D2CAFD30A00FB817D /* FightTheLandloardTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 49C8E86C2CAFD30A00FB817D /* FightTheLandloardTests.swift */; };
-		49F5A1000000000000000202 /* ScoreCalculatorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 49F5A1000000000000000201 /* ScoreCalculatorTests.swift */; };
-		49F5A1000000000000000204 /* StatsEngineTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 49F5A1000000000000000203 /* StatsEngineTests.swift */; };
-		49C8E8772CAFD30A00FB817D /* FightTheLandloardUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 49C8E8762CAFD30A00FB817D /* FightTheLandloardUITests.swift */; };
-		49C8E8792CAFD30A00FB817D /* FightTheLandloardUITestsLaunchTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 49C8E8782CAFD30A00FB817D /* FightTheLandloardUITestsLaunchTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -36,12 +31,7 @@
 /* Begin PBXFileReference section */
 		49C8E8582CAFD30800FB817D /* FightTheLandloard.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = FightTheLandloard.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		49C8E8682CAFD30A00FB817D /* FightTheLandloardTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = FightTheLandloardTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
-		49C8E86C2CAFD30A00FB817D /* FightTheLandloardTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FightTheLandloardTests.swift; sourceTree = "<group>"; };
-		49F5A1000000000000000201 /* ScoreCalculatorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScoreCalculatorTests.swift; sourceTree = "<group>"; };
-		49F5A1000000000000000203 /* StatsEngineTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatsEngineTests.swift; sourceTree = "<group>"; };
 		49C8E8722CAFD30A00FB817D /* FightTheLandloardUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = FightTheLandloardUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
-		49C8E8762CAFD30A00FB817D /* FightTheLandloardUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FightTheLandloardUITests.swift; sourceTree = "<group>"; };
-		49C8E8782CAFD30A00FB817D /* FightTheLandloardUITestsLaunchTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FightTheLandloardUITestsLaunchTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -61,6 +51,16 @@
 				49F5A1000000000000000002 /* Exceptions for "FightTheLandloard" folder in "FightTheLandloard" target */,
 			);
 			path = FightTheLandloard;
+			sourceTree = "<group>";
+		};
+		49C8E86B2CAFD30A00FB817D /* FightTheLandloardTests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = FightTheLandloardTests;
+			sourceTree = "<group>";
+		};
+		49C8E8752CAFD30A00FB817D /* FightTheLandloardUITests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = FightTheLandloardUITests;
 			sourceTree = "<group>";
 		};
 /* End PBXFileSystemSynchronizedRootGroup section */
@@ -112,25 +112,6 @@
 			name = Products;
 			sourceTree = "<group>";
 		};
-		49C8E86B2CAFD30A00FB817D /* FightTheLandloardTests */ = {
-			isa = PBXGroup;
-			children = (
-				49C8E86C2CAFD30A00FB817D /* FightTheLandloardTests.swift */,
-				49F5A1000000000000000201 /* ScoreCalculatorTests.swift */,
-				49F5A1000000000000000203 /* StatsEngineTests.swift */,
-			);
-			path = FightTheLandloardTests;
-			sourceTree = "<group>";
-		};
-		49C8E8752CAFD30A00FB817D /* FightTheLandloardUITests */ = {
-			isa = PBXGroup;
-			children = (
-				49C8E8762CAFD30A00FB817D /* FightTheLandloardUITests.swift */,
-				49C8E8782CAFD30A00FB817D /* FightTheLandloardUITestsLaunchTests.swift */,
-			);
-			path = FightTheLandloardUITests;
-			sourceTree = "<group>";
-		};
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
@@ -171,6 +152,9 @@
 			dependencies = (
 				49C8E86A2CAFD30A00FB817D /* PBXTargetDependency */,
 			);
+			fileSystemSynchronizedGroups = (
+				49C8E86B2CAFD30A00FB817D /* FightTheLandloardTests */,
+			);
 			name = FightTheLandloardTests;
 			productName = FightTheLandloardTests;
 			productReference = 49C8E8682CAFD30A00FB817D /* FightTheLandloardTests.xctest */;
@@ -188,6 +172,9 @@
 			);
 			dependencies = (
 				49C8E8742CAFD30A00FB817D /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				49C8E8752CAFD30A00FB817D /* FightTheLandloardUITests */,
 			);
 			name = FightTheLandloardUITests;
 			productName = FightTheLandloardUITests;
@@ -277,9 +264,6 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				49C8E86D2CAFD30A00FB817D /* FightTheLandloardTests.swift in Sources */,
-				49F5A1000000000000000202 /* ScoreCalculatorTests.swift in Sources */,
-				49F5A1000000000000000204 /* StatsEngineTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -287,8 +271,6 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				49C8E8772CAFD30A00FB817D /* FightTheLandloardUITests.swift in Sources */,
-				49C8E8792CAFD30A00FB817D /* FightTheLandloardUITestsLaunchTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
