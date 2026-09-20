@@ -154,6 +154,40 @@ final class StatsEngineTests: XCTestCase {
         XCTAssertEqual(byScore.last?.games, 0)          // players without games stay last
     }
 
+    func testEvolutionMonthsAndSituationalStats() {
+        // Four matches a month apart → 12 games, three slices of four.
+        let starts = (0..<4).map { Date(timeIntervalSince1970: 1_700_000_000 + Double($0) * 31 * 86_400) }
+        let samples = starts.map { sampleMatch(start: $0) }
+        let stats = PlayerStatsEngine.compute(
+            playerId: "p-c", playerName: "老王",
+            gameRecords: samples.flatMap { $0.1 },
+            matchRecords: samples.map { $0.0 }
+        )
+        XCTAssertEqual(stats.periods.count, 3)
+        XCTAssertEqual(stats.periods.map { $0.games }, [4, 4, 4])
+        XCTAssertEqual(stats.periods.map { $0.label }, ["早期", "中期", "近期"])
+        XCTAssertEqual(stats.months.count, 4)
+        XCTAssertEqual(stats.months.map { $0.games }, [3, 3, 3, 3])
+        XCTAssertEqual(stats.months.map { $0.matches }, [1, 1, 1, 1])
+        XCTAssertEqual(stats.months.first?.netScore, 700)
+        XCTAssertEqual(stats.rollingWinRate.count, 12)
+        XCTAssertEqual(stats.rollingWinRate.last ?? 0, 8.0 / 12.0 * 100, accuracy: 0.01)
+        // In every match C loses game 1 (-300) and is behind for games 2 and 3, which C wins.
+        XCTAssertEqual(stats.gamesWhenTrailing, 8)
+        XCTAssertEqual(stats.winsWhenTrailing, 8)
+        XCTAssertEqual(stats.gamesWhenLeading, 0)
+        XCTAssertEqual(stats.lateGames, 0)               // matches shorter than 6 games are not split
+        XCTAssertEqual(stats.busiestMonth?.games, 3)
+    }
+
+    func testEvolutionNeedsTwelveGames() {
+        let (match, records, _) = sampleMatch(start: Date(timeIntervalSince1970: 1_700_000_000))
+        let stats = PlayerStatsEngine.compute(playerId: "p-a", playerName: "阿明", gameRecords: records, matchRecords: [match])
+        XCTAssertTrue(stats.periods.isEmpty)
+        XCTAssertEqual(stats.rollingWinRate.count, 3)
+        XCTAssertEqual(stats.months.count, 1)
+    }
+
     func testActiveMatchRotationAndTotals() {
         var active = ActiveMatch(playerIds: ids.map { Optional($0) }, starter: .b)
         XCTAssertEqual(active.nextFirstBidder, .b)

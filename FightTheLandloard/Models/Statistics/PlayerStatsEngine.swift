@@ -44,13 +44,18 @@ enum PlayerStatsEngine {
         let games = orderedGames(gameRecords.filter { $0.seat(of: playerId) != nil }, matches: myMatches)
 
         var starters: [String: Int] = [:]
+        var matchStart: [String: Date] = [:]
         for match in myMatches {
-            if let id = match.id { starters[id] = match.initialStarter }
+            if let id = match.id {
+                starters[id] = match.initialStarter
+                matchStart[id] = match.startedAt
+            }
         }
         computeGameStats(&stats, games: games, playerId: playerId, playerNames: playerNames,
                          starters: starters, recentWindow: recentWindow, formWindow: formWindow)
         computeMatchStats(&stats, matches: endedMatches, playerId: playerId)
         computeActivity(&stats, games: games, matches: myMatches)
+        computeEvolution(&stats, games: games, playerId: playerId, matchStart: matchStart, matches: myMatches)
         return stats
     }
 
@@ -76,11 +81,33 @@ enum PlayerStatsEngine {
         var points: [TimelinePoint] = [.origin]
         points.reserveCapacity(games.count + 1)
 
+        let gamesPerMatch = Dictionary(grouping: games, by: { $0.matchId }).mapValues { $0.count }
+        var currentMatchId: String?
+        var matchRunning = 0
+
         for (index, record) in games.enumerated() {
             guard let seat = record.seat(of: playerId) else { continue }
             let score = record.score(for: seat)
             let won = score > 0
             let lost = score < 0
+
+            // Situation inside the match before this game was played.
+            if currentMatchId != record.matchId {
+                currentMatchId = record.matchId
+                matchRunning = 0
+            }
+            if matchRunning < 0 {
+                stats.gamesWhenTrailing += 1
+                if won { stats.winsWhenTrailing += 1 }
+            } else if matchRunning > 0 {
+                stats.gamesWhenLeading += 1
+                if won { stats.winsWhenLeading += 1 }
+            }
+            if let total = gamesPerMatch[record.matchId], total >= 6, record.gameIndex >= (total * 2) / 3 {
+                stats.lateGames += 1
+                if won { stats.lateWins += 1 }
+            }
+            matchRunning += score
             let isLandlord = record.isLandlord(seat)
             let doubled = record.doubled(seat)
             let bid = record.bid(for: seat)
@@ -323,5 +350,75 @@ enum PlayerStatsEngine {
         stats.firstPlayedAt = (matchDates + gameDates).min()
         let activityDates = matches.compactMap { $0.lastActivityAt ?? $0.endedAt }
         stats.lastPlayedAt = (matchDates + activityDates + gameDates).max()
+    }
+
+    // MARK: - Change over time
+
+    static let periodLabels = ["早期", "中期", "近期"]
+
+    private static func computeEvolution(_ stats: inout PlayerStatistics,
+                                         games: [GameRecord],
+                                         playerId: String,
+                                         matchStart: [String: Date],
+                                         matches: [MatchRecord]) {
+        let results: [(score: Int, record: GameRecord, seat: Seat)] = games.compactMap { record in
+            guard let seat = record.seat(of: playerId) else { return nil }
+            return (record.score(for: seat), record, seat)
+        }
+        guard !results.isEmpty else { return }
+
+        // Rolling win rate.
+        let window = stats.rollingWindow
+        var rolling: [Double] = []
+        rolling.reserveCapacity(results.count)
+        var wins = 0
+        for (index, item) in results.enumerated() {
+            if item.score > 0 { wins += 1 }
+            if index >= window, results[index - window].score > 0 { wins -= 1 }
+            let span = min(window, index + 1)
+            rolling.append(Double(wins) / Double(span) * 100)
+        }
+        stats.rollingWinRate = rolling
+
+        // Career slices.
+        if results.count >= 12 {
+            let sliceCount = 3
+            var periods = (0..<sliceCount).map { PeriodSnapshot(id: $0, label: periodLabels[$0]) }
+            for (index, item) in results.enumerated() {
+                let slice = min(sliceCount - 1, index * sliceCount / results.count)
+                periods[slice].games += 1
+                if item.score > 0 { periods[slice].wins += 1 }
+                periods[slice].netScore += item.score
+                if item.record.isLandlord(item.seat) { periods[slice].landlordGames += 1 }
+                periods[slice].bidSum += item.record.bid(for: item.seat)
+                if item.record.doubled(item.seat) { periods[slice].doubledGames += 1 }
+                periods[slice].bombs += item.record.bombs
+            }
+            stats.periods = periods
+        }
+
+        // Calendar months (by the match's start date, falling back to the game's own time).
+        let calendar = Calendar.current
+        var months: [String: MonthSnapshot] = [:]
+        func monthKey(_ date: Date) -> (String, Date) {
+            let c = calendar.dateComponents([.year, .month], from: date)
+            let start = calendar.date(from: c) ?? date
+            return (String(format: "%04d-%02d", c.year ?? 0, c.month ?? 0), start)
+        }
+        for item in results {
+            let (key, start) = monthKey(matchStart[item.record.matchId] ?? item.record.playedAt)
+            var snapshot = months[key] ?? MonthSnapshot(id: key, start: start)
+            snapshot.games += 1
+            if item.score > 0 { snapshot.wins += 1 }
+            snapshot.netScore += item.score
+            months[key] = snapshot
+        }
+        for match in matches {
+            let (key, start) = monthKey(match.startedAt)
+            var snapshot = months[key] ?? MonthSnapshot(id: key, start: start)
+            snapshot.matches += 1
+            months[key] = snapshot
+        }
+        stats.months = months.values.sorted { $0.start < $1.start }
     }
 }

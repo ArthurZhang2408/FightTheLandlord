@@ -2,7 +2,8 @@
 //  PlayerDetailView.swift
 //  FightTheLandlord
 //
-//  Everything about one player.
+//  Everything about one player, in three pages: 概览 (form, trend, months),
+//  风格 (how they play and how that changed), 纪录 (records, rivals, activity).
 //
 
 import SwiftUI
@@ -14,17 +15,25 @@ struct PlayerDetailView: View {
     @Environment(DataStore.self) private var store
     @Environment(AppSettings.self) private var settings
     @Environment(AppRouter.self) private var router
-    @Environment(\.dismiss) private var dismiss
 
+    @State private var page: Page = .overview
     @State private var chartMode: ChartMode = .games
     @State private var showFullscreenChart = false
     @State private var showShare = false
     @State private var showEditor = false
     @State private var cachedStats: PlayerStatistics?
 
+    enum Page: String, CaseIterable, Identifiable {
+        case overview = "概览"
+        case style = "风格"
+        case records = "纪录"
+        var id: String { rawValue }
+    }
+
     enum ChartMode: String, CaseIterable, Identifiable {
         case games = "按局"
         case matches = "按场"
+        case form = "状态"
         var id: String { rawValue }
     }
 
@@ -36,16 +45,35 @@ struct PlayerDetailView: View {
             if let stats = stats, stats.totalGames > 0 {
                 VStack(spacing: AppTheme.Spacing.l) {
                     header(stats)
-                    formCard(stats)
-                    trendCard(stats)
-                    rolesCard(stats)
-                    biddingCard(stats)
-                    specialsCard(stats)
-                    recordsCard(stats)
-                    if !stats.partners.isEmpty || !stats.opponents.isEmpty {
-                        relationsCard(stats)
+                    Picker("页面", selection: $page) {
+                        ForEach(Page.allCases) { p in Text(p.rawValue).tag(p) }
                     }
-                    activityCard(stats)
+                    .pickerStyle(.segmented)
+
+                    switch page {
+                    case .overview:
+                        formCard(stats)
+                        trendCard(stats)
+                        if stats.months.count >= 2 {
+                            monthlyCard(stats)
+                        }
+                    case .style:
+                        if !stats.periods.isEmpty {
+                            evolutionCard(stats)
+                        } else {
+                            InfoBanner(icon: "hourglass", title: "风格演变需要至少 12 局", message: "累积更多对局后，这里会比较早期、中期和近期的打法。", tint: AppTheme.textSecondary)
+                        }
+                        situationalCard(stats)
+                        rolesCard(stats)
+                        biddingCard(stats)
+                        specialsCard(stats)
+                    case .records:
+                        recordsCard(stats)
+                        if !stats.partners.isEmpty || !stats.opponents.isEmpty {
+                            relationsCard(stats)
+                        }
+                        activityCard(stats)
+                    }
                 }
                 .padding(.horizontal)
                 .padding(.vertical, AppTheme.Spacing.s)
@@ -68,12 +96,14 @@ struct PlayerDetailView: View {
                     } label: {
                         Image(systemName: "square.and.arrow.up")
                     }
+                    .accessibilityLabel("分享战绩")
                 }
                 Button {
                     showEditor = true
                 } label: {
                     Image(systemName: "pencil")
                 }
+                .accessibilityLabel("编辑玩家")
             }
         }
         .sheet(isPresented: $showEditor) {
@@ -108,11 +138,18 @@ struct PlayerDetailView: View {
     }
 
     private func series(_ stats: PlayerStatistics) -> ChartSeries {
-        ChartSeries(name: currentPlayer.name, color: currentPlayer.color,
-                    points: chartMode == .games ? stats.gamePoints : stats.matchPoints)
+        switch chartMode {
+        case .games:
+            return ChartSeries(name: currentPlayer.name, color: currentPlayer.color, points: stats.gamePoints)
+        case .matches:
+            return ChartSeries(name: currentPlayer.name, color: currentPlayer.color, points: stats.matchPoints)
+        case .form:
+            return ChartSeries(name: "近\(stats.rollingWindow)局胜率", color: currentPlayer.color,
+                               values: stats.rollingWinRate.map { Int($0.rounded()) })
+        }
     }
 
-    // MARK: - Cards
+    // MARK: - Header
 
     private func header(_ stats: PlayerStatistics) -> some View {
         VStack(spacing: AppTheme.Spacing.l) {
@@ -157,6 +194,8 @@ struct PlayerDetailView: View {
         .frame(maxWidth: .infinity)
     }
 
+    // MARK: - Overview
+
     private func formCard(_ stats: PlayerStatistics) -> some View {
         VStack(spacing: AppTheme.Spacing.s) {
             SectionHeader("近期状态", subtitle: "最近 \(stats.recentResults.count) 局")
@@ -171,7 +210,7 @@ struct PlayerDetailView: View {
                     }
                 }
                 HStack(spacing: AppTheme.Spacing.s) {
-                    StatTile(title: "近期胜率", value: ScoreFormat.percent(stats.recentWinRate, digits: 0), caption: stats.winRate > 0 ? "整体 \(ScoreFormat.percent(stats.winRate, digits: 0))" : nil)
+                    StatTile(title: "近\(stats.recentGames)局胜率", value: ScoreFormat.percent(stats.recentWinRate, digits: 0), caption: "整体 \(ScoreFormat.percent(stats.winRate, digits: 0))", tint: trendTint(stats.recentWinRate - stats.winRate))
                     StatTile(title: "近期净分", value: ScoreFormat.signed(stats.recentNetScore), tint: AppTheme.scoreColor(stats.recentNetScore, greenWin: settings.greenWin))
                     StatTile(title: "局均得分", value: ScoreFormat.decimal(stats.averageScorePerGame), caption: "场均 \(ScoreFormat.decimal(stats.averageScorePerMatch, digits: 0))", tint: AppTheme.scoreColor(stats.averageScorePerGame, greenWin: settings.greenWin))
                 }
@@ -180,19 +219,138 @@ struct PlayerDetailView: View {
         }
     }
 
+    private func trendTint(_ delta: Double) -> Color {
+        if abs(delta) < 3 { return AppTheme.textPrimary }
+        return AppTheme.resultColor(win: delta > 0, greenWin: settings.greenWin)
+    }
+
     private func trendCard(_ stats: PlayerStatistics) -> some View {
         VStack(spacing: AppTheme.Spacing.s) {
-            SectionHeader("得分走势") {
+            SectionHeader(chartMode == .form ? "状态走势" : "得分走势") {
                 Picker("模式", selection: $chartMode) {
                     ForEach(ChartMode.allCases) { mode in
                         Text(mode.rawValue).tag(mode)
                     }
                 }
                 .pickerStyle(.segmented)
-                .frame(width: 130)
+                .frame(width: 170)
             }
-            ScoreLineChart(series: [series(stats)], xLabel: chartMode == .games ? "局" : "场", height: 170, showLegend: false, showArea: true, onExpand: { showFullscreenChart = true })
-                .card()
+            VStack(alignment: .leading, spacing: 8) {
+                ScoreLineChart(
+                    series: [series(stats)],
+                    xLabel: chartMode == .matches ? "场" : "局",
+                    height: 170,
+                    showLegend: false,
+                    showArea: true,
+                    onExpand: chartMode == .form ? nil : { showFullscreenChart = true },
+                    yDomain: chartMode == .form ? 0...100 : nil,
+                    referenceValue: chartMode == .form ? 50 : 0
+                )
+                if chartMode == .form {
+                    Text("每一点是截至该局的近 \(stats.rollingWindow) 局胜率，虚线为 50%。")
+                        .font(.caption2)
+                        .foregroundStyle(AppTheme.textTertiary)
+                }
+            }
+            .card()
+        }
+    }
+
+    private func monthlyCard(_ stats: PlayerStatistics) -> some View {
+        let recent = Array(stats.months.suffix(12))
+        return VStack(spacing: AppTheme.Spacing.s) {
+            SectionHeader("月度变化", subtitle: "最近 \(recent.count) 个月净分")
+            VStack(spacing: AppTheme.Spacing.m) {
+                MonthlyNetChart(months: recent, height: 150)
+                HStack(spacing: AppTheme.Spacing.s) {
+                    monthTile(title: "最佳月份", month: stats.bestMonth, positive: true)
+                    monthTile(title: "最差月份", month: stats.worstMonth, positive: false)
+                    StatTile(title: "最活跃", value: stats.busiestMonth.map { DateFormat.month.string(from: $0.start).replacingOccurrences(of: "年", with: "/").replacingOccurrences(of: "月", with: "") } ?? "–", caption: stats.busiestMonth.map { "\($0.games) 局 · \($0.matches) 场" })
+                }
+            }
+            .card()
+        }
+    }
+
+    private func monthTile(title: String, month: MonthSnapshot?, positive: Bool) -> some View {
+        StatTile(
+            title: title,
+            value: month.map { ScoreFormat.signed($0.netScore) } ?? "–",
+            caption: month.map { DateFormat.month.string(from: $0.start) + " · 胜率 \(ScoreFormat.percent($0.winRate, digits: 0))" },
+            tint: month.map { AppTheme.scoreColor($0.netScore, greenWin: settings.greenWin) } ?? AppTheme.textPrimary
+        )
+    }
+
+    // MARK: - Style
+
+    private func evolutionCard(_ stats: PlayerStatistics) -> some View {
+        VStack(spacing: AppTheme.Spacing.s) {
+            SectionHeader("风格演变", subtitle: "生涯分三段，每段约 \(stats.periods.first?.games ?? 0) 局")
+            VStack(spacing: AppTheme.Spacing.m) {
+                HStack {
+                    Text("")
+                        .frame(width: 60, alignment: .leading)
+                    ForEach(stats.periods) { period in
+                        Text(period.label)
+                            .font(.caption2)
+                            .foregroundStyle(AppTheme.textTertiary)
+                            .frame(maxWidth: .infinity)
+                    }
+                    Text("变化")
+                        .font(.caption2)
+                        .foregroundStyle(AppTheme.textTertiary)
+                        .frame(width: 58, alignment: .trailing)
+                }
+                EvolutionRow(title: "胜率", values: stats.periods.map { $0.winRate }, scale: 100, higherIsBetter: true,
+                             format: { ScoreFormat.percent($0, digits: 0) }, deltaFormat: { deltaPercentPoints($0) })
+                EvolutionRow(title: "地主率", values: stats.periods.map { $0.landlordRate }, scale: 100, higherIsBetter: nil,
+                             format: { ScoreFormat.percent($0, digits: 0) }, deltaFormat: { deltaPercentPoints($0) })
+                EvolutionRow(title: "平均叫分", values: stats.periods.map { $0.averageBid }, scale: 3, higherIsBetter: nil,
+                             format: { ScoreFormat.decimal($0, digits: 1) }, deltaFormat: { signedDecimal($0, digits: 1) })
+                EvolutionRow(title: "加倍率", values: stats.periods.map { $0.doubleRate }, scale: 100, higherIsBetter: nil,
+                             format: { ScoreFormat.percent($0, digits: 0) }, deltaFormat: { deltaPercentPoints($0) })
+                EvolutionRow(title: "局均得分", values: stats.periods.map { $0.averageScore }, scale: nil, higherIsBetter: true,
+                             format: { ScoreFormat.decimal($0, digits: 0) }, deltaFormat: { signedDecimal($0, digits: 0) })
+                Text(evolutionSummary(stats))
+                    .font(.caption)
+                    .foregroundStyle(AppTheme.textSecondary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .card()
+        }
+    }
+
+    private func deltaPercentPoints(_ delta: Double) -> String {
+        (delta >= 0 ? "+" : "") + String(format: "%.0f", delta)
+    }
+
+    private func signedDecimal(_ delta: Double, digits: Int) -> String {
+        (delta >= 0 ? "+" : "") + String(format: "%.\(digits)f", delta)
+    }
+
+    private func evolutionSummary(_ stats: PlayerStatistics) -> String {
+        guard let first = stats.earliestPeriod, let last = stats.latestPeriod else { return "" }
+        var parts: [String] = []
+        let bidDelta = last.averageBid - first.averageBid
+        if bidDelta >= 0.3 { parts.append("叫分更积极了") } else if bidDelta <= -0.3 { parts.append("叫分更谨慎了") }
+        let landlordDelta = last.landlordRate - first.landlordRate
+        if landlordDelta >= 8 { parts.append("更常当地主") } else if landlordDelta <= -8 { parts.append("更少当地主") }
+        let winDelta = last.winRate - first.winRate
+        if winDelta >= 8 { parts.append("胜率明显上升") } else if winDelta <= -8 { parts.append("胜率有所下滑") }
+        let doubleDelta = last.doubleRate - first.doubleRate
+        if doubleDelta >= 8 { parts.append("更敢加倍") } else if doubleDelta <= -8 { parts.append("加倍更克制") }
+        if parts.isEmpty { return "早期到近期风格基本稳定。" }
+        return "和早期相比：" + parts.joined(separator: "，") + "。"
+    }
+
+    private func situationalCard(_ stats: PlayerStatistics) -> some View {
+        VStack(spacing: AppTheme.Spacing.s) {
+            SectionHeader("情境表现", subtitle: "整体胜率 \(ScoreFormat.percent(stats.winRate, digits: 0))")
+            HStack(spacing: AppTheme.Spacing.s) {
+                StatTile(title: "落后时", value: stats.gamesWhenTrailing > 0 ? ScoreFormat.percent(stats.trailingWinRate, digits: 0) : "–", caption: "\(stats.gamesWhenTrailing) 局", icon: "arrow.down.right", tint: stats.gamesWhenTrailing > 0 ? trendTint(stats.trailingWinRate - stats.winRate) : AppTheme.textPrimary)
+                StatTile(title: "领先时", value: stats.gamesWhenLeading > 0 ? ScoreFormat.percent(stats.leadingWinRate, digits: 0) : "–", caption: "\(stats.gamesWhenLeading) 局", icon: "arrow.up.right", tint: stats.gamesWhenLeading > 0 ? trendTint(stats.leadingWinRate - stats.winRate) : AppTheme.textPrimary)
+                StatTile(title: "尾盘", value: stats.lateGames > 0 ? ScoreFormat.percent(stats.lateWinRate, digits: 0) : "–", caption: "每场最后⅓局", icon: "flag.checkered", tint: stats.lateGames > 0 ? trendTint(stats.lateWinRate - stats.winRate) : AppTheme.textPrimary)
+            }
         }
     }
 
@@ -237,7 +395,7 @@ struct PlayerDetailView: View {
             VStack(spacing: AppTheme.Spacing.m) {
                 let maxCount = max(1, stats.bidCountsAll.max() ?? 1)
                 VStack(spacing: 8) {
-                    ForEach(Array([3, 2, 1, 0].enumerated()), id: \.element) { _, bid in
+                    ForEach([3, 2, 1, 0], id: \.self) { bid in
                         HorizontalBarRow(label: bid == 0 ? "不叫" : "\(bid)分", value: stats.bidCountsAll[bid], maxValue: maxCount, tint: AppTheme.stakeColor(bid), valueText: "\(stats.bidCountsAll[bid])")
                     }
                 }
@@ -281,6 +439,8 @@ struct PlayerDetailView: View {
             .overlay(RoundedRectangle(cornerRadius: AppTheme.Radius.l, style: .continuous).stroke(AppTheme.hairline, lineWidth: 0.5))
         }
     }
+
+    // MARK: - Records
 
     private func recordsCard(_ stats: PlayerStatistics) -> some View {
         let green = settings.greenWin
@@ -396,6 +556,68 @@ struct PlayerDetailView: View {
                 }
             }
             .card()
+        }
+    }
+}
+
+// MARK: - Evolution row
+
+/// One metric across the career slices with a "then → now" delta.
+struct EvolutionRow: View {
+    @Environment(AppSettings.self) private var settings
+    let title: String
+    let values: [Double]
+    /// Bar scale (value / scale); nil shows numbers only.
+    let scale: Double?
+    /// true: higher is better; false: lower is better; nil: neutral (a style, not a quality).
+    let higherIsBetter: Bool?
+    let format: (Double) -> String
+    let deltaFormat: (Double) -> String
+
+    private var delta: Double {
+        guard let first = values.first, let last = values.last, values.count > 1 else { return 0 }
+        return last - first
+    }
+
+    private var deltaTint: Color {
+        guard values.count > 1 else { return AppTheme.textTertiary }
+        let threshold: Double = scale == nil ? 15 : (scale == 3 ? 0.2 : 3)
+        if abs(delta) < threshold { return AppTheme.textTertiary }
+        guard let higherIsBetter = higherIsBetter else { return AppTheme.accent }
+        return AppTheme.resultColor(win: (delta > 0) == higherIsBetter, greenWin: settings.greenWin)
+    }
+
+    var body: some View {
+        HStack(alignment: .center, spacing: 8) {
+            Text(title)
+                .font(.caption.weight(.medium))
+                .foregroundStyle(AppTheme.textSecondary)
+                .frame(width: 60, alignment: .leading)
+            ForEach(Array(values.enumerated()), id: \.offset) { index, value in
+                VStack(spacing: 4) {
+                    Text(format(value))
+                        .font(AppFont.score(14, weight: index == values.count - 1 ? .bold : .semibold))
+                        .monospacedDigit()
+                        .foregroundStyle(index == values.count - 1 ? AppTheme.textPrimary : AppTheme.textSecondary)
+                    if let scale = scale {
+                        MiniBar(fraction: scale > 0 ? max(0, value) / scale : 0,
+                                tint: index == values.count - 1 ? AppTheme.accent : AppTheme.accent.opacity(0.45),
+                                height: 5)
+                    }
+                }
+                .frame(maxWidth: .infinity)
+            }
+            HStack(spacing: 2) {
+                if abs(delta) > 0.0001 {
+                    Image(systemName: delta > 0 ? "arrow.up.right" : "arrow.down.right")
+                        .font(.system(size: 9, weight: .bold))
+                }
+                Text(deltaFormat(delta))
+                    .font(.caption.weight(.semibold))
+                    .monospacedDigit()
+            }
+            .foregroundStyle(deltaTint)
+            .frame(width: 58, alignment: .trailing)
         }
     }
 }

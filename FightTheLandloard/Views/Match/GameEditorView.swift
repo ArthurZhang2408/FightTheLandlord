@@ -54,18 +54,30 @@ struct GameEditorView: View {
                 }
 
                 Section("倍数") {
-                    Stepper(value: $draft.bombs, in: 0...8) {
-                        HStack {
-                            Label("炸弹", systemImage: "flame")
-                            Spacer()
-                            Text("\(draft.bombs)")
-                                .font(AppFont.score(17, weight: .semibold))
-                                .monospacedDigit()
-                                .foregroundStyle(draft.bombs > 0 ? AppTheme.accent : AppTheme.textSecondary)
-                        }
+                    HStack(spacing: 12) {
+                        Image(systemName: "flame.fill")
+                            .font(.body)
+                            .foregroundStyle(AppTheme.accent)
+                            .frame(width: 24)
+                        Text("炸弹")
+                        Spacer()
+                        Text("\(draft.bombs)")
+                            .font(AppFont.score(17, weight: .semibold))
+                            .monospacedDigit()
+                            .foregroundStyle(draft.bombs > 0 ? AppTheme.accent : AppTheme.textSecondary)
+                            .frame(minWidth: 24, alignment: .trailing)
+                        Stepper("炸弹", value: $draft.bombs, in: 0...8)
+                            .labelsHidden()
                     }
-                    Toggle(isOn: $draft.spring) {
-                        Label("春天", systemImage: "sun.max")
+                    HStack(spacing: 12) {
+                        Image(systemName: "sun.max.fill")
+                            .font(.body)
+                            .foregroundStyle(AppTheme.gold)
+                            .frame(width: 24)
+                        Text("春天")
+                        Spacer()
+                        Toggle("春天", isOn: $draft.spring)
+                            .labelsHidden()
                     }
                 }
 

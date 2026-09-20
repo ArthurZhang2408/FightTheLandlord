@@ -33,6 +33,37 @@ struct RelationStat: Identifiable, Equatable {
     var winRate: Double { games > 0 ? Double(wins) / Double(games) * 100 : 0 }
 }
 
+/// One slice of a player's career (e.g. 早期 / 中期 / 近期).
+struct PeriodSnapshot: Identifiable, Equatable {
+    let id: Int
+    let label: String
+    var games = 0
+    var wins = 0
+    var netScore = 0
+    var landlordGames = 0
+    var bidSum = 0
+    var doubledGames = 0
+    var bombs = 0
+
+    var winRate: Double { games > 0 ? Double(wins) / Double(games) * 100 : 0 }
+    var landlordRate: Double { games > 0 ? Double(landlordGames) / Double(games) * 100 : 0 }
+    var averageBid: Double { games > 0 ? Double(bidSum) / Double(games) : 0 }
+    var averageScore: Double { games > 0 ? Double(netScore) / Double(games) : 0 }
+    var doubleRate: Double { games > 0 ? Double(doubledGames) / Double(games) * 100 : 0 }
+}
+
+/// A calendar month of play.
+struct MonthSnapshot: Identifiable, Equatable {
+    let id: String              // yyyy-MM
+    let start: Date
+    var games = 0
+    var wins = 0
+    var netScore = 0
+    var matches = 0
+
+    var winRate: Double { games > 0 ? Double(wins) / Double(games) * 100 : 0 }
+}
+
 struct PlayerStatistics: Equatable {
     let playerId: String
     let playerName: String
@@ -130,6 +161,23 @@ struct PlayerStatistics: Equatable {
     var gamesByWeekday = [Int](repeating: 0, count: 7)   // index = Calendar weekday - 1 (0 = Sunday)
     var gamesByHour = [Int](repeating: 0, count: 24)
 
+    // MARK: Change over time
+    /// Career split into up to three equal slices (empty with fewer than 12 games).
+    var periods: [PeriodSnapshot] = []
+    /// Calendar months with at least one game, oldest first.
+    var months: [MonthSnapshot] = []
+    /// Win rate over the previous `rollingWindow` games, one value per game.
+    var rollingWinRate: [Double] = []
+    var rollingWindow = 20
+
+    // MARK: Situational
+    var gamesWhenTrailing = 0       // the player's match total was negative before the game
+    var winsWhenTrailing = 0
+    var gamesWhenLeading = 0
+    var winsWhenLeading = 0
+    var lateGames = 0               // games in the final third of a match (matches with 6+ games)
+    var lateWins = 0
+
     // MARK: Series for charts
     var gamePoints: [TimelinePoint] = [.origin]
     var matchPoints: [TimelinePoint] = [.origin]
@@ -162,6 +210,18 @@ struct PlayerStatistics: Equatable {
         let sum = bidCountsAll.enumerated().reduce(0) { $0 + $1.offset * $1.element }
         return Double(sum) / Double(totalGames)
     }
+
+    var trailingWinRate: Double { rate(winsWhenTrailing, of: gamesWhenTrailing) }
+    var leadingWinRate: Double { rate(winsWhenLeading, of: gamesWhenLeading) }
+    var lateWinRate: Double { rate(lateWins, of: lateGames) }
+
+    var bestMonth: MonthSnapshot? { months.max { ($0.netScore, $0.games) < ($1.netScore, $1.games) } }
+    var worstMonth: MonthSnapshot? { months.min { ($0.netScore, -$0.games) < ($1.netScore, -$1.games) } }
+    var busiestMonth: MonthSnapshot? { months.max { ($0.games, $0.netScore) < ($1.games, $1.netScore) } }
+
+    /// First and last career slices, for "then vs now" comparisons.
+    var earliestPeriod: PeriodSnapshot? { periods.first }
+    var latestPeriod: PeriodSnapshot? { periods.count > 1 ? periods.last : nil }
 
     var gameSeries: [Int] { gamePoints.map { $0.cumulative } }
     var matchSeries: [Int] { matchPoints.map { $0.cumulative } }

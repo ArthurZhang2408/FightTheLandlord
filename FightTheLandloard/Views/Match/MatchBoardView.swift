@@ -80,7 +80,14 @@ struct MatchBoardView: View {
                 FullscreenChartView(title: "得分走势", series: chartSeries, xLabel: "局")
             }
             .confirmationDialog("结束这场对局？", isPresented: $showEndConfirmation, titleVisibility: .visible) {
-                Button("结束并保存") { endMatch() }
+                Button("结束并保存") {
+                    // Let the dialog finish dismissing before the board is cleared and
+                    // the tab switches; mutating both mid-transition is fragile.
+                    Task { @MainActor in
+                        try? await Task.sleep(for: .milliseconds(400))
+                        endMatch()
+                    }
+                }
                 Button("取消", role: .cancel) {}
             } message: {
                 Text("对局会保存到历史记录，之后仍可在历史中继续。")
@@ -556,7 +563,11 @@ struct MatchBoardView: View {
         }
         Haptics.success()
         lastEndedMatchId = id
-        router.showMatch(id: id)
+        // Give the board one frame to settle in its idle state before navigating.
+        Task { @MainActor in
+            try? await Task.sleep(for: .milliseconds(150))
+            router.showMatch(id: id)
+        }
     }
 }
 

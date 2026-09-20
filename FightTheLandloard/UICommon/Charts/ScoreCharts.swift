@@ -65,8 +65,21 @@ struct ScoreLineChart: View {
     var showLegend: Bool = true
     var showArea: Bool = false
     var onExpand: (() -> Void)? = nil
+    /// Fixed y range (e.g. 0...100 for percentages); nil fits the data.
+    var yDomain: ClosedRange<Int>? = nil
+    /// Value drawn as the dashed reference line.
+    var referenceValue: Int = 0
 
     private var maxCount: Int { series.map { $0.count }.max() ?? 0 }
+
+    /// Data range including the reference line, padded so lines do not touch the edges.
+    private var fittedYDomain: ClosedRange<Int> {
+        let values = series.flatMap { $0.values } + [referenceValue]
+        let low = values.min() ?? 0
+        let high = values.max() ?? 0
+        let pad = max(1, (high - low) / 12)
+        return (low - pad)...(high + pad)
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -120,13 +133,14 @@ struct ScoreLineChart: View {
                     .lineStyle(StrokeStyle(lineWidth: 2))
                     .interpolationMethod(.monotone)
                 }
-                RuleMark(y: .value("零", 0))
+                RuleMark(y: .value("参考", referenceValue))
                     .foregroundStyle(AppTheme.textTertiary.opacity(0.6))
                     .lineStyle(StrokeStyle(lineWidth: 1, dash: [4, 4]))
             }
             .chartForegroundStyleScale(domain: series.map { $0.id }, range: series.map { $0.color })
             .chartLegend(.hidden)
             .chartXScale(domain: 0...max(1, maxCount - 1))
+            .chartYScale(domain: yDomain ?? fittedYDomain)
             .chartXAxis {
                 AxisMarks(values: .automatic(desiredCount: 5)) { _ in
                     AxisGridLine().foregroundStyle(AppTheme.hairline)
@@ -445,5 +459,56 @@ struct WeekdayActivityChart: View {
                 .frame(maxWidth: .infinity)
             }
         }
+    }
+}
+
+
+// MARK: - Monthly net score bars
+
+struct MonthlyNetChart: View {
+    @Environment(AppSettings.self) private var settings
+    let months: [MonthSnapshot]
+    var height: CGFloat = 150
+
+    private static let labelFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.locale = Locale(identifier: "zh_CN")
+        f.dateFormat = "M月"
+        return f
+    }()
+
+    var body: some View {
+        Chart(months) { month in
+            BarMark(
+                x: .value("月份", month.id),
+                y: .value("净分", month.netScore),
+                width: .ratio(0.55)
+            )
+            .foregroundStyle(AppTheme.scoreColor(month.netScore, greenWin: settings.greenWin))
+            .cornerRadius(3)
+            .annotation(position: month.netScore >= 0 ? .top : .bottom, spacing: 2) {
+                Text("\(month.games)局")
+                    .font(.system(size: 8))
+                    .foregroundStyle(AppTheme.textTertiary)
+            }
+        }
+        .chartXAxis {
+            AxisMarks(values: .automatic(desiredCount: 6)) { value in
+                AxisValueLabel {
+                    if let id = value.as(String.self), let month = months.first(where: { $0.id == id }) {
+                        Text(Self.labelFormatter.string(from: month.start))
+                            .font(.caption2)
+                            .foregroundStyle(AppTheme.textTertiary)
+                    }
+                }
+            }
+        }
+        .chartYAxis {
+            AxisMarks(position: .leading, values: .automatic(desiredCount: 4)) { _ in
+                AxisGridLine().foregroundStyle(AppTheme.hairline)
+                AxisValueLabel().font(.caption2).foregroundStyle(AppTheme.textTertiary)
+            }
+        }
+        .frame(height: height)
     }
 }
