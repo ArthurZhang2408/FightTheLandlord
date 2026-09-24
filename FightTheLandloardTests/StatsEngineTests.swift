@@ -232,6 +232,24 @@ final class StatsEngineTests: XCTestCase {
         XCTAssertEqual(active.nextFirstBidder, .a)
     }
 
+    func testRotatingSeatsBeforePlayKeepsTheFirstBidderSeat() {
+        var active = ActiveMatch(playerIds: ids.map { Optional($0) }, starter: .a)
+        XCTAssertEqual(active.nextFirstBidder, .a)
+
+        active.rotateSeats()
+        // B, C, A now, and the seat that bids first is still A: B's player bids first.
+        XCTAssertEqual(active.playerIds, [ids[1], ids[2], ids[0]])
+        XCTAssertEqual(active.starter, .a)
+        XCTAssertEqual(active.nextFirstBidder, .a)
+        XCTAssertEqual(active.playerIds[active.nextFirstBidder], ids[1])
+
+        // An explicit seat choice before play is a seat too, so it stays put.
+        active.nextBidderOverride = .c
+        active.rotateSeats()
+        XCTAssertEqual(active.nextBidderOverride, .c)
+        XCTAssertEqual(active.playerIds, [ids[2], ids[0], ids[1]])
+    }
+
     func testRotatingSeatsKeepsEveryValueWithItsPlayer() {
         var active = ActiveMatch(playerIds: ids.map { Optional($0) }, starter: .a)
         active.games.append(game(bids: [3, 0, 0], landlordWon: true, firstBidder: .a, playedAt: Date()))

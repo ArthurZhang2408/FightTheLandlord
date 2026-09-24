@@ -48,11 +48,18 @@ struct ActiveMatch: Codable, Equatable {
     /// Moves every seat one place to the left, so A, B, C becomes B, C, A.
     /// Everything stored per seat (players, bids, doubles, scores, landlord,
     /// first bidder) moves with its player, so totals and history are unchanged.
+    ///
+    /// Who bids next depends on whether play has started. Once rounds exist the
+    /// turn belongs to a person and moves with them. Before the first round the
+    /// turn belongs to a seat: whoever is moved into the seat that bids first
+    /// (seat A by default) bids first, which is the point of rotating before play.
     mutating func rotateSeats() {
         playerIds = Seat.allCases.map { playerIds[$0.next] }
-        starter = starter.previous
-        nextBidderOverride = nextBidderOverride?.previous
         games = games.map { $0.rotatedSeats() }
+        if hasGames {
+            starter = starter.previous
+            nextBidderOverride = nextBidderOverride?.previous
+        }
     }
     var resolvedPlayerIds: [String]? {
         let ids = playerIds.compactMap { $0 }
