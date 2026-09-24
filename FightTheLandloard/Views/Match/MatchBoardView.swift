@@ -373,19 +373,20 @@ struct MatchBoardView: View {
                         .font(.caption)
                         .foregroundStyle(AppTheme.textTertiary)
                 }
+                rotateSeatsButton
             }
             .padding(.horizontal, AppTheme.Spacing.l)
-            .padding(.top, 14)
+            .padding(.top, 12)
             .padding(.bottom, 12)
 
+            // Columns are keyed by player, so a seat change slides them into
+            // their new places instead of swapping the text in place.
             HStack(spacing: 0) {
-                ForEach(Seat.allCases) { seat in
-                    seatColumn(seat)
-                    if seat != .c {
-                        Rectangle().fill(AppTheme.hairline).frame(width: 0.5, height: 88)
-                    }
+                ForEach(seatSlots) { slot in
+                    seatColumn(slot.seat)
                 }
             }
+            .overlay { seatDividers }
             .padding(.bottom, 14)
 
             Divider().overlay(AppTheme.hairline)
@@ -410,6 +411,53 @@ struct MatchBoardView: View {
         .background(AppTheme.surface)
         .clipShape(RoundedRectangle(cornerRadius: AppTheme.Radius.xl, style: .continuous))
         .overlay(RoundedRectangle(cornerRadius: AppTheme.Radius.xl, style: .continuous).stroke(AppTheme.hairline, lineWidth: 0.5))
+    }
+
+    private struct SeatSlot: Identifiable {
+        let seat: Seat
+        let id: String
+    }
+
+    /// One slot per seat, identified by the player sitting there.
+    private var seatSlots: [SeatSlot] {
+        Seat.allCases.map { seat in
+            SeatSlot(seat: seat, id: (session.active?.playerIds[seat] ?? nil) ?? "empty-\(seat.rawValue)")
+        }
+    }
+
+    /// Hairlines between the three columns, drawn over the row so they stay put
+    /// while the columns animate.
+    private var seatDividers: some View {
+        HStack(spacing: 0) {
+            Color.clear.frame(maxWidth: .infinity)
+            Rectangle().fill(AppTheme.hairline).frame(width: 0.5, height: 88)
+            Color.clear.frame(maxWidth: .infinity)
+            Rectangle().fill(AppTheme.hairline).frame(width: 0.5, height: 88)
+            Color.clear.frame(maxWidth: .infinity)
+        }
+        .allowsHitTesting(false)
+    }
+
+    /// One tap moves everyone one seat to the left: A, B, C becomes B, C, A.
+    private var rotateSeatsButton: some View {
+        let names = session.playerNames
+        let order = [names[Seat.b], names[Seat.c], names[Seat.a]].joined(separator: "、")
+        return Button {
+            Haptics.light()
+            withAnimation(.snappy(duration: 0.4)) {
+                session.rotateSeats()
+            }
+        } label: {
+            Image(systemName: "arrow.triangle.2.circlepath")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(AppTheme.textSecondary)
+                .padding(6)
+                .background(AppTheme.fill)
+                .clipShape(Circle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("换位")
+        .accessibilityHint("座位顺序变为 \(order)")
     }
 
     private func seatColumn(_ seat: Seat) -> some View {

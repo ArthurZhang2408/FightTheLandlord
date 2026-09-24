@@ -32,6 +32,11 @@ enum Seat: Int, Codable, CaseIterable, Hashable, Identifiable {
         Seat(rawValue: (rawValue + 1) % 3) ?? .a
     }
 
+    /// The seat before this one (A → C → B → A).
+    var previous: Seat {
+        Seat(rawValue: (rawValue + 2) % 3) ?? .a
+    }
+
     /// The two other seats at the table, in table order.
     var others: [Seat] {
         Seat.allCases.filter { $0 != self }

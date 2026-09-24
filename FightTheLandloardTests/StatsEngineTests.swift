@@ -232,6 +232,35 @@ final class StatsEngineTests: XCTestCase {
         XCTAssertEqual(active.nextFirstBidder, .a)
     }
 
+    func testRotatingSeatsKeepsEveryValueWithItsPlayer() {
+        var active = ActiveMatch(playerIds: ids.map { Optional($0) }, starter: .a)
+        active.games.append(game(bids: [3, 0, 0], landlordWon: true, firstBidder: .a, playedAt: Date()))
+        active.games.append(game(bids: [0, 0, 2], spring: true, landlordWon: true, firstBidder: .b, playedAt: Date()))
+        active.nextBidderOverride = .c
+        let before = active
+
+        active.rotateSeats()
+        // Order is now B, C, A.
+        XCTAssertEqual(active.playerIds, [ids[1], ids[2], ids[0]])
+        XCTAssertEqual(active.starter, .c)                 // A moved to the last seat
+        XCTAssertEqual(active.nextBidderOverride, .b)      // C moved to the middle seat
+        XCTAssertEqual(active.nextFirstBidder, .b)
+        // Totals follow the players: [600-400, -300-400, -300+800] read B, C, A now.
+        XCTAssertEqual(before.totals, [200, -700, 500])
+        XCTAssertEqual(active.totals, [-700, 500, 200])
+        XCTAssertEqual(active.games[0].landlord, .c)
+        XCTAssertEqual(active.games[0].firstBidder, .c)
+        XCTAssertEqual(active.games[0].bids, [0, 0, 3])
+        XCTAssertEqual(active.games[1].landlord, .b)
+        XCTAssertEqual(active.games[1].spring, true)
+        XCTAssertEqual(active.games.map { $0.id }, before.games.map { $0.id })
+
+        // Three rotations bring the table back exactly.
+        active.rotateSeats()
+        active.rotateSeats()
+        XCTAssertEqual(active, before)
+    }
+
     func testActiveMatchRoundTripsThroughJSON() throws {
         var active = ActiveMatch(playerIds: [ids[0], nil, ids[2]], starter: .c)
         active.games.append(game(bids: [0, 2, 0], bombs: 1, landlordWon: false, firstBidder: .c, playedAt: Date(timeIntervalSince1970: 1_700_000_000)))

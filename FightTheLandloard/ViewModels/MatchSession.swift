@@ -244,6 +244,14 @@ final class MatchSession {
         touch(activity: false)
     }
 
+    /// The players changed seats: A, B, C → B, C, A. Scores follow the players.
+    func rotateSeats() {
+        guard var current = active else { return }
+        current.rotateSeats()
+        active = current
+        touch()
+    }
+
     func setNextFirstBidder(_ seat: Seat) {
         guard let current = active else { return }
         if current.games.isEmpty {

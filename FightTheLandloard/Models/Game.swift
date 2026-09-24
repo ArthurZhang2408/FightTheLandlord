@@ -53,6 +53,19 @@ struct Game: Codable, Identifiable, Hashable {
     /// Highest bid of the round (the stake level).
     var winningBid: Int { bids.max() ?? 0 }
 
+    /// The same round with every seat moved one place to the left (B, C, A):
+    /// what was at seat B is now at A, and so on. Used when the players change
+    /// seats, so each value stays with its player.
+    func rotatedSeats() -> Game {
+        var rotated = self
+        rotated.bids = Seat.allCases.map { bids[$0.next] }
+        rotated.doubles = Seat.allCases.map { doubles[$0.next] }
+        rotated.scores = Seat.allCases.map { scores[$0.next] }
+        rotated.landlord = landlord.previous
+        rotated.firstBidder = firstBidder.previous
+        return rotated
+    }
+
     /// Seats that played as farmers.
     var farmers: [Seat] { landlord.others }
 

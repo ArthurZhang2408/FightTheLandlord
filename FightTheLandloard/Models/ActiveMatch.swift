@@ -44,6 +44,16 @@ struct ActiveMatch: Codable, Equatable {
 
     var hasGames: Bool { !games.isEmpty }
     var allSeatsFilled: Bool { playerIds.allSatisfy { $0 != nil } }
+
+    /// Moves every seat one place to the left, so A, B, C becomes B, C, A.
+    /// Everything stored per seat (players, bids, doubles, scores, landlord,
+    /// first bidder) moves with its player, so totals and history are unchanged.
+    mutating func rotateSeats() {
+        playerIds = Seat.allCases.map { playerIds[$0.next] }
+        starter = starter.previous
+        nextBidderOverride = nextBidderOverride?.previous
+        games = games.map { $0.rotatedSeats() }
+    }
     var resolvedPlayerIds: [String]? {
         let ids = playerIds.compactMap { $0 }
         return ids.count == 3 ? ids : nil
