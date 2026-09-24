@@ -59,6 +59,7 @@ Collections `players`, `matches`, `gameRecords` keep their original field names.
 2. On `.background`/`.inactive` the match is upserted into history with `endedAt == nil` (“进行中”). Subsequent edits re-sync with a 1.5 s debounce.
 3. On `.active` and every minute while running, `checkIdle()` closes the match when `lastActivityAt` is older than the configured timeout (`endedAt = lastActivityAt`, `autoEnded = true`) and clears the board. A banner offers to continue it.
 4. “继续这场对局” loads the records back onto the board and reopens the history entry.
+5. First bidder: every new match (including “沿用上次玩家，再开一场”) starts with seat A; each game then passes to the next seat. A round nobody bids on is not recorded and rotates the first bidder once more; the seat menu on the board sets it explicitly. `MatchSession` reads `nextFirstBidder` into a local before writing `active` (an optional-chain write whose right-hand side reads the same `@Observable` property is an exclusivity trap at runtime).
 
 ## Building
 

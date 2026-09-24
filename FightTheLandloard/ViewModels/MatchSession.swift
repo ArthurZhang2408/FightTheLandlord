@@ -108,8 +108,10 @@ final class MatchSession {
     }
 
     /// Starts a new match with the same players as the one that just ended.
+    /// Like any new match it begins with seat A bidding first; the seat menu on
+    /// the board changes that, and a round nobody bids on rotates it.
     func startNewMatch(reusing previous: MatchRecord) {
-        startNewMatch(playerIds: previous.playerIds.map { Optional($0) }, starter: previous.starterSeat.next)
+        startNewMatch(playerIds: previous.playerIds.map { Optional($0) }, starter: .a)
     }
 
     /// Ends and saves the current match. Returns the history id, or nil when there is
@@ -232,7 +234,13 @@ final class MatchSession {
     /// Nobody bid: the next game starts with the following seat.
     func rotateFirstBidder() {
         guard active != nil else { return }
-        active?.nextBidderOverride = nextFirstBidder.next
+        // Read first, then write. `active?.x = nextFirstBidder.next` would begin the
+        // write access to `active` before evaluating the right-hand side (optional
+        // chaining must know the base is non-nil first), and `nextFirstBidder`
+        // reads `active` again inside that access: an exclusivity violation that
+        // traps at runtime on an @Observable class.
+        let next = nextFirstBidder.next
+        active?.nextBidderOverride = next
         touch(activity: false)
     }
 
